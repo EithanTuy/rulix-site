@@ -26,11 +26,8 @@ function Hero() {
     <section className="hero-bg border-b border-line-soft">
       <div className="wrap grid items-center gap-12 py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
         <div>
-          <span className="chip mb-5 !border-accent/30 !bg-accent-soft !text-accent">
-            Human-review-first · decision support only
-          </span>
           <h1 className="text-[clamp(34px,5vw,52px)]">
-            Export-control review that can <span className="text-accent">defend itself</span>.
+            <span className="text-accent">AI-assisted</span> export-control classification.
           </h1>
           <p className="mt-5 max-w-[52ch] text-[16.5px] text-text-2">
             Rulix audits classification memos with a council of AI agents backed by deterministic
