@@ -55,7 +55,7 @@ export function Layout() {
                 {n.label}
               </Link>
             ))}
-            <a href="#demo" className="btn primary !py-2 !text-[13px]">Request a demo</a>
+            <Link to="/contact" className="btn primary !py-2 !text-[13px]">Request a demo</Link>
           </nav>
         </div>
       </header>
@@ -86,7 +86,7 @@ export function Layout() {
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Company</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
               <li><Link to="/legal" className="hover:text-text-1">Legal &amp; disclaimer</Link></li>
-              <li><a href="mailto:hello@rulix.example" className="hover:text-text-1">Contact</a></li>
+              <li><Link to="/contact" className="hover:text-text-1">Contact</Link></li>
             </ul>
           </div>
         </div>

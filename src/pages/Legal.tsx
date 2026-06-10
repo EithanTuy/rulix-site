@@ -43,7 +43,7 @@ export function Legal() {
 
         <h2 className="mt-10 text-[20px]">Contact</h2>
         <p className="text-[14.5px] text-text-2">
-          Questions about these terms: <a className="text-accent" href="mailto:hello@rulix.example">hello@rulix.example</a>.
+          Questions about these terms: <a className="text-accent" href="mailto:tuyilin2@msu.edu">tuyilin2@msu.edu</a>.
         </p>
       </div>
     </section>

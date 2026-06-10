@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createHashRouter, Navigate, RouterProvider } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { Contact } from "./pages/Contact";
 import { Home } from "./pages/Home";
 import { Legal } from "./pages/Legal";
 import { Security } from "./pages/Security";
@@ -23,6 +24,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Home /> },
       { path: "security", element: <Security /> },
+      { path: "contact", element: <Contact /> },
       { path: "legal", element: <Legal /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

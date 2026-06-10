@@ -35,7 +35,7 @@ function Hero() {
             audit-ready record. Your team makes the call. Rulix makes it defensible.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a href="#demo" className="btn primary lg">Request a demo</a>
+            <Link to="/contact" className="btn primary lg">Request a demo</Link>
             <a href="#how" className="btn lg">See how it works</a>
           </div>
           <p className="footnote mt-6">
@@ -231,8 +231,6 @@ function Audience() {
 }
 
 function DemoCta() {
-  const mail =
-    "mailto:hello@rulix.example?subject=Rulix%20demo%20request&body=Organization%3A%0ARole%3A%0AWhat%20does%20your%20review%20workflow%20look%20like%20today%3F%0A";
   return (
     <section id="demo" className="hero-bg">
       <div className="wrap py-24 text-center">
@@ -243,8 +241,8 @@ function DemoCta() {
             on demo data, in about 25 minutes.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <a href={mail} className="btn primary lg">Request a demo</a>
-            <a href={mail} className="btn lg">Join the pilot waitlist</a>
+            <Link to="/contact" className="btn primary lg">Request a demo</Link>
+            <Link to="/contact" className="btn lg">Join the pilot waitlist</Link>
           </div>
           <p className="footnote mt-6">
             Prototype status: research-grade. Pilots run on sanitized or public data only.
