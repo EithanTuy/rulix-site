@@ -41,10 +41,6 @@ export function Contact() {
           </a>
         </div>
 
-        <div className="mt-10">
-          <a href={MAIL_HREF} className="btn primary lg">Email a demo request</a>
-        </div>
-
         <p className="footnote mt-8">
           Please don&apos;t send CUI, ITAR technical data, or other controlled information in your
           message — use sanitized or public data only.
