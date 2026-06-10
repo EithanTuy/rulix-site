@@ -35,10 +35,10 @@ export function Legal() {
         <h2 className="mt-10 text-[20px]">Privacy</h2>
         <p className="text-[14.5px] text-text-2">
           The public demo runs entirely in your browser on sample data; demo input is not transmitted
-          to our servers. In live pilots, submitted text is processed to produce the audit and retained
-          as part of the case record under the pilot agreement. We do not sell or share pilot data.
-          Hosted model calls are made server-side under the terms of the model provider&apos;s API
-          agreement. Contact us to request deletion of pilot data.
+          to our servers. If you contact us directly, we use the information you send only to respond
+          to your inquiry, and we do not sell or share it. Where hosted models are used, those calls
+          are made server-side under the terms of the model provider&apos;s API agreement. Contact us
+          with any questions about data handling or to request deletion of information you&apos;ve sent.
         </p>
 
         <h2 className="mt-10 text-[20px]">Contact</h2>

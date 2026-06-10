@@ -6,7 +6,7 @@ const ITEMS = [
   {
     icon: FileWarning,
     title: "Input scope is the first control",
-    body: "Rulix is designed for sanitized, public, or explicitly approved text. CUI, ITAR technical data, controlled technical data, and proprietary specifications must not be submitted to hosted models. The intake screens state this; pilot agreements enforce it.",
+    body: "Rulix is designed for sanitized, public, or explicitly approved text. CUI, ITAR technical data, controlled technical data, and proprietary specifications must not be submitted to hosted models. The intake screens state this clearly.",
   },
   {
     icon: KeyRound,
@@ -65,10 +65,10 @@ export function Security() {
         <div className="mt-14 border border-warn/40 bg-warn-soft p-6">
           <h2 className="text-[16px] text-warn">Current status: research-grade prototype</h2>
           <p className="m-0 mt-2 max-w-[80ch] text-[14px] text-text-2">
-            Rulix is in pilot. It has not completed a third-party security audit, and pilots run on
-            sanitized or public data only. If your evaluation requires processing controlled
-            information, talk to us about an approved compute lane first — do not submit it to the
-            hosted service.
+            Rulix is an early-stage prototype. It has not completed a third-party security audit, and
+            should be evaluated on sanitized or public data only. If your evaluation requires
+            processing controlled information, talk to us about an approved compute lane first — do
+            not submit it to the hosted service.
           </p>
         </div>
       </div>

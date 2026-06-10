@@ -79,7 +79,7 @@ function HowItWorks() {
       <div className="wrap py-20">
         <div className="reveal max-w-[60ch]">
           <span className="eyebrow">How it works</span>
-          <h2 className="text-[clamp(26px,3.4vw,36px)]">From raw memo to reviewer-ready in minutes.</h2>
+          <h2 className="text-[clamp(26px,3.4vw,36px)]">From raw memo to reviewer-ready.</h2>
         </div>
         <ol className="m-0 mt-12 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
@@ -237,15 +237,13 @@ function DemoCta() {
         <div className="reveal mx-auto max-w-[58ch]">
           <h2 className="text-[clamp(28px,3.8vw,40px)]">See your own memo workflow in Rulix.</h2>
           <p className="mt-4 text-[15.5px] text-text-2">
-            We&apos;ll walk through the council audit, the reviewer queue, and the audit artifact —
-            on demo data, in about 25 minutes.
+            Get in touch to set up a demo on sample data.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to="/contact" className="btn primary lg">Request a demo</Link>
-            <Link to="/contact" className="btn lg">Join the pilot waitlist</Link>
           </div>
           <p className="footnote mt-6">
-            Prototype status: research-grade. Pilots run on sanitized or public data only.
+            Research-grade prototype. Use sanitized or public data only.
           </p>
         </div>
       </div>

@@ -16,8 +16,7 @@ export function Contact() {
         <span className="eyebrow">Contact</span>
         <h1 className="text-[clamp(30px,4vw,44px)]">Request a demo.</h1>
         <p className="mt-5 text-[16px] text-text-2">
-          We&apos;ll walk through the council audit, the reviewer queue, and the audit artifact —
-          on demo data, in about 25 minutes. Reach out directly and we&apos;ll find a time.
+          Reach out by email or phone to set up a demo on sample data.
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -47,8 +46,8 @@ export function Contact() {
         </div>
 
         <p className="footnote mt-8">
-          Pilots run on sanitized or public data only — please don&apos;t send CUI, ITAR technical
-          data, or other controlled information in your message.
+          Please don&apos;t send CUI, ITAR technical data, or other controlled information in your
+          message — use sanitized or public data only.
         </p>
       </div>
     </section>
