@@ -1,0 +1,422 @@
+openapi: 3.1.0
+info:
+  title: Rulix ECCN API
+  version: 0.1.0
+  description: API contract for the ECCN memo review workflow.
+servers:
+  - url: https://{tenantHost}/api
+    variables:
+      tenantHost:
+        default: tenant.example.com
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Check backend health and provider configuration
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, service, phase, provider]
+                properties:
+                  ok:
+                    type: boolean
+                  service:
+                    type: string
+                  phase:
+                    type: string
+                  provider:
+                    type: object
+                    required: [configured, model]
+                    properties:
+                      configured:
+                        type: boolean
+                      model:
+                        type: string
+  /corpus:
+    get:
+      summary: Get the active official-source corpus snapshot
+      operationId: getCorpus
+      responses:
+        "200":
+          description: Corpus snapshot
+  /ai/review:
+    post:
+      summary: Run backend AI council analysis for an ad hoc memo
+      operationId: analyzeMemo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memo]
+              properties:
+                memo:
+                  $ref: "#/components/schemas/MemoRecord"
+      responses:
+        "200":
+          description: Review result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [result]
+                properties:
+                  result:
+                    $ref: "#/components/schemas/ReviewResult"
+  /documents:
+    post:
+      summary: Upload a memo or supporting document
+      operationId: createDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, documentType]
+              properties:
+                documentType:
+                  type: string
+                  enum: [memo, specification, prior-classification, vendor-source, correspondence]
+                dataClass:
+                  type: string
+                  enum: [public, proprietary, export-controlled, itar-risk, cui]
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "202":
+          description: Accepted for extraction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+  /reviews:
+    get:
+      summary: List stored review memos
+      operationId: listReviews
+      responses:
+        "200":
+          description: Review list
+    post:
+      summary: Create a stored memo review
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewReviewInput"
+      responses:
+        "201":
+          description: Review created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review, result]
+                properties:
+                  review:
+                    $ref: "#/components/schemas/MemoRecord"
+                  result:
+                    $ref: "#/components/schemas/ReviewResult"
+  /reviews/{reviewId}:
+    get:
+      summary: Get a review result
+      operationId: getReview
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Review state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review, auditEvents]
+                properties:
+                  review:
+                    $ref: "#/components/schemas/MemoRecord"
+                  decision:
+                    $ref: "#/components/schemas/ReviewerDecision"
+                  auditEvents:
+                    type: array
+                    items:
+                      type: object
+  /reviews/{reviewId}/analyze:
+    post:
+      summary: Run AI council analysis for a stored review memo
+      operationId: analyzeStoredReview
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Review result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [result]
+                properties:
+                  result:
+                    $ref: "#/components/schemas/ReviewResult"
+  /findings/{findingId}:
+    patch:
+      summary: Update reviewer disposition for a finding
+      operationId: updateFinding
+      parameters:
+        - name: findingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reviewerStatus]
+              properties:
+                reviewerStatus:
+                  type: string
+                  enum: [accepted, rejected, needs-info, escalated]
+                note:
+                  type: string
+      responses:
+        "200":
+          description: Finding updated
+  /reviews/{reviewId}/decision:
+    post:
+      summary: Submit human reviewer decision
+      operationId: createReviewerDecision
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewerDecision"
+      responses:
+        "200":
+          description: Decision recorded
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Document:
+      type: object
+      required: [id, status, checksumSha256]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [uploaded, extracting, extracted, failed]
+        checksumSha256:
+          type: string
+        sourceObjectKey:
+          type: string
+    ItemMetadata:
+      type: object
+      properties:
+        itemName:
+          type: string
+        itemFamily:
+          type: string
+        manufacturer:
+          type: string
+        intendedUse:
+          type: string
+    NewReviewInput:
+      type: object
+      required: [title, itemFamily, memoText]
+      properties:
+        title:
+          type: string
+        itemFamily:
+          type: string
+        manufacturer:
+          type: string
+        intendedUse:
+          type: string
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        sourcePath:
+          type: string
+          enum: [manufacturer, self-classification, ccats, cj, unknown]
+        memoText:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+    ReviewRun:
+      type: object
+      required: [id, status, corpusId]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, needs-info, complete, failed]
+        corpusId:
+          type: string
+        recommendedEccn:
+          type: string
+        jurisdictionOutcome:
+          type: string
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+    Finding:
+      type: object
+      required: [id, status, title, sourceChunkIds]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [strong, weak, missing, conflict]
+        title:
+          type: string
+        claim:
+          type: string
+        rationale:
+          type: string
+        excerpt:
+          type: string
+        start:
+          type: number
+        end:
+          type: number
+        sourceChunkIds:
+          type: array
+          items:
+            type: string
+        agent:
+          type: string
+        severity:
+          type: string
+          enum: [info, review, escalate]
+    ReviewerDecision:
+      type: object
+      required: [action, notes]
+      properties:
+        action:
+          type: string
+          enum: [accept, request-info, override]
+        notes:
+          type: string
+        signedBy:
+          type: string
+        signedAt:
+          type: string
+    MemoRecord:
+      type: object
+      required: [id, title, itemFamily, owner, updatedAt, documentCode, status, memoText, attachments]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        itemFamily:
+          type: string
+        owner:
+          type: string
+        updatedAt:
+          type: string
+        documentCode:
+          type: string
+        status:
+          type: string
+          enum: [draft, ready, needs-info, conflict, signed-off]
+        memoText:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        manufacturer:
+          type: string
+        intendedUse:
+          type: string
+    ReviewResult:
+      type: object
+      required: [memoId, generatedAt, corpusId, modelPolicy, provider, jurisdiction, recommended, findings, infoRequests, agents]
+      properties:
+        memoId:
+          type: string
+        generatedAt:
+          type: string
+        corpusId:
+          type: string
+        modelPolicy:
+          type: string
+        provider:
+          type: object
+          required: [source, label, model, live, message, checkedAt]
+          properties:
+            source:
+              type: string
+              enum: [anthropic, local-rules, fallback]
+            label:
+              type: string
+            model:
+              type: string
+            live:
+              type: boolean
+            message:
+              type: string
+            checkedAt:
+              type: string
+            latencyMs:
+              type: number
+        jurisdiction:
+          type: object
+        recommended:
+          type: object
+        alternatives:
+          type: array
+          items:
+            type: object
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        infoRequests:
+          type: array
+          items:
+            type: string
+        agents:
+          type: array
+          items:
+            type: object

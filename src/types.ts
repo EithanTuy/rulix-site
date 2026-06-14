@@ -1,0 +1,155 @@
+export type EvidenceStatus = "strong" | "weak" | "missing" | "conflict";
+
+export type ReviewStatus =
+  | "draft"
+  | "ready"
+  | "needs-info"
+  | "conflict"
+  | "signed-off";
+
+export type DataClass = "public" | "proprietary" | "export-controlled" | "itar-risk" | "cui";
+
+export type AppView = "reviews" | "controls" | "evidence" | "corpus" | "users" | "settings";
+
+export type AgentRole =
+  | "memo-parser"
+  | "jurisdiction-gate"
+  | "eccn-candidate"
+  | "evidence-mapper"
+  | "citation-verifier"
+  | "risk-reviewer"
+  | "report-writer";
+
+export interface SourceDocument {
+  id: string;
+  title: string;
+  authority: "EAR" | "ITAR" | "BIS" | "ITA";
+  url: string;
+  snapshotDate: string;
+}
+
+export interface SourceChunk {
+  id: string;
+  documentId: string;
+  title: string;
+  locator: string;
+  url: string;
+  text: string;
+  tags: string[];
+}
+
+export interface CorpusSnapshot {
+  id: string;
+  label: string;
+  generatedAt: string;
+  checksum: string;
+  documents: SourceDocument[];
+  chunks: SourceChunk[];
+}
+
+export interface MemoRecord {
+  id: string;
+  title: string;
+  itemFamily: string;
+  owner: string;
+  updatedAt: string;
+  documentCode: string;
+  status: ReviewStatus;
+  memoText: string;
+  attachments: string[];
+  dataClass?: DataClass;
+  manufacturer?: string;
+  sourcePath?: "manufacturer" | "self-classification" | "ccats" | "cj" | "unknown";
+  intendedUse?: string;
+}
+
+export interface ClassificationCandidate {
+  eccn: string;
+  label: string;
+  confidence: number;
+  risk: "low" | "medium" | "high";
+  summary: string;
+  sourceChunkIds: string[];
+}
+
+export interface EvidenceFinding {
+  id: string;
+  status: EvidenceStatus;
+  title: string;
+  claim: string;
+  rationale: string;
+  excerpt?: string;
+  start?: number;
+  end?: number;
+  sourceChunkIds: string[];
+  agent: AgentRole;
+  severity: "info" | "review" | "escalate";
+}
+
+export interface JurisdictionFinding {
+  outcome: "ear-likely" | "itar-risk" | "insufficient-info";
+  summary: string;
+  rationale: string;
+  sourceChunkIds: string[];
+}
+
+export interface CouncilAgentRun {
+  role: AgentRole;
+  label: string;
+  status: "complete" | "blocked";
+  summary: string;
+}
+
+export type AnalysisSource = "anthropic" | "local-rules" | "fallback";
+
+export interface AnalysisProviderStatus {
+  source: AnalysisSource;
+  label: string;
+  model: string;
+  live: boolean;
+  message: string;
+  checkedAt: string;
+  latencyMs?: number;
+}
+
+export interface ReviewResult {
+  memoId: string;
+  generatedAt: string;
+  corpusId: string;
+  modelPolicy: string;
+  provider: AnalysisProviderStatus;
+  jurisdiction: JurisdictionFinding;
+  recommended: ClassificationCandidate;
+  alternatives: ClassificationCandidate[];
+  findings: EvidenceFinding[];
+  infoRequests: string[];
+  agents: CouncilAgentRun[];
+}
+
+export interface ReviewerDecision {
+  action: "accept" | "request-info" | "override";
+  notes: string;
+  signedBy?: string;
+  signedAt?: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  memoId: string;
+  at: string;
+  actor: string;
+  action: string;
+  detail: string;
+  severity: "info" | "review" | "escalate";
+}
+
+export interface NewReviewInput {
+  title: string;
+  itemFamily: string;
+  manufacturer: string;
+  intendedUse: string;
+  dataClass: DataClass;
+  sourcePath: MemoRecord["sourcePath"];
+  memoText: string;
+  attachments: string[];
+}
