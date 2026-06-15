@@ -59,6 +59,7 @@ resource "aws_lambda_function" "app" {
       {
         NODE_ENV        = "production"
         RULIX_DIST_DIR  = "dist"
+        ANTHROPIC_MODEL = var.anthropic_model
       },
       var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result },
       var.anthropic_api_key == "" ? {} : { ANTHROPIC_API_KEY = var.anthropic_api_key }

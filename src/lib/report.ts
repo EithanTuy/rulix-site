@@ -32,6 +32,9 @@ export function buildReviewReport(
         .map((event) => `- ${event.at} | ${event.actor} | ${event.action}: ${event.detail}`)
         .join("\n")
     : "- No audit events recorded.";
+  const agentLines = result.agents
+    .map((agent) => `- ${agent.label}: ${agent.status} - ${agent.summary}`)
+    .join("\n");
 
   const corpusLabel =
     result.corpusId === officialCorpus.id ? `${officialCorpus.label} (${result.corpusId})` : result.corpusId;
@@ -42,6 +45,8 @@ Document: ${memo.title}
 Code: ${memo.documentCode}
 Corpus: ${corpusLabel}
 Generated: ${result.generatedAt}
+Provider: ${result.provider.label} (${result.provider.model})
+Depth: ${result.provider.depth ?? "standard"}
 
 ## AI Classification Recommendation
 ${result.recommended.eccn} - ${result.recommended.label}
@@ -59,6 +64,9 @@ ${findings}
 
 ## Requested Information
 ${result.infoRequests.length ? result.infoRequests.map((item) => `- ${item}`).join("\n") : "- None"}
+
+## AI Council
+${agentLines}
 
 ## Human Review
 Action: ${decision?.action ?? "pending"}

@@ -176,6 +176,8 @@ paths:
               properties:
                 memo:
                   $ref: "#/components/schemas/MemoRecord"
+                depth:
+                  $ref: "#/components/schemas/AnalysisDepth"
       responses:
         "200":
           description: Review result
@@ -318,6 +320,15 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                depth:
+                  $ref: "#/components/schemas/AnalysisDepth"
       responses:
         "200":
           description: Review result
@@ -686,6 +697,8 @@ components:
               type: string
             model:
               type: string
+            depth:
+              $ref: "#/components/schemas/AnalysisDepth"
             live:
               type: boolean
             message:
@@ -714,3 +727,7 @@ components:
           type: array
           items:
             type: object
+    AnalysisDepth:
+      type: string
+      enum: [standard, deep]
+      description: Review depth requested by the browser. Provider model selection is server-owned through ANTHROPIC_MODEL.

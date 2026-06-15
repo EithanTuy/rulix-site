@@ -44,4 +44,21 @@ describe("ECCN council review engine", () => {
     expect(result.findings.some((finding) => finding.status === "missing")).toBe(true);
     expect(result.infoRequests.join(" ")).toContain("spectral sensitivity");
   });
+
+  it("does not treat quantum/RF control pulses as laser evidence", () => {
+    const quantumMemo = reviewFixtures.find((memo) => memo.id === "fixture-quantum-2026-0409")!;
+    const result = analyzeMemo(quantumMemo);
+
+    expect(result.recommended.eccn).toBe("3A001/3D001 review");
+    expect(result.recommended.label).toContain("electronics");
+    expect(result.findings.some((finding) => finding.claim.includes("firmware"))).toBe(true);
+  });
+
+  it("does not treat letters inside performance as RF electronics evidence", () => {
+    const vacuumMemo = reviewFixtures.find((memo) => memo.id === "fixture-vac-2026-0401")!;
+    const result = analyzeMemo(vacuumMemo);
+
+    expect(result.recommended.eccn).toBe("EAR99 candidate");
+    expect(result.findings.some((finding) => finding.status === "missing" || finding.status === "conflict")).toBe(false);
+  });
 });

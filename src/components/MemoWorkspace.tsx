@@ -17,6 +17,7 @@ interface MemoWorkspaceProps {
   result?: ReviewResult;
   selectedFindingId?: string;
   chatMessages: MemoChatMessage[];
+  analysisLocked: boolean;
   onMemoTextChange: (memoId: string, memoText: string) => void;
   onSendChat: (memoId: string, message: string) => Promise<void>;
   onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
@@ -27,6 +28,7 @@ export function MemoWorkspace({
   result,
   selectedFindingId,
   chatMessages,
+  analysisLocked,
   onMemoTextChange,
   onSendChat,
   onApplyChatSuggestion
@@ -37,6 +39,7 @@ export function MemoWorkspace({
   const [highlightsVisible, setHighlightsVisible] = useState(true);
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatError, setChatError] = useState("");
   const selectedFindingRef = useRef<HTMLElement | null>(null);
   const findings = result?.findings ?? [];
   const segments = createHighlightSegments(memo.memoText, findings);
@@ -53,6 +56,7 @@ export function MemoWorkspace({
   }, [selectedFindingId]);
 
   const saveDraft = () => {
+    if (analysisLocked) return;
     onMemoTextChange(memo.id, draft);
     setEditing(false);
   };
@@ -62,8 +66,12 @@ export function MemoWorkspace({
     const message = chatDraft.trim();
     setChatDraft("");
     setChatBusy(true);
+    setChatError("");
     try {
       await onSendChat(memo.id, message);
+    } catch (error) {
+      setChatDraft(message);
+      setChatError(error instanceof Error ? error.message : "Chat failed. Your draft was kept.");
     } finally {
       setChatBusy(false);
     }
@@ -119,6 +127,7 @@ export function MemoWorkspace({
         <button
           type="button"
           className="tool"
+          disabled={analysisLocked}
           onClick={() => {
             setDraft(memo.memoText);
             setEditing((value) => !value);
@@ -134,7 +143,7 @@ export function MemoWorkspace({
             <textarea value={draft} onChange={(event) => setDraft(event.target.value)} />
             <div className="editor-actions">
               <button className="button primary small" type="button" onClick={saveDraft}>
-                Save &amp; Re-run
+                Save Changes
               </button>
             </div>
           </div>
@@ -228,7 +237,7 @@ export function MemoWorkspace({
                   <button
                     type="button"
                     className={message.applied ? "button small applied" : "button primary small"}
-                    disabled={message.applied}
+                    disabled={message.applied || analysisLocked}
                     onClick={() => onApplyChatSuggestion(memo.id, message.id, message.proposedMemoText!)}
                   >
                     {message.applied ? <CheckCircle2 size={16} /> : <Edit3 size={16} />}
@@ -245,12 +254,15 @@ export function MemoWorkspace({
             onChange={(event) => setChatDraft(event.target.value)}
             placeholder="Ask a question or tell Rulix what to add, revise, or clarify..."
             rows={3}
+            disabled={analysisLocked}
           />
-          <button className="button primary small" type="button" onClick={submitChat} disabled={chatBusy || !chatDraft.trim()}>
+          <button className="button primary small" type="button" onClick={submitChat} disabled={analysisLocked || chatBusy || !chatDraft.trim()}>
             <Send size={16} />
             Send
           </button>
         </div>
+        {analysisLocked && <p className="memo-chat-note">Memo edits are locked until the running analysis finishes.</p>}
+        {chatError && <p className="memo-chat-error">{chatError}</p>}
       </section>
     </main>
   );

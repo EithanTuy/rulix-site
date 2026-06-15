@@ -68,7 +68,9 @@ export function AnalysisPanel({
     .filter(Boolean)
     : [];
   const readiness = result ? summarizeReadiness(result) : undefined;
-  const canSubmit = Boolean(selectedAction && notes.trim());
+  const hasBlockingEvidence = Boolean(readiness?.blockers);
+  const acceptBlocked = selectedAction === "accept" && hasBlockingEvidence;
+  const canSubmit = Boolean(selectedAction && notes.trim()) && !acceptBlocked;
   const selectedFinding = result?.findings.find((finding) => finding.id === selectedFindingId);
 
   if (!result || analysisState.status === "unanalyzed" || analysisState.status === "running") {
@@ -135,6 +137,12 @@ export function AnalysisPanel({
       <section className="analysis-section">
         <h3>Analysis Mode</h3>
         <AnalysisModeSelector mode={analysisMode} onModeChange={onAnalysisModeChange} />
+        <div className="run-metadata">
+          <strong>Last result</strong>
+          <span>
+            {result.provider.label} | {result.provider.model} | {depthLabel(result.provider.depth)}
+          </span>
+        </div>
       </section>
 
       <section className="review-checklist">
@@ -231,6 +239,17 @@ export function AnalysisPanel({
         </section>
       )}
 
+      <section className="analysis-section agent-section">
+        <h3>AI Council</h3>
+        {result.agents.map((agent) => (
+          <div className="agent-row" key={agent.role}>
+            <span className={`status-dot ${agent.status === "complete" ? "green" : "amber"}`} />
+            <strong>{agent.label}</strong>
+            <span>{agent.summary}</span>
+          </div>
+        ))}
+      </section>
+
       <section className="analysis-section">
         <h3>Source Citations</h3>
         <div className="citation-list">
@@ -274,6 +293,8 @@ export function AnalysisPanel({
           <button
             type="button"
             className={selectedAction === "accept" ? "decision-button accept selected" : "decision-button accept"}
+            disabled={hasBlockingEvidence}
+            title={hasBlockingEvidence ? "Resolve missing or conflicting evidence before accepting." : "Accept recommendation"}
             onClick={() => setSelectedAction("accept")}
           >
             <Check size={16} /> Accept Recommendation
@@ -311,6 +332,11 @@ export function AnalysisPanel({
         >
           <UserRound size={17} /> Record Decision
         </button>
+        {acceptBlocked && (
+          <p className="decision-state warning">
+            Missing or conflicting evidence is still blocking acceptance. Request more info or override instead.
+          </p>
+        )}
         {decision && <p className="decision-state">Current action: {decision.action}</p>}
       </section>
 
@@ -334,6 +360,10 @@ function analysisStatusTitle(status: AnalysisPanelProps["analysisState"]["status
   if (status === "deterministic") return "Deterministic analysis";
   if (status === "running") return "AI analysis running";
   return "Unanalyzed";
+}
+
+function depthLabel(depth: ReviewResult["provider"]["depth"]) {
+  return depth === "deep" ? "Deep Council Pass" : "Full AI Council";
 }
 
 function formatAuditTime(value: string) {

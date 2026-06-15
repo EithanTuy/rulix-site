@@ -34,6 +34,17 @@ variable "anthropic_api_key" {
   sensitive   = true
 }
 
+variable "anthropic_model" {
+  description = "Server-owned Anthropic model id. Default uses the currently supported Haiku council model."
+  type        = string
+  default     = "claude-haiku-4-5"
+
+  validation {
+    condition     = can(regex("^claude-[a-z0-9-]+$", var.anthropic_model))
+    error_message = "anthropic_model must be a Claude model id, for example claude-haiku-4-5."
+  }
+}
+
 variable "custom_domain" {
   description = "Public custom domain for the app, e.g. app.rulix.cloud. Empty = use the default Function URL only (no CloudFront)."
   type        = string

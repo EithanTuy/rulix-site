@@ -27,7 +27,7 @@ The production council should be orchestrated by application code rather than fr
 - Contradiction/risk reviewer
 - Report writer
 
-Use Claude Sonnet through Amazon Bedrock where available, with model IDs pinned in configuration and a provider abstraction for swaps. The local prototype simulates this council deterministically so tests can run offline.
+Use the configured Claude Haiku council model where available, with model IDs pinned in configuration and a provider abstraction for swaps. The local prototype simulates this council deterministically so tests can run offline.
 
 ## Security Baseline
 
@@ -53,4 +53,3 @@ Migration requirements:
 ## Records and Review
 
 Store immutable audit trails for uploads, extracted claims, source chunks, prompts, model outputs, reviewer edits, decisions, overrides, final reports, and signers. Export classification records as evidence bundles with corpus version and source checksums.
-

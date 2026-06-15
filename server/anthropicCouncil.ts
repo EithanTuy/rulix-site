@@ -13,11 +13,14 @@ import type {
   ReviewResult
 } from "../src/types";
 
-export const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
+export const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5";
+export const LEGACY_HAIKU_35_MODEL = "claude-3-5-haiku-20241022";
+export type CouncilDepth = "standard" | "deep";
 
 interface CouncilOptions {
   apiKey?: string;
   model?: string;
+  depth?: CouncilDepth;
   maxTokens?: number;
 }
 
@@ -45,6 +48,9 @@ const SYSTEM_PROMPT = `You are an export-control classification memo review assi
 You are not a lawyer and must not present a final legal determination.
 Act as a council of seven bounded subagents: memo-parser, jurisdiction-gate, eccn-candidate, evidence-mapper, citation-verifier, risk-reviewer, and report-writer.
 Review the memo against the supplied official-source corpus excerpts and the deterministic baseline.
+Each subagent must be represented in the agents array exactly once with either complete or blocked status.
+Prefer useful, reviewer-actionable blockers over vague caution. Do not block ready memos unless a concrete source-backed gap remains.
+Treat the deterministic baseline as a broad-category guardrail. Do not move to a different ECCN family unless the memo text itself contains source-supported facts for that family. Quantum/RF control pulses are not laser pulses.
 Use the record_eccn_review tool to return structured results.`;
 
 const AI_REVIEW_SCHEMA = {
@@ -143,12 +149,14 @@ export async function runCouncilAnalysis(
   const localResult = analyzeMemo(memo);
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
   const model = options.model ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  const depth = options.depth ?? "standard";
 
   if (!apiKey?.trim()) {
     return withProvider(localResult, {
       source: "local-rules",
       label: "Local rules council",
       model: "local-rule-engine-v1",
+      depth,
       live: false,
       message: "No Anthropic key is configured on the backend, so the deterministic council is displayed.",
       checkedAt: new Date().toISOString()
@@ -174,7 +182,7 @@ export async function runCouncilAnalysis(
       messages: [
         {
           role: "user",
-          content: buildCouncilPrompt(memo, localResult)
+          content: buildCouncilPrompt(memo, localResult, depth)
         }
       ]
     });
@@ -190,13 +198,14 @@ export async function runCouncilAnalysis(
     const payload = toolBlock ? (toolBlock.input as AiCouncilPayload) : parseJsonPayload(rawText);
     const checkedAt = new Date().toISOString();
 
-    return withProvider(mergeAiPayload(memo, localResult, payload), {
+    return withProvider(mergeAiPayload(memo, localResult, payload, { model, depth }), {
       source: "anthropic",
-      label: "Claude Sonnet council",
+      label: providerLabel(model),
       model,
+      depth,
       live: true,
       message:
-        "Live Anthropic analysis was used, then citation IDs and memo highlights were validated by the backend.",
+        `Live ${providerLabel(model)} analysis completed as a ${depth === "deep" ? "deep" : "standard"} full-council pass; citation IDs and memo highlights were validated by the backend.`,
       checkedAt,
       latencyMs: Date.now() - startedAt
     });
@@ -206,6 +215,7 @@ export async function runCouncilAnalysis(
       source: "fallback",
       label: "Local fallback council",
       model,
+      depth,
       live: false,
       message: `Live Anthropic analysis failed (${safeError(error, apiKey)}). Showing deterministic backend fallback.`,
       checkedAt,
@@ -214,7 +224,7 @@ export async function runCouncilAnalysis(
   }
 }
 
-function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult) {
+function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult, depth: CouncilDepth) {
   const corpus = officialCorpus.chunks.map((chunk) => ({
     id: chunk.id,
     locator: chunk.locator,
@@ -275,7 +285,13 @@ function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult) {
   return JSON.stringify(
     {
       task:
-        "Review whether the memo's ECCN classification is supported. Highlight good evidence, bad reasoning, conflicts, and missing information. Prefer precise source chunk IDs from the corpus.",
+        depth === "deep"
+          ? "Run a deep full-council review of whether the memo's ECCN classification is supported. In addition to evidence, bad reasoning, conflicts, and missing information, identify anything that would make a reviewer unhappy: ambiguous blocker wording, missing next action, unsupported confidence, overblocking a ready memo, or underblocking a risky memo. Prefer precise source chunk IDs from the corpus."
+          : "Run a full-council review of whether the memo's ECCN classification is supported. Highlight good evidence, bad reasoning, conflicts, and missing information. Prefer precise source chunk IDs from the corpus.",
+      analysisDepth: depth,
+      fullCouncilRoles: AGENT_ROLES,
+      blockerPolicy:
+        "Mark an agent blocked only when the memo cannot support reviewer signoff without a specific missing fact, conflict, or jurisdiction issue. Make each info request actionable.",
       memo,
       officialCorpus: corpus,
       deterministicBaseline: localResult,
@@ -304,7 +320,8 @@ function parseJsonPayload(rawText: string): AiCouncilPayload {
 function mergeAiPayload(
   memo: MemoRecord,
   localResult: ReviewResult,
-  payload: AiCouncilPayload
+  payload: AiCouncilPayload,
+  runtime: { model: string; depth: CouncilDepth }
 ): ReviewResult {
   const findings = Array.isArray(payload.findings)
     ? payload.findings
@@ -314,25 +331,108 @@ function mergeAiPayload(
         .filter((finding): finding is EvidenceFinding => Boolean(finding))
     : [];
 
-  const mergedFindings = findings.length > 0 ? findings : localResult.findings;
+  const mergedFindings = mergeFindings(findings, localResult.findings);
   const infoRequests = sanitizeStringArray(payload.infoRequests).slice(0, 10);
+  const mergedInfoRequests = uniqueStrings([...infoRequests, ...buildInfoRequests(mergedFindings)]).slice(0, 10);
 
   return {
     ...localResult,
     generatedAt: new Date().toISOString(),
-    modelPolicy:
-      "Claude Sonnet council with deterministic citation/range validation; human export-control signoff required.",
+    modelPolicy: `${providerLabel(runtime.model)} ${runtime.depth} full-council review with deterministic citation/range validation; human export-control signoff required.`,
     jurisdiction: normalizeJurisdiction(payload.jurisdiction, localResult.jurisdiction),
-    recommended: normalizeCandidate(payload.recommended, localResult.recommended),
+    recommended: normalizeRecommendedCandidate(memo.memoText, payload.recommended, localResult.recommended),
     alternatives: Array.isArray(payload.alternatives)
       ? payload.alternatives
           .map((candidate, index) => normalizeCandidate(candidate, localResult.alternatives[index]))
           .filter((candidate): candidate is ClassificationCandidate => Boolean(candidate))
       : localResult.alternatives,
     findings: mergedFindings,
-    infoRequests: infoRequests.length > 0 ? infoRequests : buildInfoRequests(mergedFindings),
-    agents: normalizeAgents(payload.agents, localResult.agents)
+    infoRequests: mergedInfoRequests,
+    agents: normalizeAgents(payload.agents, localResult.agents, mergedFindings)
   };
+}
+
+function mergeFindings(aiFindings: EvidenceFinding[], localFindings: EvidenceFinding[]) {
+  if (aiFindings.length === 0) return localFindings;
+  const localGuardrails = localFindings.filter(
+    (finding) => finding.status === "missing" || finding.status === "conflict"
+  );
+  return [
+    ...aiFindings,
+    ...localGuardrails.filter((localFinding) =>
+      !aiFindings.some((aiFinding) => isSimilarFinding(aiFinding, localFinding))
+    )
+  ].sort(sortMergedFindings);
+}
+
+function isSimilarFinding(a: EvidenceFinding, b: EvidenceFinding) {
+  const sameTitle = a.title.trim().toLowerCase() === b.title.trim().toLowerCase();
+  const sharedSource = a.sourceChunkIds.some((id) => b.sourceChunkIds.includes(id));
+  return sameTitle || (sharedSource && a.agent === b.agent && a.status === b.status);
+}
+
+function sortMergedFindings(a: EvidenceFinding, b: EvidenceFinding) {
+  const weight = { conflict: 0, missing: 1, weak: 2, strong: 3 };
+  if (weight[a.status] !== weight[b.status]) return weight[a.status] - weight[b.status];
+  return (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER);
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function normalizeRecommendedCandidate(
+  memoText: string,
+  value: unknown,
+  fallback: ClassificationCandidate
+) {
+  const candidate = normalizeCandidate(value, fallback) ?? fallback;
+  if (isUnsupportedFamilyShift(memoText, candidate, fallback)) {
+    return fallback;
+  }
+  return candidate;
+}
+
+function isUnsupportedFamilyShift(
+  memoText: string,
+  candidate: ClassificationCandidate,
+  fallback: ClassificationCandidate
+) {
+  const candidateFamily = candidateCategory(candidate);
+  const fallbackFamily = candidateCategory(fallback);
+  return Boolean(
+    candidateFamily &&
+      fallbackFamily &&
+      candidateFamily !== fallbackFamily &&
+      !memoSupportsCategory(memoText, candidateFamily)
+  );
+}
+
+function candidateCategory(candidate: ClassificationCandidate) {
+  const text = `${candidate.eccn} ${candidate.label} ${candidate.summary}`.toLowerCase();
+  if (/6a005|laser|femtosecond|wavelength/.test(text)) return "laser";
+  if (/6a003|camera|imaging|sensor/.test(text)) return "camera";
+  if (/cryogenic|cryostat|low-temperature|3a001\.a\.5/.test(text)) return "cryogenic";
+  if (/3d001|quantum|\brf\b|microwave|electronics|firmware|software/.test(text)) return "electronics";
+  if (/ear99|no specific ccl|classification path/.test(text)) return "ear99";
+  return undefined;
+}
+
+function memoSupportsCategory(memoText: string, category: string) {
+  const text = memoText.toLowerCase();
+  if (category === "laser") return /laser|femtosecond|wavelength|pulse energy|beam quality/.test(text);
+  if (category === "camera") return /camera|imaging|cmos|frames per second|fps|sensor/.test(text);
+  if (category === "cryogenic") return /cryogenic|cryostat|pulse tube|joule-thomson|dewar|1\.2 k/.test(text);
+  if (category === "electronics") return /quantum|microwave|\brf\b|waveform|qubit|firmware|software|electronics/.test(text);
+  if (category === "ear99") return /manufacturer classification|ccl screening|no listed performance|ear99/.test(text);
+  return false;
+}
+
+function providerLabel(model: string) {
+  const normalized = model.toLowerCase();
+  if (normalized.includes("haiku")) return "Claude Haiku council";
+  if (normalized.includes("opus")) return "Claude Opus council";
+  return "Claude council";
 }
 
 function normalizeJurisdiction(
@@ -400,7 +500,7 @@ function normalizeFinding(
       ? input.severity
       : fallback?.severity ?? (status === "conflict" ? "escalate" : "review");
 
-  return {
+  const normalized: EvidenceFinding = {
     id: asString(input.id, fallback?.id ?? `ai-finding-${index + 1}`),
     status,
     title: asString(input.title, fallback?.title ?? "Review finding"),
@@ -413,19 +513,62 @@ function normalizeFinding(
     agent,
     severity
   };
+
+  return softenLowRiskProceduralBlocker(memoText, normalized);
 }
 
-function normalizeAgents(value: unknown, fallback: CouncilAgentRun[]): CouncilAgentRun[] {
+function softenLowRiskProceduralBlocker(memoText: string, finding: EvidenceFinding) {
+  const findingText = `${finding.title} ${finding.claim} ${finding.rationale}`;
+  if (
+    (finding.status === "missing" || finding.status === "conflict") &&
+    isLowRiskEar99Memo(memoText) &&
+    !/pulse energy|spectral sensitivity|cooling capacity|timing resolution|source code|firmware.*provided|software.*provided|radiation hardening present|encryption present/i.test(findingText)
+  ) {
+    return {
+      ...finding,
+      status: "weak" as const,
+      severity: finding.severity === "escalate" ? "review" as const : finding.severity,
+      rationale: `${finding.rationale} Backend validation downgraded this to procedural guidance because the memo documents an EAR99-style item with no affirmative defense indicators or concrete controlled-parameter gap.`
+    };
+  }
+  return finding;
+}
+
+function isLowRiskEar99Memo(memoText: string) {
+  const text = memoText.toLowerCase();
+  const hasEar99Path = /ear99|manufacturer classification|ccl screening|no listed performance/.test(text);
+  const hasAffirmativeDefenseCue = /weapon|missile|defense|usml|nuclear|military end-use|military application/.test(text);
+  return hasEar99Path && !hasAffirmativeDefenseCue;
+}
+
+function normalizeAgents(
+  value: unknown,
+  fallback: CouncilAgentRun[],
+  findings: EvidenceFinding[]
+): CouncilAgentRun[] {
   const inputs = Array.isArray(value) ? value.map(asRecord).filter(Boolean) : [];
   return fallback.map((agent) => {
     const input = inputs.find((item) => item?.role === agent.role);
-    if (!input) return agent;
+    const roleFindings = findings.filter((finding) => finding.agent === agent.role);
+    const blockers = roleFindings.filter(
+      (finding) => finding.status === "missing" || finding.status === "conflict"
+    );
+    const validatedStatus = blockers.length > 0 ? "blocked" : "complete";
+    if (!input) {
+      return {
+        ...agent,
+        status: validatedStatus
+      };
+    }
 
     return {
       role: agent.role,
       label: asString(input.label, agent.label),
-      status: input.status === "blocked" || input.status === "complete" ? input.status : agent.status,
-      summary: asString(input.summary, agent.summary)
+      status: validatedStatus,
+      summary:
+        input.status === "blocked" && validatedStatus === "complete"
+          ? "No blocking issue found after backend validation."
+          : asString(input.summary, agent.summary)
     };
   });
 }

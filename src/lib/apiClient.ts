@@ -1,5 +1,6 @@
 import type {
   AccountReviewState,
+  AuditEvent,
   CorpusSnapshot,
   MemoChatMessage,
   MemoRecord,
@@ -7,24 +8,24 @@ import type {
   UserProfile
 } from "../types";
 
-export type AnalysisMode = "standard" | "escalated";
+export type AnalysisMode = "standard" | "deep";
 
 export const ANALYSIS_MODE_CONFIG = {
   standard: {
-    label: "Standard Review",
-    model: "claude-haiku-4-5",
-    cost: "Lower cost",
-    description: "Use for routine first-pass triage and missing-information checks."
+    label: "Full AI Council",
+    depth: "standard",
+    cost: "Haiku live review",
+    description: "Use for routine seven-agent triage, citation checks, and missing-information mapping."
   },
-  escalated: {
-    label: "Escalated Review",
-    model: "claude-sonnet-4-6",
-    cost: "More expensive",
-    description: "Use for higher-risk jurisdiction, ITAR, conflict, or override reviews."
+  deep: {
+    label: "Deep Council Pass",
+    depth: "deep",
+    cost: "Haiku deeper pass",
+    description: "Use when blockers, user friction, or signoff risk need a stricter second look."
   }
 } as const satisfies Record<AnalysisMode, {
   label: string;
-  model: string;
+  depth: "standard" | "deep";
   cost: string;
   description: string;
 }>;
@@ -64,7 +65,11 @@ export async function analyzeMemoWithBackend(
   mode: AnalysisMode,
   signal?: AbortSignal
 ) {
-  const response = await fetchJson<{ review: MemoRecord; result: ReviewResult }>(
+  const response = await fetchJson<{
+    review: MemoRecord;
+    result: ReviewResult;
+    auditEvents?: AuditEvent[];
+  }>(
     `/api/reviews/${encodeURIComponent(memo.id)}/analyze`,
     {
       method: "POST",
@@ -72,7 +77,7 @@ export async function analyzeMemoWithBackend(
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ model: ANALYSIS_MODE_CONFIG[mode].model })
+      body: JSON.stringify({ depth: ANALYSIS_MODE_CONFIG[mode].depth })
     }
   );
   return response;
@@ -131,7 +136,7 @@ export async function saveAccountState(state: AccountReviewState, signal?: Abort
 }
 
 export async function sendMemoChat(memoId: string, message: string, signal?: AbortSignal) {
-  const response = await fetchJson<{ messages: MemoChatMessage[] }>(
+  const response = await fetchJson<{ messages: MemoChatMessage[]; auditEvents?: AuditEvent[] }>(
     `/api/reviews/${encodeURIComponent(memoId)}/chat`,
     {
       method: "POST",
@@ -142,7 +147,7 @@ export async function sendMemoChat(memoId: string, message: string, signal?: Abo
       body: JSON.stringify({ message })
     }
   );
-  return response.messages;
+  return response;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

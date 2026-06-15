@@ -53,7 +53,6 @@ function inferItemFamily(text: string) {
   if (/cryogenic|cryostat|pulse tube/i.test(text)) return "Cryogenic laboratory equipment";
   if (/camera|imaging|CMOS/i.test(text)) return "Imaging sensor module";
   if (/laser|wavelength|pulse/i.test(text)) return "Laser source";
-  if (/quantum|microwave|RF|qubit/i.test(text)) return "Signal/control electronics";
+  if (/quantum|microwave|\bRF\b|qubit/i.test(text)) return "Signal/control electronics";
   return "Uploaded item";
 }
-

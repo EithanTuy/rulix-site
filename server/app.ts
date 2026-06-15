@@ -14,7 +14,11 @@ import type {
   NewReviewInput,
   ReviewerDecision
 } from "../src/types";
-import { getAnthropicRuntime, runCouncilAnalysis } from "./anthropicCouncil";
+import {
+  getAnthropicRuntime,
+  runCouncilAnalysis,
+  type CouncilDepth
+} from "./anthropicCouncil";
 import {
   StoreError,
   createAccountStore,
@@ -23,7 +27,7 @@ import {
   type SessionRecord
 } from "./store";
 
-const ALLOWED_REVIEW_MODELS = new Set(["claude-haiku-4-5", "claude-sonnet-4-6"]);
+const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
 const SESSION_COOKIE = "rulix_session";
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 8;
 
@@ -194,23 +198,29 @@ export function createApp(options: CreateAppOptions = {}) {
     }
 
     const state = store.getAccountState(res.locals.user.id);
-    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
+    const depth = coerceReviewDepth(req.body?.depth);
+    const result = await runCouncilAnalysis(memo, {
+      depth,
+      maxTokens: depth === "deep" ? 3600 : undefined
+    });
     const updatedMemo = {
       ...memo,
       status: deriveReviewStatus(result, state.decisions[memo.id])
     };
     store.setAnalysisResult(res.locals.user.id, updatedMemo, result);
-    store.appendAuditEvent(
-      res.locals.user.id,
-      createAuditEvent(
-        memo.id,
-        "Analysis completed",
-        result.provider.message,
-        result.provider.live ? "info" : "review",
-        res.locals.user.name
-      )
+    const auditEvent = createAuditEvent(
+      memo.id,
+      "Analysis completed",
+      result.provider.message,
+      result.provider.live ? "info" : "review",
+      res.locals.user.name
     );
-    res.json({ review: updatedMemo, result });
+    store.appendAuditEvent(res.locals.user.id, auditEvent);
+    res.json({
+      review: updatedMemo,
+      result,
+      auditEvents: memoAuditEvents(store, res.locals.user.id, memo.id)
+    });
   });
 
   app.post("/api/ai/review", requireAuth(store), requireCsrf, async (req, res) => {
@@ -220,14 +230,18 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
+    const depth = coerceReviewDepth(req.body?.depth);
+    const result = await runCouncilAnalysis(memo, {
+      depth,
+      maxTokens: depth === "deep" ? 3600 : undefined
+    });
     res.json({ result });
   });
 
   app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, (req, res) => {
     const memo = store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
-      res.status(404).json({ error: "Review not found" });
+      res.status(404).json({ error: "Review not found." });
       return;
     }
 
@@ -251,7 +265,10 @@ export function createApp(options: CreateAppOptions = {}) {
         )
       );
     }
-    res.json({ messages: fullThread });
+    res.json({
+      messages: fullThread,
+      auditEvents: memoAuditEvents(store, res.locals.user.id, memo.id)
+    });
   });
 
   app.post("/api/reviews/:id/decision", requireAuth(store), requireCsrf, (req, res) => {
@@ -273,14 +290,14 @@ export function createApp(options: CreateAppOptions = {}) {
       ...memo,
       status: deriveReviewStatus(result, decision)
     };
-    const auditEvent = createAuditEvent(
+    const decisionAuditEvent = createAuditEvent(
       memo.id,
       `Reviewer decision: ${decision.action}`,
       decision.notes,
       decision.action === "override" ? "escalate" : decision.action === "request-info" ? "review" : "info",
       res.locals.user.name
     );
-    store.setDecision(res.locals.user.id, updatedMemo, decision, auditEvent);
+    store.setDecision(res.locals.user.id, updatedMemo, decision, decisionAuditEvent);
 
     res.json({ review: updatedMemo, decision });
   });
@@ -303,6 +320,10 @@ export function createApp(options: CreateAppOptions = {}) {
   }
 
   return app;
+}
+
+function memoAuditEvents(store: AccountStore, userId: string, memoId: string) {
+  return store.getAccountState(userId).auditEvents.filter((event) => event.memoId === memoId);
 }
 
 function createMemoRecord(input: Partial<NewReviewInput>, owner = "API User"): MemoRecord {
@@ -479,8 +500,10 @@ function appendReviewerContext(currentMemoText: string, reviewerMessage: string)
   return `${currentMemoText.trim()}\n\n${heading}\n${line}\n`;
 }
 
-function coerceReviewModel(value: unknown) {
-  return typeof value === "string" && ALLOWED_REVIEW_MODELS.has(value) ? value : undefined;
+function coerceReviewDepth(value: unknown): CouncilDepth {
+  return typeof value === "string" && ALLOWED_REVIEW_DEPTHS.has(value as CouncilDepth)
+    ? (value as CouncilDepth)
+    : "standard";
 }
 
 function normalizeText(value: unknown, fallback: string) {

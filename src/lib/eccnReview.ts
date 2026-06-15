@@ -173,7 +173,7 @@ const missingChecks: Array<{
     title: "Missing specially-designed reasoning",
     claim:
       "Explain whether specially-designed analysis is needed and document why it applies or does not apply.",
-    requiredWhen: /military|weapon|missile|defense|USML|specially designed/i,
+    requiredWhen: /weapon|missile|defense|USML|specially designed/i,
     absent: /specially designed analysis|specially-designed analysis|catch and release/i,
     sourceChunkIds: ["chunk-order-of-review", "chunk-usml-check"]
   },
@@ -200,7 +200,7 @@ const missingChecks: Array<{
     title: "Missing software and technology split",
     claim:
       "State whether firmware, source code, software updates, or technical data are separately provided.",
-    requiredWhen: /firmware|software|electronics|quantum control|control electronics|encryption|source code/i,
+    requiredWhen: /firmware|software|electronics|quantum control|control electronics|source code/i,
     absent: /technical data|source code|software updates|separately provided/i,
     sourceChunkIds: ["chunk-ear-subject", "chunk-itar-release"]
   }
@@ -300,7 +300,7 @@ function classify(text: string): ClassificationCandidate {
     };
   }
 
-  if (/laser|femtosecond|wavelength|pulse/i.test(text)) {
+  if (/laser|femtosecond|wavelength|pulse energy|pulse duration|beam quality|repetition rate|ultrafast/i.test(text)) {
     return {
       eccn: "6A005 review",
       label: "Laser system candidate",
@@ -312,7 +312,7 @@ function classify(text: string): ClassificationCandidate {
     };
   }
 
-  if (/quantum|microwave|RF|waveform|qubit|firmware/i.test(text)) {
+  if (/quantum|microwave|\bRF\b|waveform|qubit|firmware/i.test(text)) {
     return {
       eccn: "3A001/3D001 review",
       label: "Advanced electronics plus software/technology review",

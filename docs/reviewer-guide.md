@@ -48,10 +48,10 @@ If live AI does not finish within 3 minutes, Rulix records a deterministic resul
 
 ## Analysis Modes
 
-- Standard Review uses Claude Haiku (`claude-haiku-4-5`). It is the lower-cost option and should be used for routine first-pass triage, missing-information checks, and ordinary evidence mapping.
-- Escalated Review uses Claude Sonnet (`claude-sonnet-4-6`). It is more expensive and should be reserved for higher-risk reviews, possible ITAR/USML issues, conflicting jurisdiction facts, unusual technology, or reviewer override support.
+- Full AI Council uses the server-configured Claude Haiku model. It runs the seven-agent council for routine first-pass triage, missing-information checks, citation validation, and evidence mapping.
+- Deep Council Pass uses the same server-configured Claude Haiku model with a stricter prompt. It asks the council to look for user-facing blockers: ambiguous next steps, unsupported confidence, overblocking a ready memo, or underblocking a risky memo.
 
-Start with Standard Review for most memos. Use Escalated Review when the reviewer needs a stronger model for a harder classification question.
+The browser never chooses the provider model directly. Model selection stays on the backend through `ANTHROPIC_MODEL`, with `claude-haiku-4-5` as the supported default. Older Haiku 3.5 (`claude-3-5-haiku-20241022`) is a legacy override only for accounts that still have provider access.
 
 ## Evidence Labels
 

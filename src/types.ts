@@ -106,6 +106,7 @@ export interface AnalysisProviderStatus {
   source: AnalysisSource;
   label: string;
   model: string;
+  depth?: "standard" | "deep";
   live: boolean;
   message: string;
   checkedAt: string;

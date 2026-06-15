@@ -102,7 +102,7 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
             Cancel
           </button>
           <button className="button primary" type="button" onClick={submit} disabled={!memoText.trim()}>
-            Run AI Council Review
+            Create Review
           </button>
         </div>
       </section>

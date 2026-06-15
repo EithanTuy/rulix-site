@@ -162,7 +162,9 @@ export class AccountStore {
   }
 
   replaceAccountState(userId: string, state: AccountReviewState) {
-    this.accounts.set(userId, normalizeAccountState(state));
+    const incoming = normalizeAccountState(state);
+    const existing = this.accounts.get(userId);
+    this.accounts.set(userId, existing ? mergeAccountState(existing, incoming) : incoming);
     this.persist();
   }
 
@@ -332,6 +334,38 @@ function normalizeAccountState(state: Partial<AccountReviewState> | undefined): 
       : {},
     chatMessages: normalizeChatMessages(state?.chatMessages)
   };
+}
+
+function mergeAccountState(existing: AccountReviewState, incoming: AccountReviewState): AccountReviewState {
+  return {
+    ...incoming,
+    auditEvents: mergeById(incoming.auditEvents, existing.auditEvents),
+    chatMessages: mergeChatMessages(existing.chatMessages, incoming.chatMessages)
+  };
+}
+
+function mergeById<T extends { id: string }>(preferred: T[], preserved: T[]) {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  [...preferred, ...preserved].forEach((item) => {
+    if (seen.has(item.id)) return;
+    seen.add(item.id);
+    merged.push(item);
+  });
+  return merged;
+}
+
+function mergeChatMessages(
+  existing: AccountReviewState["chatMessages"],
+  incoming: AccountReviewState["chatMessages"]
+) {
+  const memoIds = new Set([...Object.keys(existing), ...Object.keys(incoming)]);
+  return Object.fromEntries(
+    Array.from(memoIds).map((memoId) => [
+      memoId,
+      mergeById(incoming[memoId] ?? [], existing[memoId] ?? [])
+    ])
+  );
 }
 
 function cloneAccountState(state: AccountReviewState) {

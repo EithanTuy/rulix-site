@@ -62,6 +62,52 @@ describe("Rulix ECCN API", () => {
     expect(response.body.result.provider.source).toBe("local-rules");
   });
 
+  it("accepts analysis depth but does not trust client-supplied model selection", async () => {
+    const { agent, csrfToken } = await signedInAgent("depth@example.com");
+    const response = await agent
+      .post("/api/ai/review")
+      .set("x-rulix-csrf", csrfToken)
+      .send({
+        memo: reviewFixtures[0],
+        depth: "deep",
+        model: "claude-opus-4-8"
+      })
+      .expect(200);
+
+    expect(response.body.result.provider.depth).toBe("deep");
+    expect(response.body.result.provider.model).toBe("local-rule-engine-v1");
+    expect(response.body.result.modelPolicy).not.toContain("Sonnet");
+  });
+
+  it("preserves server-side audit events across later client state saves", async () => {
+    const { agent, csrfToken } = await signedInAgent("audit-merge@example.com");
+    await saveState(agent, csrfToken, {
+      ...emptyAccountState(),
+      memos: [reviewFixtures[0]],
+      selectedMemoId: reviewFixtures[0].id
+    });
+
+    const analysisResponse = await agent
+      .post(`/api/reviews/${reviewFixtures[0].id}/analyze`)
+      .set("x-rulix-csrf", csrfToken)
+      .send({ depth: "deep", model: "claude-opus-4-8" })
+      .expect(200);
+
+    expect(analysisResponse.body.result.provider.depth).toBe("deep");
+    expect(analysisResponse.body.auditEvents.some((event: { action: string }) => event.action === "Analysis completed")).toBe(true);
+
+    await saveState(agent, csrfToken, {
+      ...emptyAccountState(),
+      memos: [reviewFixtures[0]],
+      selectedMemoId: reviewFixtures[0].id
+    });
+
+    const stateResponse = await agent.get("/api/account/state").expect(200);
+    expect(
+      stateResponse.body.state.auditEvents.some((event: { action: string }) => event.action === "Analysis completed")
+    ).toBe(true);
+  });
+
   it("records a reviewer decision under the signed-in account", async () => {
     const { agent, csrfToken } = await signedInAgent("decision@example.com");
     await saveState(agent, csrfToken, {

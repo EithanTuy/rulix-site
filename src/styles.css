@@ -1220,6 +1220,21 @@ button {
   align-items: end;
 }
 
+.memo-chat-note,
+.memo-chat-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.memo-chat-note {
+  color: var(--muted);
+}
+
+.memo-chat-error {
+  color: #a22b36;
+}
+
 .memo-chat-input textarea {
   resize: vertical;
   min-height: 72px;
@@ -1765,6 +1780,28 @@ button {
   opacity: 0.62;
 }
 
+.run-metadata {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.run-metadata strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.run-metadata span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .analysis-status-banner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2221,6 +2258,12 @@ button {
   font-size: 12px;
 }
 
+.agent-row span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .audit-mini-list {
   display: grid;
   gap: 8px;
@@ -2418,6 +2461,10 @@ button {
   color: var(--teal);
   font-size: 12px;
   font-weight: 800;
+}
+
+.decision-state.warning {
+  color: #8a5700;
 }
 
 @media (max-width: 1380px) {

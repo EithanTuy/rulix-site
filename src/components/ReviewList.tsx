@@ -110,7 +110,7 @@ export function ReviewList({
               rows={6}
             />
             <button className="button primary small full" type="button" onClick={submitPaste}>
-              Run Review
+              Add Memo
             </button>
           </div>
         )}

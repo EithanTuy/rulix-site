@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { officialCorpus } from "./data/corpus";
 import {
   ANALYSIS_MODE_CONFIG,
@@ -76,6 +76,7 @@ export function App() {
   const [backendNotice, setBackendNotice] = useState("Checking analysis service...");
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("standard");
   const [selectedFindingId, setSelectedFindingId] = useState<string | undefined>();
+  const memosRef = useRef<MemoRecord[]>([]);
 
   const selectedMemo = selectedMemoId
     ? memos.find((memo) => memo.id === selectedMemoId)
@@ -93,6 +94,10 @@ export function App() {
   const decision = selectedMemo ? decisions[selectedMemo.id] : undefined;
   const reviewResults = useMemo(() => analysisResults, [analysisResults]);
   const currentUser = auth.status === "signed-in" ? auth.user : undefined;
+
+  useEffect(() => {
+    memosRef.current = memos;
+  }, [memos]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -132,7 +137,7 @@ export function App() {
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setBackendNotice("Backend unavailable. Showing deterministic local analysis.");
+          setBackendNotice("Backend unavailable. Sign-in, saves, and AI analysis may be unavailable.");
         }
       });
     return () => controller.abort();
@@ -145,8 +150,10 @@ export function App() {
       setSyncNotice("Saving...");
       saveAccountState(buildCurrentAccountState(), controller.signal)
         .then(() => setSyncNotice("Saved to account"))
-        .catch(() => {
-          if (!controller.signal.aborted) setSyncNotice("Save failed");
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            setSyncNotice(readableApiError(error instanceof Error ? error.message : "Save failed"));
+          }
         });
     }, 450);
 
@@ -288,6 +295,10 @@ export function App() {
   };
 
   const updateMemoText = (memoId: string, memoText: string, detail = "Memo text changed; prior signoff was cleared.") => {
+    if (analysisStates[memoId]?.status === "running") {
+      setSyncNotice("Wait for the running analysis before editing this memo.");
+      return;
+    }
     setMemos((current) =>
       current.map((memo) =>
         memo.id === memoId
@@ -353,6 +364,11 @@ export function App() {
       window.setTimeout(() => setExportNotice(""), 3200);
       return;
     }
+    if (!decision) {
+      setExportNotice("Record decision before export");
+      window.setTimeout(() => setExportNotice(""), 3200);
+      return;
+    }
     const report = buildReviewReport(
       selectedMemo,
       reviewResult,
@@ -387,10 +403,22 @@ export function App() {
 
     try {
       await saveAccountState(buildCurrentAccountState(), controller.signal);
-      const { review, result } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal);
+      const { review, result, auditEvents: serverAuditEvents } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal);
       window.clearTimeout(timeoutId);
+      const currentMemo = memosRef.current.find((item) => item.id === memo.id);
+      if (!currentMemo || currentMemo.memoText !== memo.memoText) {
+        setAnalysisStates((current) => ({
+          ...current,
+          [memo.id]: {
+            status: "failed",
+            message: "Memo changed while analysis was running. The stale result was discarded; run analysis again."
+          }
+        }));
+        return;
+      }
       const failedToUseLiveAi = backendHealth?.provider.configured && result.provider.source !== "anthropic";
       setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
+      if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
       setAnalysisStates((current) => ({
         ...current,
         [memo.id]: failedToUseLiveAi
@@ -409,13 +437,14 @@ export function App() {
               }
       }));
       setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
-    } catch {
+    } catch (error) {
       window.clearTimeout(timeoutId);
+      const message = readableApiError(error instanceof Error ? error.message : "AI analysis request failed.");
       setAnalysisStates((current) => ({
         ...current,
         [memo.id]: {
           status: "failed",
-          message: "AI analysis request failed. Deterministic rules were not recorded; retry when the backend is available."
+          message: `${message} Deterministic rules were not recorded; retry when the backend is available.`
         }
       }));
       addAuditEvent(memo.id, "AI analysis failed", "Backend AI analysis failed; no new result was recorded.", "review");
@@ -423,9 +452,13 @@ export function App() {
   };
 
   const handleSendMemoChat = async (memoId: string, message: string) => {
+    if (analysisStates[memoId]?.status === "running") {
+      throw new Error("Wait for the running analysis before changing this memo.");
+    }
     await saveAccountState(buildCurrentAccountState());
-    const messages = await sendMemoChat(memoId, message);
+    const { messages, auditEvents: serverAuditEvents } = await sendMemoChat(memoId, message);
     setChatMessages((current) => ({ ...current, [memoId]: messages }));
+    if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
   };
 
   const handleApplyChatSuggestion = (memoId: string, messageId: string, proposedMemoText: string) => {
@@ -472,6 +505,17 @@ export function App() {
       createAuditEvent(memoId, action, detail, severity, currentUser?.name ?? "Reviewer"),
       ...current
     ]);
+  };
+
+  const mergeAuditEvents = (events: AuditEvent[]) => {
+    setAuditEvents((current) => {
+      const seen = new Set<string>();
+      return [...events, ...current].filter((event) => {
+        if (seen.has(event.id)) return false;
+        seen.add(event.id);
+        return true;
+      });
+    });
   };
 
   if (auth.status === "checking") {
@@ -530,6 +574,7 @@ export function App() {
                   result={reviewResult}
                   selectedFindingId={selectedFindingId}
                   chatMessages={chatMessages[selectedMemo.id] ?? []}
+                  analysisLocked={analysisState.status === "running"}
                   onMemoTextChange={updateMemoText}
                   onSendChat={handleSendMemoChat}
                   onApplyChatSuggestion={handleApplyChatSuggestion}
