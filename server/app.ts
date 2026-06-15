@@ -146,7 +146,9 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
   // Serve the built frontend (Vite `dist/`) so the whole app runs as one
   // service in production (e.g. AWS App Runner). No-op in dev/tests where
   // `dist/` does not exist and Vite serves the client separately.
-  const distDir = path.resolve(fileURLToPath(new URL("../dist", import.meta.url)));
+  const distDir = process.env.RULIX_DIST_DIR
+    ? path.resolve(process.env.RULIX_DIST_DIR)
+    : path.resolve(fileURLToPath(new URL("../dist", import.meta.url)));
   if (existsSync(distDir)) {
     app.use(express.static(distDir));
     app.use((req, res, next) => {

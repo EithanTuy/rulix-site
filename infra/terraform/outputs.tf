@@ -26,24 +26,24 @@ output "worker_policy_arn" {
   value = aws_iam_policy.worker.arn
 }
 
-output "app_service_url" {
-  description = "Default App Runner HTTPS URL for the deployed app."
-  value       = "https://${aws_apprunner_service.app.service_url}"
+output "app_function_url" {
+  description = "Direct public Function URL of the app (works immediately, AWS-hosted URL)."
+  value       = aws_lambda_function_url.app.function_url
 }
 
-output "app_custom_domain_dns_targets" {
-  description = "DNS records to add at GoDaddy to validate + activate the custom domain. Add every record shown here."
+output "app_cert_validation_records" {
+  description = "ACM DNS validation CNAME(s) to add at GoDaddy before the cert/CloudFront becomes active."
   value = var.custom_domain == "" ? [] : [
-    for r in aws_apprunner_custom_domain_association.app[0].certificate_validation_records : {
-      name  = r.name
-      type  = r.type
-      value = r.value
+    for o in aws_acm_certificate.app[0].domain_validation_options : {
+      name  = o.resource_record_name
+      type  = o.resource_record_type
+      value = o.resource_record_value
     }
   ]
 }
 
 output "app_custom_domain_cname_target" {
-  description = "CNAME target for the app domain itself (point app.rulix.cloud here at GoDaddy)."
-  value       = var.custom_domain == "" ? "" : aws_apprunner_custom_domain_association.app[0].dns_target
+  description = "CloudFront domain to point app.rulix.cloud at via a CNAME at GoDaddy."
+  value       = var.custom_domain == "" ? "" : aws_cloudfront_distribution.app[0].domain_name
 }
 

@@ -1,134 +1,130 @@
-# Public app hosting for Rulix ECCN on AWS App Runner.
+# Public app hosting for Rulix ECCN on AWS Lambda + Function URL, fronted by
+# CloudFront for the custom domain app.rulix.cloud.
 #
-# This deploys the single Node service (Express serving the built Vite client
-# plus the /api routes) straight from the GitHub repo — no Docker, no S3, no
-# CloudFront. App Runner provides managed HTTPS and a custom domain for
-# app.rulix.cloud. See docs/aws-deploy.md for the apply runbook.
-#
-# Prerequisites that must exist BEFORE `terraform apply` (see runbook):
-#   1. An App Runner <-> GitHub connection authorized in the console; pass its
-#      ARN via var.apprunner_connection_arn.
-#   2. The Anthropic API key stored in Secrets Manager; pass its ARN via
-#      var.anthropic_secret_arn (or leave empty to run in local-rules mode).
+# The single Node service (Express serving the built Vite client + /api) is
+# bundled by `npm run build:lambda` into ../../lambda-build, zipped here, and
+# run on the Node 20 Lambda runtime. CloudFront terminates TLS for the custom
+# domain and forwards everything to the Function URL. See docs/aws-deploy.md.
 
 locals {
-  service_name = "rulix-${var.tenant_slug}-app"
+  fn_name = "rulix-${var.tenant_slug}-app"
 }
 
-# IAM role App Runner assumes to pull the source connection / read secrets.
-data "aws_iam_policy_document" "apprunner_build_assume" {
+data "archive_file" "lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda-build"
+  output_path = "${path.module}/function.zip"
+}
+
+# ---- Lambda execution role ----
+data "aws_iam_policy_document" "lambda_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
-      identifiers = ["build.apprunner.amazonaws.com"]
+      identifiers = ["lambda.amazonaws.com"]
     }
   }
 }
 
-resource "aws_iam_role" "apprunner_build" {
-  name               = "${local.service_name}-build"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_build_assume.json
+resource "aws_iam_role" "lambda_exec" {
+  name               = "${local.fn_name}-exec"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
   tags               = local.common_tags
 }
 
-resource "aws_iam_role_policy_attachment" "apprunner_build" {
-  role       = aws_iam_role.apprunner_build.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
+resource "aws_iam_role_policy_attachment" "lambda_logs" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# IAM role the running instance uses (read the API key secret + optional Bedrock).
-data "aws_iam_policy_document" "apprunner_instance_assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["tasks.apprunner.amazonaws.com"]
-    }
-  }
-}
+# ---- The function ----
+resource "aws_lambda_function" "app" {
+  function_name    = local.fn_name
+  role             = aws_iam_role.lambda_exec.arn
+  runtime          = "nodejs20.x"
+  handler          = "handler.handler"
+  filename         = data.archive_file.lambda.output_path
+  source_code_hash = data.archive_file.lambda.output_base64sha256
+  memory_size      = 1024
+  timeout          = 60
 
-resource "aws_iam_role" "apprunner_instance" {
-  name               = "${local.service_name}-instance"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_instance_assume.json
-  tags               = local.common_tags
-}
-
-data "aws_iam_policy_document" "apprunner_instance" {
-  count = var.anthropic_secret_arn == "" ? 0 : 1
-
-  statement {
-    sid       = "ReadAnthropicKey"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [var.anthropic_secret_arn]
-  }
-}
-
-resource "aws_iam_role_policy" "apprunner_instance" {
-  count  = var.anthropic_secret_arn == "" ? 0 : 1
-  name   = "${local.service_name}-secrets"
-  role   = aws_iam_role.apprunner_instance.id
-  policy = data.aws_iam_policy_document.apprunner_instance[0].json
-}
-
-resource "aws_apprunner_service" "app" {
-  service_name = local.service_name
-
-  source_configuration {
-    authentication_configuration {
-      connection_arn = var.apprunner_connection_arn
-    }
-    auto_deployments_enabled = true
-
-    code_repository {
-      repository_url = var.repository_url
-      source_code_version {
-        type  = "BRANCH"
-        value = var.repository_branch
-      }
-      code_configuration {
-        configuration_source = "API"
-        code_configuration_values {
-          runtime       = "NODEJS_18"
-          build_command = "npm install && npm run build"
-          start_command = "npm run start"
-          port          = "8080"
-          runtime_environment_variables = {
-            NODE_ENV = "production"
-            PORT     = "8080"
-            HOST     = "0.0.0.0"
-          }
-          runtime_environment_secrets = var.anthropic_secret_arn == "" ? {} : {
-            ANTHROPIC_API_KEY = var.anthropic_secret_arn
-          }
-        }
-      }
-    }
-  }
-
-  instance_configuration {
-    cpu               = "1024"
-    memory            = "2048"
-    instance_role_arn = aws_iam_role.apprunner_instance.arn
-  }
-
-  health_check_configuration {
-    protocol = "HTTP"
-    path     = "/api/health"
-    interval = 10
-    timeout  = 5
+  environment {
+    variables = merge(
+      {
+        NODE_ENV        = "production"
+        RULIX_DIST_DIR  = "dist"
+      },
+      var.anthropic_api_key == "" ? {} : { ANTHROPIC_API_KEY = var.anthropic_api_key }
+    )
   }
 
   tags = local.common_tags
 }
 
-# Custom domain: app.rulix.cloud. After apply, App Runner emits DNS validation
-# records (in the outputs) that must be added at GoDaddy before the domain
-# becomes active and the managed TLS cert is issued.
-resource "aws_apprunner_custom_domain_association" "app" {
-  count       = var.custom_domain == "" ? 0 : 1
-  domain_name = var.custom_domain
-  service_arn = aws_apprunner_service.app.arn
+# Public Function URL (CloudFront forwards to this; also directly reachable).
+resource "aws_lambda_function_url" "app" {
+  function_name      = aws_lambda_function.app.function_name
+  authorization_type = "NONE"
+}
 
-  enable_www_subdomain = false
+# ---- Custom domain: CloudFront + ACM (us-east-1, required for CloudFront) ----
+resource "aws_acm_certificate" "app" {
+  count             = var.custom_domain == "" ? 0 : 1
+  domain_name       = var.custom_domain
+  validation_method = "DNS"
+  tags              = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+locals {
+  fn_url_host = replace(replace(aws_lambda_function_url.app.function_url, "https://", ""), "/", "")
+}
+
+resource "aws_cloudfront_distribution" "app" {
+  count           = var.custom_domain == "" ? 0 : 1
+  enabled         = true
+  is_ipv6_enabled = true
+  comment         = "Rulix ECCN ${var.tenant_slug}"
+  aliases         = [var.custom_domain]
+
+  origin {
+    domain_name = local.fn_url_host
+    origin_id   = "lambda-fn-url"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "lambda-fn-url"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD"]
+
+    # AWS managed policies: CachingDisabled + AllViewerExceptHostHeader.
+    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate.app[0].arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  tags = local.common_tags
 }

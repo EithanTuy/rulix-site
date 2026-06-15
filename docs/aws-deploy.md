@@ -1,74 +1,75 @@
 # Deploying Rulix ECCN to AWS (app.rulix.cloud)
 
-This stands the app up on **AWS App Runner** as a single Node service (Express
-serves the built Vite client + the `/api` routes). App Runner builds straight
-from the GitHub repo and provides managed HTTPS and a custom domain. No Docker,
-S3, or CloudFront.
+This runs the app on **AWS Lambda** as a single Node service (Express serving
+the built Vite client + the `/api` routes), exposed via a **Lambda Function URL**
+and fronted by **CloudFront** for the custom domain `app.rulix.cloud` with a
+managed ACM certificate. No App Runner (closed to new accounts), no containers,
+no S3 static origin.
 
 > Compliance note: per the project README this public commercial deployment is a
 > sample/redacted-data pilot. Do not process real controlled technical data here
 > — that path is AWS GovCloud.
 
-Terraform lives in `infra/terraform/`. The hosting resources are in `hosting.tf`.
+Terraform lives in `infra/terraform/`; the hosting resources are in `hosting.tf`.
 
-## One-time prerequisites (these are your actions — they're security-gated)
+## Prerequisites (your actions — these are security-gated)
 
 ### 1. Deploy credentials (do NOT have the assistant create these)
-Create an IAM **user** (not root) with programmatic access scoped to App Runner,
-IAM (for the service roles), and Secrets Manager, then configure it locally so
-Terraform can read it **without the secret ever going through chat**:
+Create an IAM **user** (not root) with deploy permissions, then configure it
+locally so Terraform reads it without the secret going through any chat:
 
 ```powershell
-# In YOUR terminal, after creating the access key in the console:
-aws configure --profile rulix-deploy   # paste key id + secret when prompted
+& "C:\Program Files\Amazon\AWSCLIV2\aws.exe" configure --profile rulix-deploy
 $env:AWS_PROFILE = "rulix-deploy"
 ```
-(Terraform reads `~/.aws/credentials` automatically.)
 
-### 2. App Runner ↔ GitHub connection
-Console → App Runner → **GitHub connections** → create + authorize for
-`Daculguy/Rulix`. Copy the connection ARN.
+### 2. (Optional) Anthropic API key for live AI
+Without a key the app runs in deterministic local-rules mode. To enable the live
+Claude council, pass the key at apply time (stored only as a Lambda env var):
+`-var anthropic_api_key="sk-ant-..."` — or wire it through Secrets Manager.
 
-### 3. Anthropic API key secret (optional — omit to run in local-rules mode)
+## Build the Lambda bundle
+
 ```powershell
-aws secretsmanager create-secret --name rulix/anthropic-api-key --secret-string "sk-ant-..."
+npm install
+npm run build:lambda   # vite build + esbuild bundle -> lambda-build/
 ```
-Copy the returned ARN.
+This produces `lambda-build/handler.cjs` (bundled Express app) and
+`lambda-build/dist/` (built client). Terraform zips this directory.
 
-## Apply
+## Apply (two phases because of DNS-validated TLS)
 
 ```powershell
 cd infra/terraform
 terraform init
-terraform apply `
-  -var tenant_slug=prod `
-  -var aws_region=us-east-1 `
-  -var apprunner_connection_arn="arn:aws:apprunner:...:connection/..." `
-  -var anthropic_secret_arn="arn:aws:secretsmanager:...:secret:rulix/anthropic-api-key-XXXX"
+
+# Phase 1 — app live at the Function URL immediately:
+terraform apply -target=aws_lambda_function_url.app `
+  -var tenant_slug=prod -var aws_region=us-east-1
+
+# Phase 2a — create the ACM cert, then add the printed validation CNAME at GoDaddy:
+terraform apply -target=aws_acm_certificate.app `
+  -var tenant_slug=prod -var aws_region=us-east-1
+#   -> add `app_cert_validation_records` to GoDaddy DNS, wait for ISSUED:
+#   aws acm wait certificate-validated --certificate-arn <arn> --region us-east-1
+
+# Phase 2b — full apply creates CloudFront (needs the issued cert):
+terraform apply -var tenant_slug=prod -var aws_region=us-east-1
 ```
 
-App Runner builds from `main` and goes live at the `app_service_url` output.
+## DNS at GoDaddy (rulix.cloud → DNS)
 
-## DNS for app.rulix.cloud (GoDaddy)
+1. **Cert validation** (phase 2a): add each record from
+   `app_cert_validation_records` as a **CNAME** (Name without the `.rulix.cloud`
+   suffix).
+2. **App domain** (after phase 2b): add a **CNAME** — Name `app`, Value =
+   `app_custom_domain_cname_target` (the CloudFront `*.cloudfront.net` domain).
 
-After apply, Terraform prints two outputs:
-
-- `app_custom_domain_dns_targets` — certificate **validation** CNAME records.
-- `app_custom_domain_cname_target` — the target the app domain points to.
-
-In GoDaddy → `rulix.cloud` → DNS, add:
-
-1. Each validation record from `app_custom_domain_dns_targets` (Type CNAME,
-   Name/Value as shown).
-2. A CNAME: **Name** `app` → **Value** = `app_custom_domain_cname_target`.
-
-Validation usually completes within minutes to an hour; re-running
-`terraform apply` (or checking the App Runner console) shows the domain as
-`active` once the managed certificate is issued. The app is then live at
-https://app.rulix.cloud.
+CloudFront takes ~5–15 min to deploy. The app is then live at
+https://app.rulix.cloud. The raw `app_function_url` works immediately regardless.
 
 ## Tear down
 
 ```powershell
-terraform destroy -var tenant_slug=prod -var aws_region=us-east-1 ...
+terraform destroy -var tenant_slug=prod -var aws_region=us-east-1
 ```
