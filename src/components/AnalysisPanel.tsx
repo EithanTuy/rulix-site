@@ -14,7 +14,10 @@ import {
 import { getSourceChunk } from "../data/corpus";
 import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
-import type { AuditEvent, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
+import type { AuditEvent, MemoChatMessage, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
+import { MemoChatPanel } from "./MemoChatPanel";
+
+type SupportTab = "chat" | "analysis" | "decision" | "audit";
 
 interface AnalysisPanelProps {
   memo: MemoRecord;
@@ -29,7 +32,11 @@ interface AnalysisPanelProps {
   onRunAnalysis: () => void;
   decision?: ReviewerDecision;
   auditEvents: AuditEvent[];
+  chatMessages: MemoChatMessage[];
+  analysisLocked: boolean;
   onDecision: (action: ReviewerDecision["action"], notes: string) => void;
+  onSendChat: (memoId: string, message: string) => Promise<void>;
+  onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
   selectedFindingId?: string;
   onFindingSelect: (findingId: string | undefined) => void;
 }
@@ -44,10 +51,15 @@ export function AnalysisPanel({
   onRunAnalysis,
   decision,
   auditEvents,
+  chatMessages,
+  analysisLocked,
   onDecision,
+  onSendChat,
+  onApplyChatSuggestion,
   selectedFindingId,
   onFindingSelect
 }: AnalysisPanelProps) {
+  const [activeTab, setActiveTab] = useState<SupportTab>("chat");
   const [notes, setNotes] = useState(decision?.notes ?? "");
   const [selectedAction, setSelectedAction] = useState<ReviewerDecision["action"] | undefined>(
     decision?.action
@@ -72,6 +84,18 @@ export function AnalysisPanel({
   const acceptBlocked = selectedAction === "accept" && hasBlockingEvidence;
   const canSubmit = Boolean(selectedAction && notes.trim()) && !acceptBlocked;
   const selectedFinding = result?.findings.find((finding) => finding.id === selectedFindingId);
+  const tabs = (
+    <SupportTabs activeTab={activeTab} onTabChange={setActiveTab} />
+  );
+  const chatPanel = (
+    <MemoChatPanel
+      memo={memo}
+      chatMessages={chatMessages}
+      analysisLocked={analysisLocked}
+      onSendChat={onSendChat}
+      onApplyChatSuggestion={onApplyChatSuggestion}
+    />
+  );
 
   if (!result || analysisState.status === "unanalyzed" || analysisState.status === "running") {
     return (
@@ -82,33 +106,41 @@ export function AnalysisPanel({
             <span>{analysisState.status === "running" ? "AI working" : "Unanalyzed"}</span>
           </div>
         </div>
+        {tabs}
 
-        <section className={`analysis-status-card ${analysisState.status}`}>
-          <strong>{analysisState.status === "running" ? "AI analysis is running" : "This memo is unanalyzed"}</strong>
-          <p>{analysisState.message}</p>
-          <small>{backendNotice}</small>
-          <AnalysisModeSelector
-            mode={analysisMode}
-            onModeChange={onAnalysisModeChange}
-            disabled={analysisState.status === "running"}
-          />
-          <button
-            type="button"
-            className="button primary full"
-            onClick={onRunAnalysis}
-            disabled={analysisState.status === "running"}
-          >
-            {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
-          </button>
-        </section>
+        {activeTab === "chat" ? chatPanel : (
+          <>
+            <section className={`analysis-status-card ${analysisState.status}`}>
+              <strong>{analysisState.status === "running" ? "AI analysis is running" : "This memo is unanalyzed"}</strong>
+              <p>{analysisState.message}</p>
+              <small>{backendNotice}</small>
+              <AnalysisModeSelector
+                mode={analysisMode}
+                onModeChange={onAnalysisModeChange}
+                disabled={analysisState.status === "running"}
+              />
+              <button
+                type="button"
+                className="button primary full"
+                onClick={onRunAnalysis}
+                disabled={analysisState.status === "running"}
+              >
+                {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
+              </button>
+            </section>
 
-        <section className="analysis-section">
-          <h3>What happens next</h3>
-          <p className="empty-note">
-            Rulix will try live AI analysis when configured. If live AI fails or is unavailable,
-            the app will clearly mark the result as deterministic rules analysis.
-          </p>
-        </section>
+            <section className="analysis-section">
+              <h3>{activeTab === "decision" ? "Decision Pending" : activeTab === "audit" ? "Audit Trail" : "What happens next"}</h3>
+              <p className="empty-note">
+                {activeTab === "decision"
+                  ? "Run analysis before recording a reviewer decision."
+                  : activeTab === "audit"
+                    ? "Audit events will appear here as intake, analysis, chat edits, and decisions are recorded."
+                    : "Rulix will try live AI analysis when configured. If live AI fails or is unavailable, the app will clearly mark the result as deterministic rules analysis."}
+              </p>
+            </section>
+          </>
+        )}
       </aside>
     );
   }
@@ -121,51 +153,56 @@ export function AnalysisPanel({
           <span>{readiness?.label}</span>
         </div>
       </div>
+      {tabs}
 
-      <section className={`analysis-status-banner ${analysisState.status}`}>
-        <strong>{analysisStatusTitle(analysisState.status)}</strong>
-        <span>{analysisState.message}</span>
-        <button
-          type="button"
-          className="button small"
-          onClick={onRunAnalysis}
-        >
-          Re-run Analysis
-        </button>
-      </section>
+      {activeTab === "chat" && chatPanel}
 
-      <section className="analysis-section">
-        <h3>Analysis Mode</h3>
-        <AnalysisModeSelector mode={analysisMode} onModeChange={onAnalysisModeChange} />
-        <div className="run-metadata">
-          <strong>Last result</strong>
-          <span>
-            {result.provider.label} | {result.provider.model} | {depthLabel(result.provider.depth)}
-          </span>
-        </div>
-      </section>
+      {activeTab === "analysis" && (
+        <>
+          <section className={`analysis-status-banner ${analysisState.status}`}>
+            <strong>{analysisStatusTitle(analysisState.status)}</strong>
+            <span>{analysisState.message}</span>
+            <button
+              type="button"
+              className="button small"
+              onClick={onRunAnalysis}
+            >
+              Re-run Analysis
+            </button>
+          </section>
 
-      <section className="review-checklist">
-        <ChecklistItem
-          label="Jurisdiction"
-          value={result.jurisdiction.outcome === "ear-likely" ? "EAR path likely" : "Review needed"}
-          tone={result.jurisdiction.outcome === "ear-likely" ? "pass" : "review"}
-        />
-        <ChecklistItem
-          label="Blocking evidence"
-          value={`${readiness!.counts.conflict + readiness!.counts.missing} item${
-            readiness!.counts.conflict + readiness!.counts.missing === 1 ? "" : "s"
-          }`}
-          tone={readiness!.blockers ? "review" : "pass"}
-        />
-        <ChecklistItem
-          label="Recommendation"
-          value={result.recommended.eccn}
-          tone={result.recommended.risk === "high" ? "review" : "pass"}
-        />
-      </section>
+          <section className="analysis-section">
+            <h3>Analysis Mode</h3>
+            <AnalysisModeSelector mode={analysisMode} onModeChange={onAnalysisModeChange} />
+            <div className="run-metadata">
+              <strong>Last result</strong>
+              <span>
+                {result.provider.label} | {result.provider.model} | {depthLabel(result.provider.depth)}
+              </span>
+            </div>
+          </section>
 
-      <section className="jurisdiction-box">
+          <section className="review-checklist">
+            <ChecklistItem
+              label="Jurisdiction"
+              value={result.jurisdiction.outcome === "ear-likely" ? "EAR path likely" : "Review needed"}
+              tone={result.jurisdiction.outcome === "ear-likely" ? "pass" : "review"}
+            />
+            <ChecklistItem
+              label="Blocking evidence"
+              value={`${readiness!.counts.conflict + readiness!.counts.missing} item${
+                readiness!.counts.conflict + readiness!.counts.missing === 1 ? "" : "s"
+              }`}
+              tone={readiness!.blockers ? "review" : "pass"}
+            />
+            <ChecklistItem
+              label="Recommendation"
+              value={result.recommended.eccn}
+              tone={result.recommended.risk === "high" ? "review" : "pass"}
+            />
+          </section>
+
+          <section className="jurisdiction-box">
         <div className="box-heading">
           <ShieldCheck size={21} />
           <strong>Jurisdiction Gate</strong>
@@ -179,15 +216,31 @@ export function AnalysisPanel({
         </p>
       </section>
 
-      <section className="recommendation">
-        <h3>{result.recommended.eccn}</h3>
-        <p>{result.recommended.label}</p>
-        <a href={firstSourceUrl(result)} target="_blank" rel="noreferrer">
-          View ECCN Guidance <ExternalLink size={15} />
-        </a>
-      </section>
+          <section className="recommendation">
+            <h3>{result.recommended.eccn}</h3>
+            <p>{result.recommended.label}</p>
+            <div className="eccn-explanation">
+              <strong>Why this recommendation</strong>
+              <p>{result.recommended.summary}</p>
+              <small>
+                Confidence {Math.round(result.recommended.confidence * 100)}% | Risk {result.recommended.risk}
+              </small>
+              {result.findings.length > 0 && (
+                <ul>
+                  {result.findings.slice(0, 3).map((finding) => (
+                    <li key={finding.id}>
+                      <strong>{finding.status}:</strong> {finding.claim}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <a href={firstSourceUrl(result)} target="_blank" rel="noreferrer">
+              View ECCN Guidance <ExternalLink size={15} />
+            </a>
+          </section>
 
-      <section className="analysis-section">
+          <section className="analysis-section">
         <h3>Evidence Map</h3>
         <div className="finding-list">
           {result.findings.map((finding, index) => (
@@ -228,29 +281,18 @@ export function AnalysisPanel({
         )}
       </section>
 
-      {result.infoRequests.length > 0 && (
-        <section className="analysis-section info-request-section">
-          <h3>Information to Request</h3>
-          <ul>
-            {result.infoRequests.slice(0, 6).map((request) => (
-              <li key={request}>{request}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+          {result.infoRequests.length > 0 && (
+            <section className="analysis-section info-request-section">
+              <h3>Information to Request</h3>
+              <ul>
+                {result.infoRequests.slice(0, 6).map((request) => (
+                  <li key={request}>{request}</li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-      <section className="analysis-section agent-section">
-        <h3>AI Council</h3>
-        {result.agents.map((agent) => (
-          <div className="agent-row" key={agent.role}>
-            <span className={`status-dot ${agent.status === "complete" ? "green" : "amber"}`} />
-            <strong>{agent.label}</strong>
-            <span>{agent.summary}</span>
-          </div>
-        ))}
-      </section>
-
-      <section className="analysis-section">
+          <section className="analysis-section">
         <h3>Source Citations</h3>
         <div className="citation-list">
           {citations.slice(0, 6).map((chunk) => (
@@ -267,10 +309,24 @@ export function AnalysisPanel({
         </div>
       </section>
 
-      <section className="analysis-section">
+          <section className={`provider-box compact ${result.provider.source}`}>
+            {result.provider.live ? (
+              <Cloud size={16} />
+            ) : result.provider.source === "fallback" ? (
+              <WifiOff size={16} />
+            ) : (
+              <Cpu size={16} />
+            )}
+            <p>{result.provider.message}</p>
+          </section>
+        </>
+      )}
+
+      {activeTab === "audit" && (
+        <section className="analysis-section">
         <h3>Audit Trail</h3>
         <div className="audit-mini-list">
-          {auditEvents.slice(0, 4).map((event) => (
+          {auditEvents.map((event) => (
             <div className="audit-mini-row" key={event.id}>
               <span className={`status-dot ${event.severity === "info" ? "green" : "amber"}`} />
               <strong>{event.action}</strong>
@@ -280,8 +336,10 @@ export function AnalysisPanel({
           {auditEvents.length === 0 && <p className="empty-note">No audit events recorded yet.</p>}
         </div>
       </section>
+      )}
 
-      <section className="decision-box">
+      {activeTab === "decision" && (
+        <section className="decision-box">
         <div className="decision-title">
           <span>Reviewer Decision</span>
           <strong>
@@ -339,18 +397,38 @@ export function AnalysisPanel({
         )}
         {decision && <p className="decision-state">Current action: {decision.action}</p>}
       </section>
-
-      <section className={`provider-box compact ${result.provider.source}`}>
-        {result.provider.live ? (
-          <Cloud size={16} />
-        ) : result.provider.source === "fallback" ? (
-          <WifiOff size={16} />
-        ) : (
-          <Cpu size={16} />
-        )}
-        <p>{result.provider.message}</p>
-      </section>
+      )}
     </aside>
+  );
+}
+
+function SupportTabs({
+  activeTab,
+  onTabChange
+}: {
+  activeTab: SupportTab;
+  onTabChange: (tab: SupportTab) => void;
+}) {
+  const tabs: Array<{ id: SupportTab; label: string }> = [
+    { id: "chat", label: "Chat" },
+    { id: "analysis", label: "Analysis" },
+    { id: "decision", label: "Decision" },
+    { id: "audit", label: "Audit" }
+  ];
+
+  return (
+    <div className="support-tabs" aria-label="Support panel sections">
+      {tabs.map((tab) => (
+        <button
+          type="button"
+          className={activeTab === tab.id ? "active" : ""}
+          onClick={() => onTabChange(tab.id)}
+          key={tab.id}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { officialCorpus } from "./data/corpus";
 import {
   ANALYSIS_MODE_CONFIG,
@@ -76,7 +77,9 @@ export function App() {
   const [backendNotice, setBackendNotice] = useState("Checking analysis service...");
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("standard");
   const [selectedFindingId, setSelectedFindingId] = useState<string | undefined>();
+  const [panelSizes, setPanelSizes] = useState({ reviewList: 400, analysis: 456 });
   const memosRef = useRef<MemoRecord[]>([]);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   const selectedMemo = selectedMemoId
     ? memos.find((memo) => memo.id === selectedMemoId)
@@ -178,6 +181,57 @@ export function App() {
       .toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  const beginPanelResize = (
+    panel: "reviewList" | "analysis",
+    event: PointerEvent<HTMLButtonElement>
+  ) => {
+    const workspace = workspaceRef.current;
+    if (!workspace || window.matchMedia("(max-width: 980px)").matches) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startSizes = panelSizes;
+    const workspaceWidth = workspace.getBoundingClientRect().width;
+    const railWidth = 64;
+    const handleWidth = 12;
+    const minimumMemoWidth = 440;
+
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      const delta = moveEvent.clientX - startX;
+      setPanelSizes(() => {
+        if (panel === "reviewList") {
+          const maxReviewList = Math.max(
+            260,
+            workspaceWidth - railWidth - handleWidth - startSizes.analysis - handleWidth - minimumMemoWidth
+          );
+          return {
+            reviewList: clamp(startSizes.reviewList + delta, 260, Math.min(560, maxReviewList)),
+            analysis: startSizes.analysis
+          };
+        }
+
+        const maxAnalysis = Math.max(
+          300,
+          workspaceWidth - railWidth - startSizes.reviewList - handleWidth - handleWidth - minimumMemoWidth
+        );
+        return {
+          reviewList: startSizes.reviewList,
+          analysis: clamp(startSizes.analysis - delta, 300, Math.min(640, maxAnalysis))
+        };
+      });
+    };
+
+    const onUp = () => {
+      document.body.classList.remove("resizing-layout");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    document.body.classList.add("resizing-layout");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  };
 
   const handleAuthenticated = async (mode: "signin" | "signup", values: AuthFormValues) => {
     try {
@@ -552,7 +606,14 @@ export function App() {
         signoffReady={decision?.action === "accept"}
         exportNotice={exportNotice}
       />
-      <div className={activeView === "reviews" ? "workspace-grid" : "workspace-grid console-mode"}>
+      <div
+        ref={workspaceRef}
+        className={activeView === "reviews" ? "workspace-grid" : "workspace-grid console-mode"}
+        style={{
+          "--review-list-width": `${panelSizes.reviewList}px`,
+          "--analysis-panel-width": `${panelSizes.analysis}px`
+        } as CSSProperties}
+      >
         <SidebarRail activeView={activeView} onViewChange={setActiveView} />
         {activeView === "reviews" ? (
           <>
@@ -567,17 +628,22 @@ export function App() {
               onFile={handleFile}
               onPasteMemo={handlePasteMemo}
             />
+            <PanelResizeHandle
+              label="Resize review queue"
+              onPointerDown={(event) => beginPanelResize("reviewList", event)}
+            />
             {selectedMemo ? (
               <>
                 <MemoWorkspace
                   memo={selectedMemo}
                   result={reviewResult}
                   selectedFindingId={selectedFindingId}
-                  chatMessages={chatMessages[selectedMemo.id] ?? []}
                   analysisLocked={analysisState.status === "running"}
                   onMemoTextChange={updateMemoText}
-                  onSendChat={handleSendMemoChat}
-                  onApplyChatSuggestion={handleApplyChatSuggestion}
+                />
+                <PanelResizeHandle
+                  label="Resize analysis panel"
+                  onPointerDown={(event) => beginPanelResize("analysis", event)}
                 />
                 <AnalysisPanel
                   memo={selectedMemo}
@@ -589,7 +655,11 @@ export function App() {
                   onRunAnalysis={runAnalysis}
                   decision={decision}
                   auditEvents={auditEvents.filter((event) => event.memoId === selectedMemo.id)}
+                  chatMessages={chatMessages[selectedMemo.id] ?? []}
+                  analysisLocked={analysisState.status === "running"}
                   onDecision={handleDecision}
+                  onSendChat={handleSendMemoChat}
+                  onApplyChatSuggestion={handleApplyChatSuggestion}
                   selectedFindingId={selectedFindingId}
                   onFindingSelect={setSelectedFindingId}
                 />
@@ -604,6 +674,10 @@ export function App() {
                     New Review
                   </button>
                 </main>
+                <PanelResizeHandle
+                  label="Resize analysis panel"
+                  onPointerDown={(event) => beginPanelResize("analysis", event)}
+                />
                 <aside className="analysis-panel empty-panel">
                   <h2>Secure Workspace</h2>
                   <p>
@@ -634,6 +708,26 @@ export function App() {
         onCreate={handleCreateReview}
       />
     </div>
+  );
+}
+
+function PanelResizeHandle({
+  label,
+  onPointerDown
+}: {
+  label: string;
+  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="panel-resize-handle"
+      aria-label={label}
+      title={label}
+      onPointerDown={onPointerDown}
+    >
+      <span />
+    </button>
   );
 }
 
@@ -758,6 +852,10 @@ function deriveAnalysisStates(results: Record<string, ReviewResult>) {
           }
     ])
   ) as Record<string, AnalysisRunState>;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function readableApiError(message: string) {

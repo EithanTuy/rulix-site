@@ -1,45 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  CheckCircle2,
   Edit3,
   FileText,
   Highlighter,
-  MessageSquare,
-  Send,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
 import { createHighlightSegments } from "../lib/highlights";
-import type { MemoChatMessage, MemoRecord, ReviewResult } from "../types";
+import type { MemoRecord, ReviewResult } from "../types";
 
 interface MemoWorkspaceProps {
   memo: MemoRecord;
   result?: ReviewResult;
   selectedFindingId?: string;
-  chatMessages: MemoChatMessage[];
   analysisLocked: boolean;
   onMemoTextChange: (memoId: string, memoText: string) => void;
-  onSendChat: (memoId: string, message: string) => Promise<void>;
-  onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
 }
 
 export function MemoWorkspace({
   memo,
   result,
   selectedFindingId,
-  chatMessages,
   analysisLocked,
-  onMemoTextChange,
-  onSendChat,
-  onApplyChatSuggestion
+  onMemoTextChange
 }: MemoWorkspaceProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(memo.memoText);
   const [zoom, setZoom] = useState(100);
   const [highlightsVisible, setHighlightsVisible] = useState(true);
-  const [chatDraft, setChatDraft] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
-  const [chatError, setChatError] = useState("");
   const selectedFindingRef = useRef<HTMLElement | null>(null);
   const findings = result?.findings ?? [];
   const segments = createHighlightSegments(memo.memoText, findings);
@@ -59,22 +47,6 @@ export function MemoWorkspace({
     if (analysisLocked) return;
     onMemoTextChange(memo.id, draft);
     setEditing(false);
-  };
-
-  const submitChat = async () => {
-    if (!chatDraft.trim()) return;
-    const message = chatDraft.trim();
-    setChatDraft("");
-    setChatBusy(true);
-    setChatError("");
-    try {
-      await onSendChat(memo.id, message);
-    } catch (error) {
-      setChatDraft(message);
-      setChatError(error instanceof Error ? error.message : "Chat failed. Your draft was kept.");
-    } finally {
-      setChatBusy(false);
-    }
   };
 
   return (
@@ -212,58 +184,6 @@ export function MemoWorkspace({
           <LegendItem status="conflict" label="Conflicting Claim" />
         </div>
       </div>
-
-      <section className="memo-chat" aria-label="Memo chat">
-        <div className="memo-chat-title">
-          <MessageSquare size={19} />
-          <div>
-            <strong>Chat About This Memo</strong>
-            <span>Add reviewer context or ask Rulix to draft memo edits.</span>
-          </div>
-        </div>
-        <div className="memo-chat-thread">
-          {chatMessages.length === 0 && (
-            <div className="memo-chat-empty">
-              Try: "Add that the vendor confirmed the system has no radiation hardening."
-            </div>
-          )}
-          {chatMessages.map((message) => (
-            <div className={`chat-message ${message.role}`} key={message.id}>
-              <p>{message.text}</p>
-              {message.proposedMemoText && (
-                <div className="chat-proposal">
-                  <strong>Proposed memo update</strong>
-                  <pre>{previewDiff(memo.memoText, message.proposedMemoText)}</pre>
-                  <button
-                    type="button"
-                    className={message.applied ? "button small applied" : "button primary small"}
-                    disabled={message.applied || analysisLocked}
-                    onClick={() => onApplyChatSuggestion(memo.id, message.id, message.proposedMemoText!)}
-                  >
-                    {message.applied ? <CheckCircle2 size={16} /> : <Edit3 size={16} />}
-                    {message.applied ? "Applied" : "Apply to Memo"}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="memo-chat-input">
-          <textarea
-            value={chatDraft}
-            onChange={(event) => setChatDraft(event.target.value)}
-            placeholder="Ask a question or tell Rulix what to add, revise, or clarify..."
-            rows={3}
-            disabled={analysisLocked}
-          />
-          <button className="button primary small" type="button" onClick={submitChat} disabled={analysisLocked || chatBusy || !chatDraft.trim()}>
-            <Send size={16} />
-            Send
-          </button>
-        </div>
-        {analysisLocked && <p className="memo-chat-note">Memo edits are locked until the running analysis finishes.</p>}
-        {chatError && <p className="memo-chat-error">{chatError}</p>}
-      </section>
     </main>
   );
 }
@@ -297,7 +217,3 @@ function formatDate(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
-function previewDiff(currentMemoText: string, proposedMemoText: string) {
-  const addition = proposedMemoText.replace(currentMemoText.trim(), "").trim();
-  return addition || proposedMemoText.slice(-500);
-}

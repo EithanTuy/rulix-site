@@ -17,6 +17,7 @@ import type {
 import {
   getAnthropicRuntime,
   runCouncilAnalysis,
+  runMemoChatWithHaiku,
   type CouncilDepth
 } from "./anthropicCouncil";
 import {
@@ -238,7 +239,7 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json({ result });
   });
 
-  app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, (req, res) => {
+  app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, async (req, res) => {
     const memo = store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found." });
@@ -251,7 +252,8 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const messages = buildMemoChatMessages(memo, message);
+    const history = store.getAccountState(res.locals.user.id).chatMessages[memo.id] ?? [];
+    const messages = await buildMemoChatMessages(memo, message, history);
     const fullThread = store.appendChatMessages(res.locals.user.id, memo.id, messages);
     if (messages.some((item) => item.proposedMemoText)) {
       store.appendAuditEvent(
@@ -457,32 +459,128 @@ function sendStoreError(res: Response, error: unknown) {
   res.status(500).json({ error: "Unexpected account error." });
 }
 
-function buildMemoChatMessages(memo: MemoRecord, reviewerMessage: string): MemoChatMessage[] {
+async function buildMemoChatMessages(
+  memo: MemoRecord,
+  reviewerMessage: string,
+  history: MemoChatMessage[]
+): Promise<MemoChatMessage[]> {
   const now = new Date().toISOString();
+  const trimmedMessage = reviewerMessage.trim();
   const userMessage: MemoChatMessage = {
     id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     memoId: memo.id,
     role: "user",
-    text: reviewerMessage,
+    text: trimmedMessage,
     createdAt: now
   };
-  const wantsMemoEdit = /\b(add|append|include|update|edit|revise|change|insert|clarify)\b/i.test(
-    reviewerMessage
-  );
-  const proposedMemoText = wantsMemoEdit
-    ? appendReviewerContext(memo.memoText, reviewerMessage)
-    : undefined;
+
+  const aiResult = await runMemoChatWithHaiku(memo, trimmedMessage, history).catch(() => undefined);
+  if (aiResult) {
+    return [
+      userMessage,
+      {
+        id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        memoId: memo.id,
+        role: "assistant",
+        text: aiResult.text,
+        createdAt: now,
+        proposedMemoText: aiResult.proposedMemoText
+      }
+    ];
+  }
+
+  const localResult = buildLocalMemoChatResult(memo, trimmedMessage);
   const assistantMessage: MemoChatMessage = {
     id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     memoId: memo.id,
     role: "assistant",
-    text: proposedMemoText
-      ? "I drafted a memo update from that context. Review it, then apply it to clear prior analysis and re-run the review."
-      : "I can help turn reviewer context into memo language. Ask me to add, revise, clarify, or insert the information you want reflected in the memo.",
+    text: localResult.text,
     createdAt: now,
-    proposedMemoText
+    proposedMemoText: localResult.proposedMemoText
   };
   return [userMessage, assistantMessage];
+}
+
+function buildLocalMemoChatResult(memo: MemoRecord, reviewerMessage: string) {
+  const wantsMemoEdit = /\b(add|append|include|update|edit|revise|change|insert|clarify)\b/i.test(
+    reviewerMessage
+  );
+  if (wantsMemoEdit) {
+    return {
+      text: `Live memo chat is unavailable, so I drafted a simple memo update using: "${reviewerMessage}".`,
+      proposedMemoText: appendReviewerContext(memo.memoText, reviewerMessage)
+    };
+  }
+  return { text: buildMemoAwareChatReply(memo, reviewerMessage) };
+}
+
+function buildMemoAwareChatReply(memo: MemoRecord, reviewerMessage: string) {
+  const matchedSentences = findRelevantMemoSentences(memo.memoText, reviewerMessage);
+  const memoContext = matchedSentences.length
+    ? `I found relevant memo language: ${matchedSentences.map((sentence) => `"${sentence}"`).join(" ")}`
+    : `I do not see an exact match for that in ${memo.documentCode}.`;
+
+  if (/\b(missing|gap|need|needs|block|blocked|risk)\b/i.test(reviewerMessage)) {
+    return `${memoContext} If this affects signoff, add the missing fact to the memo or run analysis to surface the blocker in the evidence panel.`;
+  }
+
+  if (/\b(eccn|ear99|classification|classify|category|control)\b/i.test(reviewerMessage)) {
+    return `${memoContext} For classification support, compare that language against the recommendation and source citations after running AI analysis.`;
+  }
+
+  if (/\b(summary|summarize|what does|explain)\b/i.test(reviewerMessage)) {
+    return `${memo.title} is tracked as ${memo.documentCode} for ${memo.itemFamily}. ${memoContext}`;
+  }
+
+  return `${memoContext} Ask me to add, revise, clarify, or insert this context if you want me to draft memo text.`;
+}
+
+function findRelevantMemoSentences(memoText: string, reviewerMessage: string) {
+  const stopWords = new Set([
+    "about",
+    "after",
+    "again",
+    "also",
+    "and",
+    "are",
+    "can",
+    "does",
+    "for",
+    "from",
+    "has",
+    "have",
+    "how",
+    "into",
+    "memo",
+    "that",
+    "the",
+    "this",
+    "what",
+    "with",
+    "you"
+  ]);
+  const terms = Array.from(
+    new Set(
+      reviewerMessage
+        .toLowerCase()
+        .match(/[a-z0-9.-]{4,}/g)
+        ?.filter((term) => !stopWords.has(term)) ?? []
+    )
+  );
+  if (!terms.length) return [];
+
+  return memoText
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .map((sentence) => ({
+      sentence,
+      score: terms.filter((term) => sentence.toLowerCase().includes(term)).length
+    }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || a.sentence.length - b.sentence.length)
+    .slice(0, 2)
+    .map((match) => match.sentence.length > 220 ? `${match.sentence.slice(0, 217)}...` : match.sentence);
 }
 
 function appendReviewerContext(currentMemoText: string, reviewerMessage: string) {

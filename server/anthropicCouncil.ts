@@ -9,6 +9,7 @@ import type {
   EvidenceFinding,
   EvidenceStatus,
   JurisdictionFinding,
+  MemoChatMessage,
   MemoRecord,
   ReviewResult
 } from "../src/types";
@@ -22,6 +23,20 @@ interface CouncilOptions {
   model?: string;
   depth?: CouncilDepth;
   maxTokens?: number;
+}
+
+interface MemoChatOptions {
+  apiKey?: string;
+  model?: string;
+  maxTokens?: number;
+}
+
+export interface MemoChatAiResult {
+  source: "anthropic";
+  model: string;
+  text: string;
+  proposedMemoText?: string;
+  latencyMs: number;
 }
 
 type AiCouncilPayload = Partial<
@@ -135,6 +150,25 @@ const AI_REVIEW_SCHEMA = {
   }
 } as const;
 
+const MEMO_CHAT_SYSTEM_PROMPT = `You are Rulix memo chat, an export-control memo assistant.
+You help reviewers understand and improve the selected memo.
+Decide whether the reviewer is asking for a normal chat answer or asking you to edit/draft memo language.
+Use action "edit" only when the reviewer clearly asks to add, revise, clarify, insert, change, rewrite, or update memo text.
+For action "edit", return the complete updated memo text in proposedMemoText.
+For action "reply", do not return proposedMemoText.
+Do not claim final legal authority, do not invent facts, and say when the memo does not contain enough support.`;
+
+const MEMO_CHAT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["action", "response"],
+  properties: {
+    action: { type: "string", enum: ["reply", "edit"] },
+    response: { type: "string" },
+    proposedMemoText: { type: "string" }
+  }
+} as const;
+
 export function getAnthropicRuntime() {
   return {
     configured: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
@@ -222,6 +256,114 @@ export async function runCouncilAnalysis(
       latencyMs: Date.now() - startedAt
     });
   }
+}
+
+export async function runMemoChatWithHaiku(
+  memo: MemoRecord,
+  reviewerMessage: string,
+  history: MemoChatMessage[] = [],
+  options: MemoChatOptions = {}
+): Promise<MemoChatAiResult | undefined> {
+  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const model = options.model ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  if (!apiKey?.trim()) return undefined;
+
+  const startedAt = Date.now();
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model,
+    max_tokens: options.maxTokens ?? 1400,
+    system: MEMO_CHAT_SYSTEM_PROMPT,
+    tools: [
+      {
+        name: "record_memo_chat_response",
+        description:
+          "Choose whether to answer the reviewer or draft an updated memo, then return the response.",
+        input_schema: MEMO_CHAT_SCHEMA
+      }
+    ],
+    tool_choice: { type: "tool", name: "record_memo_chat_response" },
+    messages: [
+      {
+        role: "user",
+        content: buildMemoChatPrompt(memo, reviewerMessage, history)
+      }
+    ]
+  });
+
+  const toolBlock = response.content.find(
+    (block) => block.type === "tool_use" && block.name === "record_memo_chat_response"
+  );
+  const rawText = response.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
+  const payload = toolBlock
+    ? (toolBlock.input as Record<string, unknown>)
+    : parseJsonPayload(rawText) as Record<string, unknown>;
+
+  const responseText = asString(
+    payload.response,
+    "I reviewed the selected memo, but I need a more specific question or edit instruction."
+  );
+  const proposedMemoText = payload.action === "edit"
+    ? normalizeProposedMemoText(memo.memoText, payload.proposedMemoText)
+    : undefined;
+
+  return {
+    source: "anthropic",
+    model,
+    text: proposedMemoText
+      ? responseText
+      : `${responseText} (${providerLabel(model)})`,
+    proposedMemoText,
+    latencyMs: Date.now() - startedAt
+  };
+}
+
+function buildMemoChatPrompt(
+  memo: MemoRecord,
+  reviewerMessage: string,
+  history: MemoChatMessage[]
+) {
+  return JSON.stringify(
+    {
+      task:
+        "Answer the reviewer about the selected memo, or draft an updated memo only if the reviewer asked for an edit.",
+      memo: {
+        id: memo.id,
+        title: memo.title,
+        documentCode: memo.documentCode,
+        itemFamily: memo.itemFamily,
+        dataClass: memo.dataClass,
+        sourcePath: memo.sourcePath,
+        memoText: memo.memoText
+      },
+      recentChat: history.slice(-8).map((message) => ({
+        role: message.role,
+        text: message.text
+      })),
+      reviewerMessage,
+      outputContract: {
+        reply:
+          "Use action='reply' for questions, explanations, checks, or discussion. response should be concise and grounded in the memo.",
+        edit:
+          "Use action='edit' only for explicit edit requests. response should summarize the change, and proposedMemoText must be the complete updated memo text."
+      }
+    },
+    null,
+    2
+  );
+}
+
+function normalizeProposedMemoText(currentMemoText: string, value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const proposed = value.trim();
+  if (proposed.length < Math.max(80, currentMemoText.trim().length * 0.45)) {
+    return undefined;
+  }
+  return `${proposed}\n`;
 }
 
 function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult, depth: CouncilDepth) {

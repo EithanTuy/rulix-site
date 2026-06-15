@@ -61,7 +61,7 @@ data "aws_iam_policy_document" "tenant_kms" {
     condition {
       test     = "ArnLike"
       variable = "kms:EncryptionContext:aws:logs:arn"
-      values   = ["${local.log_group_arn}:*"]
+      values   = [local.log_group_arn, "${local.log_group_arn}:*"]
     }
   }
 }

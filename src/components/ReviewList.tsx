@@ -1,6 +1,5 @@
 import { ChangeEvent, useRef, useState } from "react";
 import {
-  ChevronDown,
   FileText,
   Filter,
   Search,
@@ -74,20 +73,18 @@ export function ReviewList({
       <section className="intake-section" aria-label="Intake and new review">
         <div className="section-title">Add a Memo</div>
         <div className="intake-card">
-          <UploadCloud size={31} strokeWidth={1.5} />
-          <div>Upload a memo file or paste memo text.</div>
-          <div className="intake-actions">
-            <button className="button small" type="button" onClick={() => inputRef.current?.click()}>
-              Upload File
-            </button>
-            <button
-              className="button small"
-              type="button"
-              onClick={() => setPasteOpen((value) => !value)}
-            >
-              Paste Text
-            </button>
-          </div>
+          <button className="button small" type="button" onClick={() => inputRef.current?.click()}>
+            <UploadCloud size={16} />
+            Upload File
+          </button>
+          <button
+            className="button small"
+            type="button"
+            onClick={() => setPasteOpen((value) => !value)}
+          >
+            <FileText size={16} />
+            Paste Text
+          </button>
           <input
             ref={inputRef}
             type="file"
@@ -156,10 +153,19 @@ export function ReviewList({
       )}
 
       <div className="sort-row">
-        <span>Sort:</span>
-        <button type="button" onClick={() => setSortMode(nextSortMode(sortMode))}>
-          {sortLabel(sortMode)} <ChevronDown size={15} />
-        </button>
+        <label>
+          Sort
+          <select
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="memo-cards" aria-label="Review list">
@@ -214,14 +220,9 @@ function compareMemos(a: MemoRecord, b: MemoRecord, sortMode: SortMode) {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
-function nextSortMode(sortMode: SortMode): SortMode {
-  const modes: SortMode[] = ["newest", "oldest", "status", "title"];
-  return modes[(modes.indexOf(sortMode) + 1) % modes.length];
-}
-
-function sortLabel(sortMode: SortMode) {
-  if (sortMode === "oldest") return "Updated (Oldest)";
-  if (sortMode === "status") return "Status";
-  if (sortMode === "title") return "Title";
-  return "Updated (Newest)";
-}
+const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
+  { value: "newest", label: "Updated (Newest)" },
+  { value: "oldest", label: "Updated (Oldest)" },
+  { value: "status", label: "Status" },
+  { value: "title", label: "Title" }
+];
