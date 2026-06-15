@@ -24,3 +24,35 @@ variable "bedrock_resource_arns" {
   type        = list(string)
   default     = ["*"]
 }
+
+# ---- App hosting (App Runner) ----
+
+variable "repository_url" {
+  description = "HTTPS URL of the GitHub repo App Runner builds from."
+  type        = string
+  default     = "https://github.com/Daculguy/Rulix"
+}
+
+variable "repository_branch" {
+  description = "Branch App Runner tracks for auto-deploys."
+  type        = string
+  default     = "main"
+}
+
+variable "apprunner_connection_arn" {
+  description = "ARN of the authorized App Runner <-> GitHub connection (create once in the console)."
+  type        = string
+  default     = ""
+}
+
+variable "anthropic_secret_arn" {
+  description = "Secrets Manager ARN holding the ANTHROPIC_API_KEY. Empty = run in local-rules mode."
+  type        = string
+  default     = ""
+}
+
+variable "custom_domain" {
+  description = "Public custom domain for the app, e.g. app.rulix.cloud. Empty = use the default App Runner URL only."
+  type        = string
+  default     = "app.rulix.cloud"
+}

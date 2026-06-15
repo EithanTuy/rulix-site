@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import { officialCorpus } from "../src/data/corpus";
@@ -139,6 +142,21 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
 
     res.json({ review: updatedMemo, decision });
   });
+
+  // Serve the built frontend (Vite `dist/`) so the whole app runs as one
+  // service in production (e.g. AWS App Runner). No-op in dev/tests where
+  // `dist/` does not exist and Vite serves the client separately.
+  const distDir = path.resolve(fileURLToPath(new URL("../dist", import.meta.url)));
+  if (existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.use((req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api")) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(distDir, "index.html"));
+    });
+  }
 
   return app;
 }
