@@ -143,6 +143,33 @@ export interface AuditEvent {
   severity: "info" | "review" | "escalate";
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: "export-control-officer" | "reviewer" | "submitter" | "counsel";
+  createdAt: string;
+}
+
+export interface MemoChatMessage {
+  id: string;
+  memoId: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
+  proposedMemoText?: string;
+  applied?: boolean;
+}
+
+export interface AccountReviewState {
+  memos: MemoRecord[];
+  selectedMemoId?: string;
+  decisions: Record<string, ReviewerDecision>;
+  auditEvents: AuditEvent[];
+  analysisResults: Record<string, ReviewResult>;
+  chatMessages: Record<string, MemoChatMessage[]>;
+}
+
 export interface NewReviewInput {
   title: string;
   itemFamily: string;

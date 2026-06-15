@@ -1,6 +1,6 @@
 # Rulix ECCN
 
-Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned official-source corpus. It ingests memo text, runs a backend Claude Sonnet-style council when `ANTHROPIC_API_KEY` is configured, falls back to deterministic local rules when the provider is unavailable, highlights memo evidence, maps findings to citations, and requires human export-control signoff before any result is treated as final.
+Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned official-source corpus. It ingests memo text, runs a backend AI council when `ANTHROPIC_API_KEY` is configured, falls back to deterministic local rules when the provider is unavailable, highlights memo evidence, maps findings to citations, and requires human export-control signoff before any result is treated as final.
 
 ## Run
 
@@ -28,6 +28,7 @@ npm run download:corpus
 ```
 
 Reviewer workflow guide: `docs/reviewer-guide.md`.
+Security and storage guide: `docs/security-auth-storage.md`.
 
 `npm run test:ai` requires `ANTHROPIC_API_KEY` and verifies that the backend returns a live Anthropic result. Do not commit `.env` files or API keys.
 
@@ -37,7 +38,8 @@ Reviewer workflow guide: `docs/reviewer-guide.md`.
 
 - React/Vite dashboard based on the generated concept in `design/eccn-dashboard-concept.png`.
 - Express backend with `/api/health`, `/api/corpus`, `/api/reviews`, `/api/reviews/:id/analyze`, `/api/ai/review`, and reviewer decision endpoints.
-- Review queue, upload/paste intake, searchable sample memo list, highlighted memo viewer, editable memo text, AI council panel, source citations, decision notes, and report export.
+- Authenticated account workspace with server-stored memos, decisions, analysis results, memo chat history, and audit events.
+- Review queue, upload/paste intake, highlighted memo viewer, editable memo text, memo chat-assisted edits, AI council panel, source citations, decision notes, and report export.
 - Backend Anthropic Sonnet council adapter with deterministic citation/range validation and safe local fallback.
 - Local review engine that recommends candidate ECCNs/EAR99 review paths, labels evidence as strong/weak/missing/conflict, verifies citations against the official corpus, and preserves human signoff as a hard gate.
 - Seed official corpus metadata for EAR/ITAR/BIS/ITA sources, with a downloader for full raw snapshots.

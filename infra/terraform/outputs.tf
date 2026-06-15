@@ -27,7 +27,7 @@ output "worker_policy_arn" {
 }
 
 output "app_function_url" {
-  description = "Direct public Function URL of the app (works immediately, AWS-hosted URL)."
+  description = "Lambda Function URL. With custom_domain set, direct browser access is rejected unless the CloudFront origin secret header is present."
   value       = aws_lambda_function_url.app.function_url
 }
 

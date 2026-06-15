@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { sampleMemos } from "../data/sampleMemos";
+import { reviewFixtures } from "../test/reviewFixtures";
 import type { AuditEvent } from "../types";
 import { analyzeMemo } from "./eccnReview";
 import { buildReviewReport } from "./report";
 
 describe("review report export", () => {
   it("includes reviewer decisions, audit events, and official citations", () => {
-    const memo = sampleMemos[0];
+    const memo = reviewFixtures[0];
     const result = analyzeMemo(memo);
     const auditEvents: AuditEvent[] = [
       {

@@ -9,12 +9,125 @@ servers:
       tenantHost:
         default: tenant.example.com
 security:
-  - bearerAuth: []
+  - cookieAuth: []
 paths:
+  /auth/register:
+    post:
+      summary: Create an account and start a secure session
+      operationId: registerAccount
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 12
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+  /auth/login:
+    post:
+      summary: Sign in and start a secure session
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+  /auth/me:
+    get:
+      summary: Return the current authenticated user and CSRF token
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Sign in required
+  /auth/logout:
+    post:
+      summary: End the current session
+      operationId: logout
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Signed out
+  /account/state:
+    get:
+      summary: Get account-linked review workspace state
+      operationId: getAccountState
+      responses:
+        "200":
+          description: Account review state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/AccountReviewState"
+        "401":
+          description: Sign in required
+    put:
+      summary: Replace account-linked review workspace state
+      operationId: saveAccountState
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  $ref: "#/components/schemas/AccountReviewState"
+      responses:
+        "200":
+          description: Saved account state
   /health:
     get:
       summary: Check backend health and provider configuration
       operationId: getHealth
+      security: []
       responses:
         "200":
           description: Service health
@@ -42,6 +155,7 @@ paths:
     get:
       summary: Get the active official-source corpus snapshot
       operationId: getCorpus
+      security: []
       responses:
         "200":
           description: Corpus snapshot
@@ -49,6 +163,9 @@ paths:
     post:
       summary: Run backend AI council analysis for an ad hoc memo
       operationId: analyzeMemo
+      security:
+        - cookieAuth: []
+          csrfToken: []
       requestBody:
         required: true
         content:
@@ -108,6 +225,9 @@ paths:
     post:
       summary: Create a stored memo review
       operationId: createReview
+      security:
+        - cookieAuth: []
+          csrfToken: []
       requestBody:
         required: true
         content:
@@ -121,12 +241,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [review, result]
+                required: [review]
                 properties:
                   review:
                     $ref: "#/components/schemas/MemoRecord"
-                  result:
-                    $ref: "#/components/schemas/ReviewResult"
   /reviews/{reviewId}:
     get:
       summary: Get a review result
@@ -153,11 +271,47 @@ paths:
                   auditEvents:
                     type: array
                     items:
-                      type: object
+                      $ref: "#/components/schemas/AuditEvent"
+    patch:
+      summary: Update memo text for a stored review
+      operationId: updateReviewMemoText
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memoText]
+              properties:
+                memoText:
+                  type: string
+      responses:
+        "200":
+          description: Review updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review]
+                properties:
+                  review:
+                    $ref: "#/components/schemas/MemoRecord"
   /reviews/{reviewId}/analyze:
     post:
       summary: Run AI council analysis for a stored review memo
       operationId: analyzeStoredReview
+      security:
+        - cookieAuth: []
+          csrfToken: []
       parameters:
         - name: reviewId
           in: path
@@ -175,6 +329,42 @@ paths:
                 properties:
                   result:
                     $ref: "#/components/schemas/ReviewResult"
+  /reviews/{reviewId}/chat:
+    post:
+      summary: Chat about a memo and optionally draft a memo edit
+      operationId: chatAboutMemo
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        "200":
+          description: Updated memo chat thread
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [messages]
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MemoChatMessage"
   /findings/{findingId}:
     patch:
       summary: Update reviewer disposition for a finding
@@ -205,6 +395,9 @@ paths:
     post:
       summary: Submit human reviewer decision
       operationId: createReviewerDecision
+      security:
+        - cookieAuth: []
+          csrfToken: []
       parameters:
         - name: reviewId
           in: path
@@ -222,11 +415,112 @@ paths:
           description: Decision recorded
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: rulix_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: x-rulix-csrf
   schemas:
+    AuthResponse:
+      type: object
+      required: [user, csrfToken]
+      properties:
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/UserProfile"
+            - type: "null"
+        csrfToken:
+          oneOf:
+            - type: string
+            - type: "null"
+    UserProfile:
+      type: object
+      required: [id, email, name, role, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [export-control-officer, reviewer, submitter, counsel]
+        createdAt:
+          type: string
+          format: date-time
+    AccountReviewState:
+      type: object
+      required: [memos, decisions, auditEvents, analysisResults, chatMessages]
+      properties:
+        memos:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemoRecord"
+        selectedMemoId:
+          type: string
+        decisions:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ReviewerDecision"
+        auditEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        analysisResults:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ReviewResult"
+        chatMessages:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/MemoChatMessage"
+    MemoChatMessage:
+      type: object
+      required: [id, memoId, role, text, createdAt]
+      properties:
+        id:
+          type: string
+        memoId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        proposedMemoText:
+          type: string
+        applied:
+          type: boolean
+    AuditEvent:
+      type: object
+      required: [id, memoId, at, actor, action, detail, severity]
+      properties:
+        id:
+          type: string
+        memoId:
+          type: string
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+        detail:
+          type: string
+        severity:
+          type: string
+          enum: [info, review, escalate]
     Document:
       type: object
       required: [id, status, checksumSha256]

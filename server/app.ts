@@ -2,32 +2,52 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { officialCorpus } from "../src/data/corpus";
-import { sampleMemos } from "../src/data/sampleMemos";
 import { analyzeMemo } from "../src/lib/eccnReview";
-import { createAuditEvent, deriveReviewStatus, seedAuditEvents } from "../src/lib/reviewLifecycle";
-import type { AuditEvent, MemoRecord, NewReviewInput, ReviewerDecision } from "../src/types";
+import { createAuditEvent, deriveReviewStatus } from "../src/lib/reviewLifecycle";
+import type {
+  AccountReviewState,
+  AuditEvent,
+  MemoChatMessage,
+  MemoRecord,
+  NewReviewInput,
+  ReviewerDecision
+} from "../src/types";
 import { getAnthropicRuntime, runCouncilAnalysis } from "./anthropicCouncil";
+import {
+  StoreError,
+  createAccountStore,
+  type AccountStore,
+  type AuthSession,
+  type SessionRecord
+} from "./store";
 
 const ALLOWED_REVIEW_MODELS = new Set(["claude-haiku-4-5", "claude-sonnet-4-6"]);
+const SESSION_COOKIE = "rulix_session";
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 8;
 
-interface Store {
-  memos: Map<string, MemoRecord>;
-  decisions: Map<string, ReviewerDecision>;
-  auditEvents: AuditEvent[];
+interface CreateAppOptions {
+  store?: AccountStore;
+  edgeSharedSecret?: string;
 }
 
-const DEFAULT_STORE: Store = {
-  memos: new Map(sampleMemos.map((memo) => [memo.id, memo])),
-  decisions: new Map(),
-  auditEvents: seedAuditEvents(sampleMemos)
-};
-
-export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
+export function createApp(options: CreateAppOptions = {}) {
+  const store = options.store ?? createAccountStore();
+  const edgeSharedSecret = options.edgeSharedSecret ?? process.env.RULIX_EDGE_SHARED_SECRET;
   const app = express();
 
-  app.use(cors({ origin: true, credentials: false }));
+  if (edgeSharedSecret) {
+    app.use((req, res, next) => {
+      if (req.get("x-rulix-edge-secret") !== edgeSharedSecret) {
+        res.status(403).json({ error: "Requests must arrive through the trusted edge." });
+        return;
+      }
+      next();
+    });
+  }
+
+  app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "5mb" }));
 
   app.get("/api/health", (_req, res) => {
@@ -45,62 +65,155 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
     res.json(officialCorpus);
   });
 
-  app.get("/api/reviews", (_req, res) => {
-    res.json({
-      reviews: Array.from(store.memos.values()),
-      auditEvents: store.auditEvents
-    });
+  app.post("/api/auth/register", (req, res) => {
+    try {
+      const session = store.registerUser({
+        email: normalizeText(req.body?.email, ""),
+        name: normalizeText(req.body?.name, ""),
+        password: normalizeText(req.body?.password, "")
+      });
+      setSessionCookie(res, session);
+      res.status(201).json({ user: session.user, csrfToken: session.csrfToken });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
   });
 
-  app.post("/api/reviews", (req, res) => {
-    const memo = createMemoRecord(req.body as Partial<NewReviewInput>);
-    const result = analyzeMemo(memo);
-    const storedMemo = {
-      ...memo,
-      status: deriveReviewStatus(result)
-    };
-    store.memos.set(storedMemo.id, storedMemo);
-    store.auditEvents.unshift(
+  app.post("/api/auth/login", (req, res) => {
+    try {
+      const session = store.authenticate(
+        normalizeText(req.body?.email, ""),
+        normalizeText(req.body?.password, "")
+      );
+      setSessionCookie(res, session);
+      res.json({ user: session.user, csrfToken: session.csrfToken });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    const session = store.getSession(readSessionCookie(req));
+    if (!session) {
+      res.json({ user: null, csrfToken: null });
+      return;
+    }
+    res.json({ user: session.user, csrfToken: session.session.csrfToken });
+  });
+
+  app.post("/api/auth/logout", requireAuth(store), requireCsrf, (req, res) => {
+    store.destroySession(readSessionCookie(req));
+    clearSessionCookie(res);
+    res.status(204).end();
+  });
+
+  app.get("/api/account/state", requireAuth(store), (_req, res) => {
+    res.json({ state: store.getAccountState(res.locals.user.id) });
+  });
+
+  app.put("/api/account/state", requireAuth(store), requireCsrf, (req, res) => {
+    store.replaceAccountState(res.locals.user.id, req.body?.state as AccountReviewState);
+    res.json({ state: store.getAccountState(res.locals.user.id) });
+  });
+
+  app.get("/api/reviews", requireAuth(store), (_req, res) => {
+    res.json(store.listReviews(res.locals.user.id));
+  });
+
+  app.post("/api/reviews", requireAuth(store), requireCsrf, (req, res) => {
+    const memo = createMemoRecord(req.body as Partial<NewReviewInput>, res.locals.user.name);
+    store.upsertReview(res.locals.user.id, memo);
+    store.appendAuditEvent(
+      res.locals.user.id,
       createAuditEvent(
-        storedMemo.id,
+        memo.id,
         "Review created",
-        "Review was created through the Phase 2 backend API.",
-        storedMemo.dataClass === "itar-risk" || storedMemo.dataClass === "cui" ? "escalate" : "info"
+        "Review was created through the authenticated Rulix API.",
+        memo.dataClass === "itar-risk" || memo.dataClass === "cui" ? "escalate" : "info",
+        res.locals.user.name
       )
     );
-    res.status(201).json({ review: storedMemo, result });
+    res.status(201).json({ review: memo });
   });
 
-  app.get("/api/reviews/:id", (req, res) => {
-    const memo = store.memos.get(req.params.id);
+  app.get("/api/reviews/:id", requireAuth(store), (req, res) => {
+    const memo = store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
+    const state = store.getAccountState(res.locals.user.id);
     res.json({
       review: memo,
-      decision: store.decisions.get(memo.id),
-      auditEvents: store.auditEvents.filter((event) => event.memoId === memo.id)
+      decision: state.decisions[memo.id],
+      result: state.analysisResults[memo.id],
+      chatMessages: state.chatMessages[memo.id] ?? [],
+      auditEvents: state.auditEvents.filter((event) => event.memoId === memo.id)
     });
   });
 
-  app.post("/api/reviews/:id/analyze", async (req, res) => {
-    const memo = store.memos.get(req.params.id);
+  app.patch("/api/reviews/:id", requireAuth(store), requireCsrf, (req, res) => {
+    const memo = store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
-    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
-    store.memos.set(memo.id, {
+    const memoText = normalizeText(req.body?.memoText, "");
+    if (!memoText) {
+      res.status(400).json({ error: "memoText is required." });
+      return;
+    }
+
+    const updatedMemo = {
       ...memo,
-      status: deriveReviewStatus(result, store.decisions.get(memo.id))
-    });
-    res.json({ result });
+      memoText,
+      updatedAt: new Date().toISOString().slice(0, 10),
+      status: "draft" as const
+    };
+    store.updateReview(res.locals.user.id, updatedMemo);
+    store.appendAuditEvent(
+      res.locals.user.id,
+      createAuditEvent(
+        memo.id,
+        "Memo edited",
+        "Memo text changed through the authenticated Rulix API.",
+        "review",
+        res.locals.user.name
+      )
+    );
+    res.json({ review: updatedMemo });
   });
 
-  app.post("/api/ai/review", async (req, res) => {
+  app.post("/api/reviews/:id/analyze", requireAuth(store), requireCsrf, async (req, res) => {
+    const memo = store.findReview(res.locals.user.id, reviewId(req));
+    if (!memo) {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
+
+    const state = store.getAccountState(res.locals.user.id);
+    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
+    const updatedMemo = {
+      ...memo,
+      status: deriveReviewStatus(result, state.decisions[memo.id])
+    };
+    store.setAnalysisResult(res.locals.user.id, updatedMemo, result);
+    store.appendAuditEvent(
+      res.locals.user.id,
+      createAuditEvent(
+        memo.id,
+        "Analysis completed",
+        result.provider.message,
+        result.provider.live ? "info" : "review",
+        res.locals.user.name
+      )
+    );
+    res.json({ review: updatedMemo, result });
+  });
+
+  app.post("/api/ai/review", requireAuth(store), requireCsrf, async (req, res) => {
     const memo = coerceMemo(req.body?.memo ?? req.body);
     if (!memo) {
       res.status(400).json({ error: "Request body must include a memo with memoText." });
@@ -111,8 +224,38 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
     res.json({ result });
   });
 
-  app.post("/api/reviews/:id/decision", (req, res) => {
-    const memo = store.memos.get(req.params.id);
+  app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, (req, res) => {
+    const memo = store.findReview(res.locals.user.id, reviewId(req));
+    if (!memo) {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
+
+    const message = normalizeText(req.body?.message, "");
+    if (!message) {
+      res.status(400).json({ error: "Chat message is required." });
+      return;
+    }
+
+    const messages = buildMemoChatMessages(memo, message);
+    const fullThread = store.appendChatMessages(res.locals.user.id, memo.id, messages);
+    if (messages.some((item) => item.proposedMemoText)) {
+      store.appendAuditEvent(
+        res.locals.user.id,
+        createAuditEvent(
+          memo.id,
+          "Memo chat suggestion drafted",
+          "Rulix drafted a memo edit from reviewer-provided context.",
+          "info",
+          res.locals.user.name
+        )
+      );
+    }
+    res.json({ messages: fullThread });
+  });
+
+  app.post("/api/reviews/:id/decision", requireAuth(store), requireCsrf, (req, res) => {
+    const memo = store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
@@ -124,21 +267,20 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
       return;
     }
 
-    store.decisions.set(memo.id, decision);
-    const result = analyzeMemo(memo);
+    const state = store.getAccountState(res.locals.user.id);
+    const result = state.analysisResults[memo.id] ?? analyzeMemo(memo);
     const updatedMemo = {
       ...memo,
       status: deriveReviewStatus(result, decision)
     };
-    store.memos.set(memo.id, updatedMemo);
-    store.auditEvents.unshift(
-      createAuditEvent(
-        memo.id,
-        `Reviewer decision: ${decision.action}`,
-        decision.notes,
-        decision.action === "override" ? "escalate" : decision.action === "request-info" ? "review" : "info"
-      )
+    const auditEvent = createAuditEvent(
+      memo.id,
+      `Reviewer decision: ${decision.action}`,
+      decision.notes,
+      decision.action === "override" ? "escalate" : decision.action === "request-info" ? "review" : "info",
+      res.locals.user.name
     );
+    store.setDecision(res.locals.user.id, updatedMemo, decision, auditEvent);
 
     res.json({ review: updatedMemo, decision });
   });
@@ -163,21 +305,13 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
   return app;
 }
 
-function cloneStore(store: Store): Store {
-  return {
-    memos: new Map(store.memos),
-    decisions: new Map(store.decisions),
-    auditEvents: [...store.auditEvents]
-  };
-}
-
-function createMemoRecord(input: Partial<NewReviewInput>): MemoRecord {
+function createMemoRecord(input: Partial<NewReviewInput>, owner = "API User"): MemoRecord {
   const now = new Date().toISOString().slice(0, 10);
   return {
     id: `review-${Date.now()}`,
     title: normalizeText(input.title, "New ECCN Classification Memo"),
     itemFamily: normalizeText(input.itemFamily, "Research equipment"),
-    owner: "API User",
+    owner,
     updatedAt: now,
     documentCode: `API-${now.replaceAll("-", "")}`,
     status: "draft",
@@ -231,6 +365,118 @@ function coerceDecision(value: unknown): ReviewerDecision | undefined {
     signedBy: input.action === "accept" ? input.signedBy ?? "API Reviewer" : input.signedBy,
     signedAt: input.action === "accept" ? input.signedAt ?? new Date().toISOString() : input.signedAt
   };
+}
+
+function reviewId(req: Request) {
+  const raw = req.params.id;
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+function requireAuth(store: AccountStore) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const session = store.getSession(readSessionCookie(req));
+    if (!session) {
+      res.status(401).json({ error: "Sign in required." });
+      return;
+    }
+    res.locals.user = session.user;
+    res.locals.session = session.session;
+    next();
+  };
+}
+
+function requireCsrf(_req: Request, res: Response, next: NextFunction) {
+  const session = res.locals.session as SessionRecord | undefined;
+  const token = _req.get("x-rulix-csrf");
+  if (!session || !token || token !== session.csrfToken) {
+    res.status(403).json({ error: "Security token expired. Refresh and sign in again." });
+    return;
+  }
+  next();
+}
+
+function setSessionCookie(res: Response, session: AuthSession) {
+  res.cookie(SESSION_COOKIE, session.rawToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: SESSION_MAX_AGE_MS,
+    path: "/"
+  });
+}
+
+function clearSessionCookie(res: Response) {
+  res.clearCookie(SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/"
+  });
+}
+
+function readSessionCookie(req: Request) {
+  return parseCookies(req.get("cookie"))[SESSION_COOKIE];
+}
+
+function parseCookies(header: string | undefined) {
+  if (!header) return {} as Record<string, string>;
+  return Object.fromEntries(
+    header.split(";").map((part) => {
+      const [name, ...valueParts] = part.trim().split("=");
+      return [decodeURIComponent(name), decodeURIComponent(valueParts.join("="))];
+    })
+  );
+}
+
+function sendStoreError(res: Response, error: unknown) {
+  if (error instanceof StoreError) {
+    res.status(error.status).json({ error: error.message });
+    return;
+  }
+  res.status(500).json({ error: "Unexpected account error." });
+}
+
+function buildMemoChatMessages(memo: MemoRecord, reviewerMessage: string): MemoChatMessage[] {
+  const now = new Date().toISOString();
+  const userMessage: MemoChatMessage = {
+    id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    memoId: memo.id,
+    role: "user",
+    text: reviewerMessage,
+    createdAt: now
+  };
+  const wantsMemoEdit = /\b(add|append|include|update|edit|revise|change|insert|clarify)\b/i.test(
+    reviewerMessage
+  );
+  const proposedMemoText = wantsMemoEdit
+    ? appendReviewerContext(memo.memoText, reviewerMessage)
+    : undefined;
+  const assistantMessage: MemoChatMessage = {
+    id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    memoId: memo.id,
+    role: "assistant",
+    text: proposedMemoText
+      ? "I drafted a memo update from that context. Review it, then apply it to clear prior analysis and re-run the review."
+      : "I can help turn reviewer context into memo language. Ask me to add, revise, clarify, or insert the information you want reflected in the memo.",
+    createdAt: now,
+    proposedMemoText
+  };
+  return [userMessage, assistantMessage];
+}
+
+function appendReviewerContext(currentMemoText: string, reviewerMessage: string) {
+  const cleaned = reviewerMessage
+    .replace(/\s+/g, " ")
+    .replace(/[^\S\r\n]+/g, " ")
+    .trim();
+  const heading = "## Reviewer-supplied context";
+  const line = `- ${cleaned}`;
+
+  if (currentMemoText.includes(heading)) {
+    return `${currentMemoText.trim()}\n${line}\n`;
+  }
+
+  return `${currentMemoText.trim()}\n\n${heading}\n${line}\n`;
 }
 
 function coerceReviewModel(value: unknown) {

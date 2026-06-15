@@ -10,6 +10,11 @@ locals {
   fn_name = "rulix-${var.tenant_slug}-app"
 }
 
+resource "random_password" "edge_shared_secret" {
+  length  = 32
+  special = false
+}
+
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = "${path.module}/../../lambda-build"
@@ -55,6 +60,7 @@ resource "aws_lambda_function" "app" {
         NODE_ENV        = "production"
         RULIX_DIST_DIR  = "dist"
       },
+      var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result },
       var.anthropic_api_key == "" ? {} : { ANTHROPIC_API_KEY = var.anthropic_api_key }
     )
   }
@@ -62,7 +68,8 @@ resource "aws_lambda_function" "app" {
   tags = local.common_tags
 }
 
-# Public Function URL (CloudFront forwards to this; also directly reachable).
+# Function URL origin. With a custom domain, the app rejects direct requests
+# unless CloudFront supplies the generated origin secret header.
 resource "aws_lambda_function_url" "app" {
   function_name      = aws_lambda_function.app.function_name
   authorization_type = "NONE"
@@ -94,6 +101,11 @@ resource "aws_cloudfront_distribution" "app" {
   origin {
     domain_name = local.fn_url_host
     origin_id   = "lambda-fn-url"
+
+    custom_header {
+      name  = "x-rulix-edge-secret"
+      value = random_password.edge_shared_secret.result
+    }
 
     custom_origin_config {
       http_port              = 80

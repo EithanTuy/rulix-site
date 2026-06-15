@@ -1,11 +1,11 @@
 import type { MemoRecord } from "../types";
 
-export const sampleMemos: MemoRecord[] = [
+export const reviewFixtures: MemoRecord[] = [
   {
-    id: "memo-cryo-2026-0417",
+    id: "fixture-cryo-2026-0417",
     title: "Compact Cryostat System Memo",
     itemFamily: "Cryogenic laboratory equipment",
-    owner: "You",
+    owner: "Fixture Reviewer",
     updatedAt: "2026-05-14",
     documentCode: "CRYO-2026-0417",
     status: "needs-info",
@@ -39,10 +39,10 @@ Intended for university research. Not for use in weapons, missile, or nuclear ap
 The item is self-classified as ECCN 3A001.a.5 because it is cryogenic equipment with controlled low-temperature performance. No license analysis is included in this memo.`
   },
   {
-    id: "memo-camera-2026-0412",
+    id: "fixture-camera-2026-0412",
     title: "High-Speed Camera Module",
     itemFamily: "Imaging sensor module",
-    owner: "A. Patel",
+    owner: "Fixture Reviewer",
     updatedAt: "2026-05-13",
     documentCode: "CAM-2026-0412",
     status: "ready",
@@ -63,10 +63,10 @@ The memo does not include spectral sensitivity, radiation hardening, environment
 The item is recommended for further review under Category 6 before relying on the ECCN.`
   },
   {
-    id: "memo-quantum-2026-0409",
+    id: "fixture-quantum-2026-0409",
     title: "Quantum Control Electronics",
     itemFamily: "Signal/control electronics",
-    owner: "J. Walsh",
+    owner: "Fixture Reviewer",
     updatedAt: "2026-05-12",
     documentCode: "QCTRL-2026-0409",
     status: "needs-info",
@@ -74,10 +74,10 @@ The item is recommended for further review under Category 6 before relying on th
     memoText: `The item is a rack-mounted quantum control electronics stack used to generate synchronized microwave and RF control pulses for qubit experiments. The memo claims EAR99 based on academic research use. It does not provide timing resolution, phase noise, channel count, waveform memory, encryption features, or whether the firmware is separately provided.`
   },
   {
-    id: "memo-laser-2026-0406",
+    id: "fixture-laser-2026-0406",
     title: "Ultrafast Laser Source",
     itemFamily: "Laser source",
-    owner: "M. Chen",
+    owner: "Fixture Reviewer",
     updatedAt: "2026-05-09",
     documentCode: "LAS-2026-0406",
     status: "conflict",
@@ -85,10 +85,10 @@ The item is recommended for further review under Category 6 before relying on th
     memoText: `The item is an ultrafast tunable laser source with femtosecond pulse duration. The memo concludes EAR99 because it will be used in a university optics lab. It lists wavelength range and average power but omits pulse energy, repetition rate, beam quality, tuning range, and whether any military end-use restrictions apply.`
   },
   {
-    id: "memo-vac-2026-0401",
+    id: "fixture-vac-2026-0401",
     title: "Vacuum Pump Assembly",
     itemFamily: "General laboratory equipment",
-    owner: "You",
+    owner: "Fixture Reviewer",
     updatedAt: "2026-05-08",
     documentCode: "VAC-2026-0401",
     status: "ready",
@@ -96,4 +96,3 @@ The item is recommended for further review under Category 6 before relying on th
     memoText: `The item is a standard oil-free scroll vacuum pump assembly for general laboratory vacuum service. It has no embedded encryption, no radiation hardening, no military design intent, and no listed performance characteristics identified in the reviewed CCL categories. The memo proposes EAR99 after manufacturer classification review and internal CCL screening.`
   }
 ];
-

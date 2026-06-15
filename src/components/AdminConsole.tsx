@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -5,7 +6,9 @@ import {
   Database,
   ExternalLink,
   FileText,
+  Filter,
   LockKeyhole,
+  Search,
   ShieldCheck,
   UsersRound
 } from "lucide-react";
@@ -13,6 +16,7 @@ import type {
   AppView,
   AuditEvent,
   CorpusSnapshot,
+  EvidenceStatus,
   MemoRecord,
   ReviewerDecision,
   ReviewResult
@@ -90,6 +94,45 @@ function Kpi({ label, value, tone = "default" }: { label: string; value: number;
 }
 
 function CorpusPanel({ corpus }: { corpus: CorpusSnapshot }) {
+  const [query, setQuery] = useState("");
+  const [authority, setAuthority] = useState<"all" | "EAR" | "ITAR" | "BIS" | "ITA">("all");
+  const authorityCounts = useMemo(
+    () =>
+      corpus.documents.reduce(
+        (acc, doc) => {
+          acc[doc.authority] += 1;
+          return acc;
+        },
+        { EAR: 0, ITAR: 0, BIS: 0, ITA: 0 }
+      ),
+    [corpus.documents]
+  );
+  const chunkCounts = useMemo(
+    () =>
+      corpus.chunks.reduce(
+        (acc, chunk) => {
+          const doc = corpus.documents.find((item) => item.id === chunk.documentId);
+          if (doc) acc[doc.authority] += 1;
+          return acc;
+        },
+        { EAR: 0, ITAR: 0, BIS: 0, ITA: 0 }
+      ),
+    [corpus.chunks, corpus.documents]
+  );
+  const filteredDocuments = corpus.documents.filter((doc) => {
+    const matchesAuthority = authority === "all" || doc.authority === authority;
+    const matchesQuery = `${doc.title} ${doc.authority}`.toLowerCase().includes(query.toLowerCase());
+    return matchesAuthority && matchesQuery;
+  });
+  const filteredChunks = corpus.chunks.filter((chunk) => {
+    const doc = corpus.documents.find((item) => item.id === chunk.documentId);
+    const matchesAuthority = authority === "all" || doc?.authority === authority;
+    const matchesQuery = `${chunk.title} ${chunk.locator} ${chunk.tags.join(" ")} ${chunk.text}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    return matchesAuthority && matchesQuery;
+  });
+
   return (
     <section className="console-section">
       <div className="console-section-title">
@@ -97,24 +140,56 @@ function CorpusPanel({ corpus }: { corpus: CorpusSnapshot }) {
         <h2>{corpus.label}</h2>
         <span>{corpus.documents.length} sources | {corpus.chunks.length} chunks</span>
       </div>
+
+      <div className="corpus-overview">
+        {(["EAR", "ITAR", "BIS", "ITA"] as const).map((item) => (
+          <button
+            className={authority === item ? "corpus-metric selected" : "corpus-metric"}
+            type="button"
+            onClick={() => setAuthority(authority === item ? "all" : item)}
+            key={item}
+          >
+            <strong>{item}</strong>
+            <span>{authorityCounts[item]} sources</span>
+            <small>{chunkCounts[item]} cited chunks</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="console-filter-row">
+        <label className="search-box compact">
+          <Search size={17} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search source, locator, tag..."
+          />
+        </label>
+        <button className={authority === "all" ? "filter-chip active" : "filter-chip"} type="button" onClick={() => setAuthority("all")}>
+          All sources
+        </button>
+      </div>
+
       <div className="corpus-grid">
-        {corpus.documents.map((doc) => (
+        {filteredDocuments.map((doc) => (
           <a className="corpus-source" href={doc.url} target="_blank" rel="noreferrer" key={doc.id}>
             <strong>{doc.title}</strong>
             <span>{doc.authority} | Snapshot {doc.snapshotDate}</span>
             <ExternalLink size={15} />
           </a>
         ))}
+        {filteredDocuments.length === 0 && <div className="empty-list">No sources match this filter.</div>}
       </div>
       <div className="chunk-table">
-        {corpus.chunks.map((chunk) => (
+        {filteredChunks.map((chunk) => (
           <div className="chunk-row" key={chunk.id}>
             <FileText size={17} />
             <strong>{chunk.locator}</strong>
-            <span>{chunk.tags.join(", ")}</span>
+            <span>{chunk.tags.slice(0, 4).join(", ")}</span>
             <small>{chunk.text}</small>
           </div>
         ))}
+        {filteredChunks.length === 0 && <div className="empty-list">No chunks match this filter.</div>}
       </div>
     </section>
   );
@@ -131,27 +206,69 @@ function EvidencePanel({
   counts: Record<"strong" | "weak" | "missing" | "conflict", number>;
   onSelectMemo: (memoId: string) => void;
 }) {
+  const [status, setStatus] = useState<"all" | EvidenceStatus>("all");
+  const [query, setQuery] = useState("");
   const rows = memos.flatMap((memo) =>
     (reviewResults[memo.id]?.findings ?? []).map((finding) => ({ memo, finding }))
   );
+  const visibleRows = rows.filter(({ memo, finding }) => {
+    const matchesStatus = status === "all" || finding.status === status;
+    const matchesQuery = `${finding.title} ${finding.rationale} ${memo.title}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    return matchesStatus && matchesQuery;
+  });
+  const attentionCount = counts.weak + counts.missing + counts.conflict;
 
   return (
     <section className="console-section">
+      <div className="evidence-brief">
+        <div>
+          <strong>{attentionCount} finding{attentionCount === 1 ? "" : "s"} need reviewer attention</strong>
+          <span>Filter by status, then open the memo to see the highlighted claim in context.</span>
+        </div>
+        <div className="evidence-filter-icon">
+          <Filter size={19} />
+        </div>
+      </div>
       <div className="evidence-summary">
-        <Kpi label="Strong" value={counts.strong} tone="green" />
-        <Kpi label="Weak" value={counts.weak} tone="amber" />
-        <Kpi label="Missing" value={counts.missing} tone="amber" />
-        <Kpi label="Conflict" value={counts.conflict} tone={counts.conflict ? "amber" : "green"} />
+        {(["strong", "weak", "missing", "conflict"] as const).map((item) => (
+          <button
+            className={status === item ? `evidence-status-tile ${item} selected` : `evidence-status-tile ${item}`}
+            type="button"
+            onClick={() => setStatus(status === item ? "all" : item)}
+            key={item}
+          >
+            <span>{statusLabel(item)}</span>
+            <strong>{counts[item]}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="console-filter-row">
+        <label className="search-box compact">
+          <Search size={17} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search finding or memo..."
+          />
+        </label>
+        <button className={status === "all" ? "filter-chip active" : "filter-chip"} type="button" onClick={() => setStatus("all")}>
+          All findings
+        </button>
       </div>
       <div className="evidence-table">
-        {rows.slice(0, 18).map(({ memo, finding }) => (
+        {visibleRows.slice(0, 24).map(({ memo, finding }) => (
           <button className="evidence-table-row" type="button" onClick={() => onSelectMemo(memo.id)} key={`${memo.id}-${finding.id}`}>
             <span className={`finding-badge ${finding.status}`}>{finding.status[0].toUpperCase()}</span>
-            <strong>{finding.title}</strong>
-            <span>{memo.title}</span>
+            <span className="evidence-row-main">
+              <strong>{finding.title}</strong>
+              <span>{memo.title}</span>
+            </span>
             <small>{finding.rationale}</small>
           </button>
         ))}
+        {visibleRows.length === 0 && <div className="empty-list">No evidence findings match this view.</div>}
       </div>
     </section>
   );
@@ -178,6 +295,13 @@ function ControlsPanel() {
       ))}
     </section>
   );
+}
+
+function statusLabel(status: EvidenceStatus) {
+  if (status === "strong") return "Strong";
+  if (status === "weak") return "Weak";
+  if (status === "missing") return "Missing";
+  return "Conflict";
 }
 
 function UsersPanel() {
@@ -211,13 +335,13 @@ function SettingsPanel() {
       </div>
       <div className="setting-card">
         <Database size={22} />
-        <strong>Local persistence</strong>
-        <p>Browser state persists reviews, decisions, and audit events for prototype evaluation.</p>
+        <strong>Account-linked storage</strong>
+        <p>Reviews, decisions, chat edits, and audit records are saved under the signed-in account.</p>
       </div>
       <div className="setting-card">
         <ShieldCheck size={22} />
         <strong>Model policy</strong>
-        <p>Claude Sonnet council orchestration is represented as a deterministic local engine until Bedrock credentials are wired.</p>
+        <p>Live analysis is optional; deterministic review remains clearly labeled and never replaces human signoff.</p>
       </div>
     </section>
   );
