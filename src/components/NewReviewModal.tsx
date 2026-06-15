@@ -51,7 +51,7 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
         <div className="modal-header">
           <div>
             <h2 id="new-review-title">New Review</h2>
-            <p>Start a memo review with metadata the AI council and audit trail can use.</p>
+            <p>Add the memo text and the minimum metadata needed for review tracking.</p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close new review">
             <X size={18} />
@@ -64,16 +64,8 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
             <input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <label>
-            Item family
-            <input value={itemFamily} onChange={(event) => setItemFamily(event.target.value)} />
-          </label>
-          <label>
             Manufacturer or source
             <input value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} />
-          </label>
-          <label>
-            Intended use
-            <input value={intendedUse} onChange={(event) => setIntendedUse(event.target.value)} />
           </label>
           <label>
             Data class

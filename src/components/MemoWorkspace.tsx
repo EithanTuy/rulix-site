@@ -1,13 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Bookmark,
   Edit3,
   FileText,
   Highlighter,
-  MessageSquare,
-  MoreVertical,
-  PanelLeft,
-  Search,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
@@ -16,14 +11,30 @@ import type { MemoRecord, ReviewResult } from "../types";
 
 interface MemoWorkspaceProps {
   memo: MemoRecord;
-  result: ReviewResult;
+  result?: ReviewResult;
+  selectedFindingId?: string;
   onMemoTextChange: (memoId: string, memoText: string) => void;
 }
 
-export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceProps) {
+export function MemoWorkspace({ memo, result, selectedFindingId, onMemoTextChange }: MemoWorkspaceProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(memo.memoText);
-  const segments = createHighlightSegments(memo.memoText, result.findings);
+  const [zoom, setZoom] = useState(100);
+  const [highlightsVisible, setHighlightsVisible] = useState(true);
+  const selectedFindingRef = useRef<HTMLElement | null>(null);
+  const findings = result?.findings ?? [];
+  const segments = createHighlightSegments(memo.memoText, findings);
+
+  useEffect(() => {
+    setDraft(memo.memoText);
+    setEditing(false);
+  }, [memo.id, memo.memoText]);
+
+  useEffect(() => {
+    if (selectedFindingId) {
+      selectedFindingRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [selectedFindingId]);
 
   const saveDraft = () => {
     onMemoTextChange(memo.id, draft);
@@ -43,36 +54,38 @@ export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceP
           </div>
         </div>
         <div className="memo-header-actions">
-          <span className={`needs-pill ${memo.status}`}>{statusPillLabel(memo.status, result.infoRequests.length)}</span>
-          <button type="button" className="icon-button" aria-label="Comments" title="Comments">
-            <MessageSquare size={18} />
-          </button>
-          <button type="button" className="icon-button" aria-label="More actions" title="More actions">
-            <MoreVertical size={18} />
-          </button>
+          <span className={`needs-pill ${memo.status}`}>{statusPillLabel(memo.status, result?.infoRequests.length ?? 0)}</span>
         </div>
       </div>
 
       <div className="memo-toolbar">
         <div className="toolbar-group">
-          <button type="button" className="tool active" aria-label="Document view" title="Document view">
-            <PanelLeft size={17} />
-          </button>
-          <button type="button" className="tool" aria-label="Search memo" title="Search memo">
-            <Search size={17} />
-          </button>
-        </div>
-        <div className="toolbar-group">
-          <button type="button" className="tool">100%</button>
-          <button type="button" className="tool" aria-label="Zoom out" title="Zoom out">
+          <button type="button" className="tool" onClick={() => setZoom(100)}>{zoom}%</button>
+          <button
+            type="button"
+            className="tool"
+            aria-label="Zoom out"
+            title="Zoom out"
+            onClick={() => setZoom((value) => Math.max(75, value - 10))}
+          >
             <ZoomOut size={17} />
           </button>
-          <button type="button" className="tool" aria-label="Zoom in" title="Zoom in">
+          <button
+            type="button"
+            className="tool"
+            aria-label="Zoom in"
+            title="Zoom in"
+            onClick={() => setZoom((value) => Math.min(150, value + 10))}
+          >
             <ZoomIn size={17} />
           </button>
         </div>
         <div className="toolbar-spacer" />
-        <button type="button" className="tool">
+        <button
+          type="button"
+          className={highlightsVisible ? "tool active" : "tool"}
+          onClick={() => setHighlightsVisible((value) => !value)}
+        >
           <Highlighter size={17} /> Highlight
         </button>
         <button
@@ -84,9 +97,6 @@ export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceP
           }}
         >
           <Edit3 size={17} /> {editing ? "Cancel Edit" : "Edit Text"}
-        </button>
-        <button type="button" className="tool icon-only" aria-label="Bookmark" title="Bookmark">
-          <Bookmark size={17} />
         </button>
       </div>
 
@@ -101,24 +111,34 @@ export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceP
             </div>
           </div>
         ) : (
-          <article className="memo-document">
+          <article
+            className="memo-document"
+            style={{ fontSize: `${16 * (zoom / 100)}px` }}
+          >
             {segments.map((segment, index) =>
-              segment.finding ? (
+              segment.finding && highlightsVisible ? (
                 <mark
-                  className={`highlight ${segment.finding.status}`}
+                  className={
+                    segment.finding.id === selectedFindingId
+                      ? `highlight ${segment.finding.status} selected`
+                      : `highlight ${segment.finding.status}`
+                  }
                   title={segment.finding.title}
                   key={`${segment.finding.id}-${index}`}
+                  ref={(element) => {
+                    if (segment.finding?.id === selectedFindingId) selectedFindingRef.current = element;
+                  }}
                 >
                   {segment.text}
                   <span className={`finding-badge ${segment.finding.status}`}>
-                    {indexBadge(result.findings, segment.finding.id)}
+                    {indexBadge(findings, segment.finding.id)}
                   </span>
                 </mark>
               ) : (
                 <span key={`text-${index}`}>{segment.text}</span>
               )
             )}
-            {result.findings
+            {findings
               .filter(
                 (finding) =>
                   finding.status === "missing" &&
@@ -126,10 +146,20 @@ export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceP
                   typeof finding.end !== "number"
               )
               .map((finding) => (
-                <p className="missing-inline" key={finding.id}>
+                <p
+                  className={
+                    finding.id === selectedFindingId
+                      ? "missing-inline selected"
+                      : "missing-inline"
+                  }
+                  key={finding.id}
+                  ref={(element) => {
+                    if (finding.id === selectedFindingId) selectedFindingRef.current = element;
+                  }}
+                >
                   [Add: {finding.claim}]
                   <span className="finding-badge missing">
-                    {indexBadge(result.findings, finding.id)}
+                    {indexBadge(findings, finding.id)}
                   </span>
                 </p>
               ))}
@@ -144,7 +174,6 @@ export function MemoWorkspace({ memo, result, onMemoTextChange }: MemoWorkspaceP
           <LegendItem status="missing" label="Missing Info" />
           <LegendItem status="conflict" label="Conflicting Claim" />
         </div>
-        <div className="autosave">Auto-saved 10:32 AM</div>
       </div>
     </main>
   );

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Check,
-  ChevronRight,
   Cloud,
   Cpu,
   ExternalLink,
@@ -13,26 +12,52 @@ import {
   X
 } from "lucide-react";
 import { getSourceChunk } from "../data/corpus";
+import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
+import { summarizeReadiness } from "../lib/reviewLifecycle";
 import type { AuditEvent, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
 
 interface AnalysisPanelProps {
   memo: MemoRecord;
-  result: ReviewResult;
+  result?: ReviewResult;
+  analysisState: {
+    status: "unanalyzed" | "running" | "live" | "deterministic" | "failed";
+    message: string;
+  };
+  analysisMode: AnalysisMode;
+  onAnalysisModeChange: (mode: AnalysisMode) => void;
+  backendNotice: string;
+  onRunAnalysis: () => void;
   decision?: ReviewerDecision;
   auditEvents: AuditEvent[];
   onDecision: (action: ReviewerDecision["action"], notes: string) => void;
+  selectedFindingId?: string;
+  onFindingSelect: (findingId: string | undefined) => void;
 }
 
 export function AnalysisPanel({
   memo,
   result,
+  analysisState,
+  analysisMode,
+  onAnalysisModeChange,
+  backendNotice,
+  onRunAnalysis,
   decision,
   auditEvents,
-  onDecision
+  onDecision,
+  selectedFindingId,
+  onFindingSelect
 }: AnalysisPanelProps) {
   const [notes, setNotes] = useState(decision?.notes ?? "");
-  useEffect(() => setNotes(decision?.notes ?? ""), [decision?.notes, memo.id]);
-  const citations = [
+  const [selectedAction, setSelectedAction] = useState<ReviewerDecision["action"] | undefined>(
+    decision?.action
+  );
+  useEffect(() => {
+    setNotes(decision?.notes ?? "");
+    setSelectedAction(decision?.action);
+  }, [decision?.action, decision?.notes, memo.id]);
+  const citations = result
+    ? [
     ...new Set([
       ...result.jurisdiction.sourceChunkIds,
       ...result.recommended.sourceChunkIds,
@@ -40,36 +65,96 @@ export function AnalysisPanel({
     ])
   ]
     .map((id) => getSourceChunk(id))
-    .filter(Boolean);
+    .filter(Boolean)
+    : [];
+  const readiness = result ? summarizeReadiness(result) : undefined;
+  const canSubmit = Boolean(selectedAction && notes.trim());
+  const selectedFinding = result?.findings.find((finding) => finding.id === selectedFindingId);
+
+  if (!result || analysisState.status === "unanalyzed" || analysisState.status === "running") {
+    return (
+      <aside className="analysis-panel">
+        <div className="analysis-title">
+          <div>
+            <h2>Review Decision Support</h2>
+            <span>{analysisState.status === "running" ? "AI working" : "Unanalyzed"}</span>
+          </div>
+        </div>
+
+        <section className={`analysis-status-card ${analysisState.status}`}>
+          <strong>{analysisState.status === "running" ? "AI analysis is running" : "This memo is unanalyzed"}</strong>
+          <p>{analysisState.message}</p>
+          <small>{backendNotice}</small>
+          <AnalysisModeSelector
+            mode={analysisMode}
+            onModeChange={onAnalysisModeChange}
+            disabled={analysisState.status === "running"}
+          />
+          <button
+            type="button"
+            className="button primary full"
+            onClick={onRunAnalysis}
+            disabled={analysisState.status === "running"}
+          >
+            {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
+          </button>
+        </section>
+
+        <section className="analysis-section">
+          <h3>What happens next</h3>
+          <p className="empty-note">
+            Rulix will try live AI analysis when configured. If live AI fails or is unavailable,
+            the app will clearly mark the result as deterministic rules analysis.
+          </p>
+        </section>
+      </aside>
+    );
+  }
 
   return (
     <aside className="analysis-panel">
       <div className="analysis-title">
         <div>
-          <h2>AI Council Analysis</h2>
-          <span>{result.agents.length} Agents</span>
+          <h2>Review Decision Support</h2>
+          <span>{readiness?.label}</span>
         </div>
-        <button type="button" className="icon-button" aria-label="Collapse analysis" title="Collapse">
-          <ChevronRight size={18} />
-        </button>
       </div>
 
-      <section className={`provider-box ${result.provider.source}`}>
-        {result.provider.live ? (
-          <Cloud size={19} />
-        ) : result.provider.source === "fallback" ? (
-          <WifiOff size={19} />
-        ) : (
-          <Cpu size={19} />
-        )}
-        <div>
-          <strong>{result.provider.label}</strong>
-          <span>
-            {result.provider.model}
-            {result.provider.latencyMs ? ` | ${result.provider.latencyMs} ms` : ""}
-          </span>
-        </div>
-        <p>{result.provider.message}</p>
+      <section className={`analysis-status-banner ${analysisState.status}`}>
+        <strong>{analysisStatusTitle(analysisState.status)}</strong>
+        <span>{analysisState.message}</span>
+        <button
+          type="button"
+          className="button small"
+          onClick={onRunAnalysis}
+        >
+          Re-run Analysis
+        </button>
+      </section>
+
+      <section className="analysis-section">
+        <h3>Analysis Mode</h3>
+        <AnalysisModeSelector mode={analysisMode} onModeChange={onAnalysisModeChange} />
+      </section>
+
+      <section className="review-checklist">
+        <ChecklistItem
+          label="Jurisdiction"
+          value={result.jurisdiction.outcome === "ear-likely" ? "EAR path likely" : "Review needed"}
+          tone={result.jurisdiction.outcome === "ear-likely" ? "pass" : "review"}
+        />
+        <ChecklistItem
+          label="Blocking evidence"
+          value={`${readiness!.counts.conflict + readiness!.counts.missing} item${
+            readiness!.counts.conflict + readiness!.counts.missing === 1 ? "" : "s"
+          }`}
+          tone={readiness!.blockers ? "review" : "pass"}
+        />
+        <ChecklistItem
+          label="Recommendation"
+          value={result.recommended.eccn}
+          tone={result.recommended.risk === "high" ? "review" : "pass"}
+        />
       </section>
 
       <section className="jurisdiction-box">
@@ -87,31 +172,64 @@ export function AnalysisPanel({
       </section>
 
       <section className="recommendation">
-        <h3>Recommended: {result.recommended.eccn}</h3>
+        <h3>{result.recommended.eccn}</h3>
         <p>{result.recommended.label}</p>
         <a href={firstSourceUrl(result)} target="_blank" rel="noreferrer">
           View ECCN Guidance <ExternalLink size={15} />
         </a>
       </section>
 
-      <div className="score-grid">
-        <Metric label="Confidence" value={result.recommended.confidence} />
-        <Metric label="Risk" value={riskValue(result.recommended.risk)} risk={result.recommended.risk} />
-      </div>
-
       <section className="analysis-section">
         <h3>Evidence Map</h3>
         <div className="finding-list">
           {result.findings.map((finding, index) => (
-            <button className="finding-row" type="button" key={finding.id}>
+            <button
+              className={finding.id === selectedFindingId ? "finding-row selected" : "finding-row"}
+              type="button"
+              key={finding.id}
+              onClick={() => onFindingSelect(finding.id === selectedFindingId ? undefined : finding.id)}
+            >
               <span className={`finding-badge ${finding.status}`}>{index + 1}</span>
               <span>{finding.title}</span>
               <strong className={finding.status}>{finding.status}</strong>
-              <ChevronRight size={17} />
+              <ExternalLink size={14} />
             </button>
           ))}
         </div>
+        {selectedFinding && (
+          <div className="finding-detail">
+            <div>
+              <strong>{selectedFinding.title}</strong>
+              <span className={selectedFinding.severity}>{selectedFinding.severity}</span>
+            </div>
+            <p>{selectedFinding.rationale}</p>
+            <small>{selectedFinding.claim}</small>
+            {selectedFinding.sourceChunkIds.length > 0 && (
+              <div className="finding-sources">
+                {selectedFinding.sourceChunkIds.map((id) => {
+                  const source = getSourceChunk(id);
+                  return source ? (
+                    <a href={source.url} target="_blank" rel="noreferrer" key={id}>
+                      {source.locator}
+                    </a>
+                  ) : null;
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </section>
+
+      {result.infoRequests.length > 0 && (
+        <section className="analysis-section info-request-section">
+          <h3>Information to Request</h3>
+          <ul>
+            {result.infoRequests.slice(0, 6).map((request) => (
+              <li key={request}>{request}</li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="analysis-section">
         <h3>Source Citations</h3>
@@ -128,17 +246,6 @@ export function AnalysisPanel({
             </a>
           ))}
         </div>
-      </section>
-
-      <section className="analysis-section agent-section">
-        <h3>Council Runs</h3>
-        {result.agents.map((agent) => (
-          <div className="agent-row" key={agent.role}>
-            <span className={agent.status === "complete" ? "status-dot green" : "status-dot amber"} />
-            <strong>{agent.label}</strong>
-            <span>{agent.summary}</span>
-          </div>
-        ))}
       </section>
 
       <section className="analysis-section">
@@ -166,22 +273,22 @@ export function AnalysisPanel({
         <div className="decision-actions">
           <button
             type="button"
-            className="decision-button accept"
-            onClick={() => onDecision("accept", notes || "Accepted with human review.")}
+            className={selectedAction === "accept" ? "decision-button accept selected" : "decision-button accept"}
+            onClick={() => setSelectedAction("accept")}
           >
             <Check size={16} /> Accept Recommendation
           </button>
           <button
             type="button"
-            className="decision-button info"
-            onClick={() => onDecision("request-info", notes || "Request additional technical evidence.")}
+            className={selectedAction === "request-info" ? "decision-button info selected" : "decision-button info"}
+            onClick={() => setSelectedAction("request-info")}
           >
             <AlertTriangle size={16} /> Request More Info
           </button>
           <button
             type="button"
-            className="decision-button override"
-            onClick={() => onDecision("override", notes || "Reviewer override required.")}
+            className={selectedAction === "override" ? "decision-button override selected" : "decision-button override"}
+            onClick={() => setSelectedAction("override")}
           >
             <X size={16} /> Override / Change ECCN
           </button>
@@ -195,15 +302,38 @@ export function AnalysisPanel({
         <button
           type="button"
           className="button signoff full"
-          disabled={!decision && !notes.trim()}
-          onClick={() => onDecision("accept", notes || `Accepted recommendation for ${memo.documentCode}.`)}
+          disabled={!canSubmit}
+          onClick={() => {
+            if (selectedAction && notes.trim()) {
+              onDecision(selectedAction, notes.trim());
+            }
+          }}
         >
-          <UserRound size={17} /> Submit for Human Signoff
+          <UserRound size={17} /> Record Decision
         </button>
         {decision && <p className="decision-state">Current action: {decision.action}</p>}
       </section>
+
+      <section className={`provider-box compact ${result.provider.source}`}>
+        {result.provider.live ? (
+          <Cloud size={16} />
+        ) : result.provider.source === "fallback" ? (
+          <WifiOff size={16} />
+        ) : (
+          <Cpu size={16} />
+        )}
+        <p>{result.provider.message}</p>
+      </section>
     </aside>
   );
+}
+
+function analysisStatusTitle(status: AnalysisPanelProps["analysisState"]["status"]) {
+  if (status === "live") return "Live AI analysis";
+  if (status === "failed") return "AI failed - deterministic result";
+  if (status === "deterministic") return "Deterministic analysis";
+  if (status === "running") return "AI analysis running";
+  return "Unanalyzed";
 }
 
 function formatAuditTime(value: string) {
@@ -215,29 +345,52 @@ function formatAuditTime(value: string) {
   }).format(new Date(value));
 }
 
-function Metric({ label, value, risk }: { label: string; value: number; risk?: string }) {
-  const labelValue = risk ? titleCase(risk) : value > 0.84 ? "High" : value > 0.55 ? "Medium" : "Low";
+function ChecklistItem({
+  label,
+  value,
+  tone
+}: {
+  label: string;
+  value: string;
+  tone: "pass" | "review";
+}) {
   return (
-    <div className="metric">
+    <div className={`checklist-item ${tone}`}>
       <span>{label}</span>
-      <strong>{labelValue}</strong>
-      <div className="dots" aria-hidden="true">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <span className={index < Math.round(value * 5) ? "filled" : ""} key={index} />
-        ))}
-      </div>
+      <strong>{value}</strong>
     </div>
   );
 }
 
-function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function riskValue(risk: "low" | "medium" | "high") {
-  if (risk === "high") return 0.86;
-  if (risk === "medium") return 0.58;
-  return 0.28;
+function AnalysisModeSelector({
+  mode,
+  onModeChange,
+  disabled = false
+}: {
+  mode: AnalysisMode;
+  onModeChange: (mode: AnalysisMode) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="analysis-mode-selector" aria-label="Analysis mode">
+      {(Object.keys(ANALYSIS_MODE_CONFIG) as AnalysisMode[]).map((option) => {
+        const config = ANALYSIS_MODE_CONFIG[option];
+        return (
+          <button
+            type="button"
+            className={mode === option ? "analysis-mode-card selected" : "analysis-mode-card"}
+            onClick={() => onModeChange(option)}
+            disabled={disabled}
+            key={option}
+          >
+            <strong>{config.label}</strong>
+            <span>{config.cost}</span>
+            <small>{config.description}</small>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function firstSourceUrl(result: ReviewResult) {

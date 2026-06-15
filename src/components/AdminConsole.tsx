@@ -24,7 +24,7 @@ interface AdminConsoleProps {
   memos: MemoRecord[];
   decisions: Record<string, ReviewerDecision>;
   auditEvents: AuditEvent[];
-  reviewResults: Record<string, ReviewResult>;
+  reviewResults: Record<string, ReviewResult | undefined>;
   corpus: CorpusSnapshot;
   onSelectMemo: (memoId: string) => void;
 }
@@ -127,7 +127,7 @@ function EvidencePanel({
   onSelectMemo
 }: {
   memos: MemoRecord[];
-  reviewResults: Record<string, ReviewResult>;
+  reviewResults: Record<string, ReviewResult | undefined>;
   counts: Record<"strong" | "weak" | "missing" | "conflict", number>;
   onSelectMemo: (memoId: string) => void;
 }) {
@@ -233,7 +233,7 @@ function AuditPanel({
   memos: MemoRecord[];
   auditEvents: AuditEvent[];
   decisions: Record<string, ReviewerDecision>;
-  reviewResults: Record<string, ReviewResult>;
+  reviewResults: Record<string, ReviewResult | undefined>;
   onSelectMemo: (memoId: string) => void;
 }) {
   return (
@@ -244,12 +244,13 @@ function AuditPanel({
       </div>
       <div className="readiness-list">
         {memos.map((memo) => {
-          const readiness = summarizeReadiness(reviewResults[memo.id]);
+          const result = reviewResults[memo.id];
+          const readiness = result ? summarizeReadiness(result) : undefined;
           return (
             <button className="readiness-row" type="button" onClick={() => onSelectMemo(memo.id)} key={memo.id}>
               <strong>{memo.title}</strong>
               <span>{memo.status}</span>
-              <span>{readiness.label}</span>
+              <span>{readiness?.label ?? "Unanalyzed"}</span>
               <small>{decisions[memo.id]?.action ?? "No reviewer decision"}</small>
             </button>
           );

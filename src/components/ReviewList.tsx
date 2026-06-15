@@ -4,10 +4,12 @@ import {
   FileText,
   Filter,
   Search,
-  UploadCloud,
-  WandSparkles
+  UploadCloud
 } from "lucide-react";
 import type { MemoRecord } from "../types";
+
+type SortMode = "newest" | "oldest" | "status" | "title";
+type StatusFilter = "all" | MemoRecord["status"];
 
 interface ReviewListProps {
   memos: MemoRecord[];
@@ -36,6 +38,14 @@ export function ReviewList({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteTitle, setPasteTitle] = useState("");
   const [pasteText, setPasteText] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+
+  const visibleMemos = [...memos]
+    .filter((memo) => statusFilter === "all" || memo.status === statusFilter)
+    .sort((a, b) => compareMemos(a, b, sortMode));
+  const queueCount = memos.filter((memo) => memo.status !== "signed-off").length;
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -54,33 +64,28 @@ export function ReviewList({
 
   return (
     <aside className="review-list">
-      <div className="review-tabs">
-        <button className="tab active" type="button">
-          My Reviews
-        </button>
-        <button className="tab" type="button">
-          Reviewer Queue <span>12</span>
-        </button>
+      <div className="queue-header">
+        <div>
+          <strong>Review Queue</strong>
+          <span>{queueCount} need action</span>
+        </div>
       </div>
 
       <section className="intake-section" aria-label="Intake and new review">
-        <div className="section-title">Intake &amp; New Review</div>
-        <div className="dropzone">
+        <div className="section-title">Add a Memo</div>
+        <div className="intake-card">
           <UploadCloud size={31} strokeWidth={1.5} />
-          <div>Drag &amp; drop memo or files here</div>
-          <span>or</span>
+          <div>Upload a memo file or paste memo text.</div>
           <div className="intake-actions">
             <button className="button small" type="button" onClick={() => inputRef.current?.click()}>
-              Upload Files
+              Upload File
             </button>
             <button
-              className="button small icon-only"
+              className="button small"
               type="button"
               onClick={() => setPasteOpen((value) => !value)}
-              aria-label="Paste memo text"
-              title="Paste memo text"
             >
-              <WandSparkles size={15} />
+              Paste Text
             </button>
           </div>
           <input
@@ -125,20 +130,40 @@ export function ReviewList({
             placeholder="Search memos..."
           />
         </label>
-        <button className="filter-button" type="button" aria-label="Filter reviews" title="Filter">
+        <button
+          className={filterOpen ? "filter-button active" : "filter-button"}
+          type="button"
+          aria-label="Filter reviews"
+          title="Filter"
+          onClick={() => setFilterOpen((value) => !value)}
+        >
           <Filter size={18} />
         </button>
       </div>
+      {filterOpen && (
+        <div className="filter-panel" aria-label="Status filters">
+          {(["all", "ready", "needs-info", "conflict", "draft", "signed-off"] as const).map((status) => (
+            <button
+              type="button"
+              className={statusFilter === status ? "filter-chip active" : "filter-chip"}
+              onClick={() => setStatusFilter(status)}
+              key={status}
+            >
+              {status === "all" ? "All" : statusLabel(status)}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="sort-row">
         <span>Sort:</span>
-        <button type="button">
-          Updated (Newest) <ChevronDown size={15} />
+        <button type="button" onClick={() => setSortMode(nextSortMode(sortMode))}>
+          {sortLabel(sortMode)} <ChevronDown size={15} />
         </button>
       </div>
 
       <div className="memo-cards" aria-label="Review list">
-        {memos.map((memo) => (
+        {visibleMemos.map((memo) => (
           <button
             type="button"
             className={memo.id === selectedMemoId ? "memo-card selected" : "memo-card"}
@@ -156,8 +181,11 @@ export function ReviewList({
             <span className={`memo-status ${memo.status}`}>{statusLabel(memo.status)}</span>
           </button>
         ))}
+        {visibleMemos.length === 0 && (
+          <div className="empty-list">No reviews match this view.</div>
+        )}
       </div>
-      <div className="list-footer">Showing 1-{memos.length} of {memos.length}</div>
+      <div className="list-footer">Showing {visibleMemos.length ? `1-${visibleMemos.length}` : "0"} of {memos.length}</div>
     </aside>
   );
 }
@@ -174,4 +202,26 @@ function formatDate(value: string) {
     day: "numeric",
     year: "numeric"
   }).format(new Date(`${value}T12:00:00`));
+}
+
+function compareMemos(a: MemoRecord, b: MemoRecord, sortMode: SortMode) {
+  if (sortMode === "oldest") return a.updatedAt.localeCompare(b.updatedAt);
+  if (sortMode === "title") return a.title.localeCompare(b.title);
+  if (sortMode === "status") {
+    const rank = { conflict: 0, "needs-info": 1, draft: 2, ready: 3, "signed-off": 4 };
+    return rank[a.status] - rank[b.status] || b.updatedAt.localeCompare(a.updatedAt);
+  }
+  return b.updatedAt.localeCompare(a.updatedAt);
+}
+
+function nextSortMode(sortMode: SortMode): SortMode {
+  const modes: SortMode[] = ["newest", "oldest", "status", "title"];
+  return modes[(modes.indexOf(sortMode) + 1) % modes.length];
+}
+
+function sortLabel(sortMode: SortMode) {
+  if (sortMode === "oldest") return "Updated (Oldest)";
+  if (sortMode === "status") return "Status";
+  if (sortMode === "title") return "Title";
+  return "Updated (Newest)";
 }

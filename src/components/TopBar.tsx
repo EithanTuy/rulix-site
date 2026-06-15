@@ -6,6 +6,7 @@ interface TopBarProps {
   exportNotice: string;
   onNewReview: () => void;
   onExport: () => void;
+  onSignoff: () => void;
 }
 
 export function TopBar({
@@ -13,7 +14,8 @@ export function TopBar({
   signoffReady,
   exportNotice,
   onNewReview,
-  onExport
+  onExport,
+  onSignoff
 }: TopBarProps) {
   return (
     <header className="topbar">
@@ -43,6 +45,7 @@ export function TopBar({
         <button
           className={signoffReady ? "button ghost ready" : "button ghost"}
           type="button"
+          onClick={onSignoff}
         >
           <UserRound size={17} />
           Human Signoff

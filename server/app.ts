@@ -7,6 +7,8 @@ import { createAuditEvent, deriveReviewStatus, seedAuditEvents } from "../src/li
 import type { AuditEvent, MemoRecord, NewReviewInput, ReviewerDecision } from "../src/types";
 import { getAnthropicRuntime, runCouncilAnalysis } from "./anthropicCouncil";
 
+const ALLOWED_REVIEW_MODELS = new Set(["claude-haiku-4-5", "claude-sonnet-4-6"]);
+
 interface Store {
   memos: Map<string, MemoRecord>;
   decisions: Map<string, ReviewerDecision>;
@@ -87,7 +89,7 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
       return;
     }
 
-    const result = await runCouncilAnalysis(memo);
+    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
     store.memos.set(memo.id, {
       ...memo,
       status: deriveReviewStatus(result, store.decisions.get(memo.id))
@@ -102,7 +104,7 @@ export function createApp(store: Store = cloneStore(DEFAULT_STORE)) {
       return;
     }
 
-    const result = await runCouncilAnalysis(memo);
+    const result = await runCouncilAnalysis(memo, { model: coerceReviewModel(req.body?.model) });
     res.json({ result });
   });
 
@@ -209,6 +211,10 @@ function coerceDecision(value: unknown): ReviewerDecision | undefined {
     signedBy: input.action === "accept" ? input.signedBy ?? "API Reviewer" : input.signedBy,
     signedAt: input.action === "accept" ? input.signedAt ?? new Date().toISOString() : input.signedAt
   };
+}
+
+function coerceReviewModel(value: unknown) {
+  return typeof value === "string" && ALLOWED_REVIEW_MODELS.has(value) ? value : undefined;
 }
 
 function normalizeText(value: unknown, fallback: string) {

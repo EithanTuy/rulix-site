@@ -1,21 +1,14 @@
 import {
   BarChart3,
   BookOpen,
-  ChevronRight,
-  FileText,
-  Settings,
-  Shield,
-  UserRound
+  FileText
 } from "lucide-react";
 import type { AppView } from "../types";
 
 const navItems = [
   { icon: FileText, label: "Reviews", view: "reviews" },
-  { icon: Shield, label: "Controls", view: "controls" },
   { icon: BarChart3, label: "Evidence", view: "evidence" },
-  { icon: BookOpen, label: "Corpus", view: "corpus" },
-  { icon: UserRound, label: "Users", view: "users" },
-  { icon: Settings, label: "Settings", view: "settings" }
+  { icon: BookOpen, label: "Sources", view: "corpus" }
 ] as const;
 
 interface SidebarRailProps {
@@ -43,9 +36,6 @@ export function SidebarRail({ activeView, onViewChange }: SidebarRailProps) {
           );
         })}
       </div>
-      <button className="rail-button collapse" type="button" aria-label="Collapse navigation">
-        <ChevronRight size={22} strokeWidth={1.8} />
-      </button>
     </nav>
   );
 }

@@ -27,6 +27,8 @@ npm run test:ai
 npm run download:corpus
 ```
 
+Reviewer workflow guide: `docs/reviewer-guide.md`.
+
 `npm run test:ai` requires `ANTHROPIC_API_KEY` and verifies that the backend returns a live Anthropic result. Do not commit `.env` files or API keys.
 
 `npm run download:corpus` downloads official source pages into `corpus/raw/` and writes `corpus/manifest.generated.json`. Those generated files are ignored by Git so a tenant can refresh snapshots without polluting source control.
