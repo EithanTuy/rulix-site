@@ -150,6 +150,22 @@ export async function sendMemoChat(memoId: string, message: string, signal?: Abo
   return response;
 }
 
+export async function draftPublicMemo(item: string, signal?: AbortSignal) {
+  return fetchJson<{
+    title: string;
+    memoText: string;
+    sources: Array<{ title: string; url: string }>;
+    provider: { configured: boolean; model: string; live: boolean; message: string };
+  }>("/api/public-memo-draft", {
+    method: "POST",
+    signal,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ item })
+  });
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const method = init?.method?.toUpperCase() ?? "GET";

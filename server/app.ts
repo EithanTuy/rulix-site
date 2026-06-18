@@ -15,6 +15,7 @@ import type {
   ReviewerDecision
 } from "../src/types";
 import {
+  draftMemoFromPublicWeb,
   getAnthropicRuntime,
   runCouncilAnalysis,
   runMemoChatWithHaiku,
@@ -237,6 +238,17 @@ export function createApp(options: CreateAppOptions = {}) {
       maxTokens: depth === "deep" ? 3600 : undefined
     });
     res.json({ result });
+  });
+
+  app.post("/api/public-memo-draft", requireAuth(store), requireCsrf, async (req, res) => {
+    const item = normalizeText(req.body?.item, "");
+    if (!item) {
+      res.status(400).json({ error: "Item description is required." });
+      return;
+    }
+
+    const draft = await draftMemoFromPublicWeb(item);
+    res.json(draft);
   });
 
   app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, async (req, res) => {

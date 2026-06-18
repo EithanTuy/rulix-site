@@ -1493,7 +1493,7 @@ button {
   top: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 8px;
   border-bottom: 1px solid var(--line);
@@ -1535,6 +1535,108 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.public-draft-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 20px;
+}
+
+.public-draft-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.public-draft-header svg {
+  color: var(--teal);
+}
+
+.public-draft-header div,
+.public-draft-input {
+  display: grid;
+  gap: 4px;
+}
+
+.public-draft-header strong,
+.public-draft-input {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.public-draft-header span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.public-draft-input textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 11px;
+  border: 1px solid #cfd9e4;
+  border-radius: 8px;
+  outline: none;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.public-draft-input textarea:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(7, 139, 142, 0.1);
+}
+
+.public-draft-result {
+  display: grid;
+  gap: 12px;
+}
+
+.public-draft-preview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.public-draft-preview strong,
+.public-source-list strong {
+  color: var(--navy-900);
+  font-size: 13px;
+}
+
+.public-draft-preview pre {
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #35475d;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.public-source-list {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.public-source-list a {
+  color: var(--teal);
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
 }
 
 .analysis-panel.collapsed {

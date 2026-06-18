@@ -39,6 +39,18 @@ export interface MemoChatAiResult {
   latencyMs: number;
 }
 
+export interface PublicMemoDraftResult {
+  title: string;
+  memoText: string;
+  sources: Array<{ title: string; url: string }>;
+  provider: {
+    configured: boolean;
+    model: string;
+    live: boolean;
+    message: string;
+  };
+}
+
 type AiCouncilPayload = Partial<
   Pick<
     ReviewResult,
@@ -168,6 +180,13 @@ const MEMO_CHAT_SCHEMA = {
     proposedMemoText: { type: "string" }
   }
 } as const;
+
+const PUBLIC_MEMO_DRAFT_PROMPT = `You are Rulix public-source memo drafting assistant.
+Use public web information to draft an ECCN self-classification memo for the requested item.
+Use web search before drafting unless the request is too vague.
+Do not make a final legal determination. If public facts are insufficient, say what must be verified.
+Return only valid JSON with title, memoText, and sources.
+The memoText must be markdown and include: item, owner placeholder, proposed classification/review path, item description, public-source facts, performance parameters, software/technical data notes, use/end-use assumptions, order-of-review notes, self-classification rationale, information still needed, and source list.`;
 
 export function getAnthropicRuntime() {
   return {
@@ -320,6 +339,115 @@ export async function runMemoChatWithHaiku(
     proposedMemoText,
     latencyMs: Date.now() - startedAt
   };
+}
+
+export async function draftMemoFromPublicWeb(
+  item: string,
+  options: MemoChatOptions = {}
+): Promise<PublicMemoDraftResult> {
+  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const model = options.model ?? process.env.ANTHROPIC_WEB_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  if (!apiKey?.trim()) {
+    return {
+      title: `Public-source memo draft - ${item}`,
+      memoText: buildOfflinePublicDraft(item),
+      sources: [],
+      provider: {
+        configured: false,
+        model: "local-template",
+        live: false,
+        message: "No Anthropic key is configured, so a public-search draft could not be generated."
+      }
+    };
+  }
+
+  const client = new Anthropic({ apiKey });
+  try {
+    const response = await client.messages.create({
+      model,
+      max_tokens: options.maxTokens ?? 3200,
+      system: PUBLIC_MEMO_DRAFT_PROMPT,
+      tools: [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 5
+        } as never
+      ],
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({
+            item,
+            task:
+              "Research public web sources and draft a cautious ECCN self-classification memo. Cite public sources used."
+          })
+        }
+      ]
+    });
+    const rawText = response.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n")
+      .trim();
+    const payload = parseJsonPayload(rawText) as Record<string, unknown>;
+    const sources = Array.isArray(payload.sources)
+      ? payload.sources
+          .map((source) => asRecord(source))
+          .filter((source): source is Record<string, unknown> => Boolean(source))
+          .map((source) => ({
+            title: asString(source.title, "Public source"),
+            url: asString(source.url, "")
+          }))
+          .filter((source) => source.url)
+          .slice(0, 8)
+      : [];
+
+    return {
+      title: asString(payload.title, `Public-source memo draft - ${item}`),
+      memoText: asLongString(payload.memoText, buildOfflinePublicDraft(item), 12000),
+      sources,
+      provider: {
+        configured: true,
+        model,
+        live: true,
+        message: "Draft generated with Claude web search from public internet sources."
+      }
+    };
+  } catch (error) {
+    return {
+      title: `Public-source memo draft - ${item}`,
+      memoText: buildOfflinePublicDraft(item),
+      sources: [],
+      provider: {
+        configured: true,
+        model,
+        live: false,
+        message: `Public web draft failed (${safeError(error, apiKey)}).`
+      }
+    };
+  }
+}
+
+function buildOfflinePublicDraft(item: string) {
+  return `# ECCN Public-Source Draft - ${item}
+
+**Item:** ${item}
+**Owner:** [Add owner]
+**Proposed Classification:** Review required
+
+## Drafting Note
+
+Public web research was unavailable from this backend session. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
+
+## Information Needed
+
+- Manufacturer and exact model number
+- Datasheet and user manual
+- Performance parameters relevant to the Commerce Control List
+- Software, firmware, source code, technical data, and encryption details
+- Intended end use, end user, destination, and restricted-party screening
+`;
 }
 
 function buildMemoChatPrompt(
@@ -756,6 +884,10 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 function asString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 900) : fallback;
+}
+
+function asLongString(value: unknown, fallback: string, maxLength: number) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : fallback;
 }
 
 function asConfidence(value: unknown, fallback: number) {

@@ -313,6 +313,38 @@ export function App() {
     setActiveView("reviews");
   };
 
+  const handleCreatePublicDraftMemo = (title: string, memoText: string) => {
+    const now = new Date().toISOString().slice(0, 10);
+    const memo: MemoRecord = {
+      id: `public-draft-${Date.now()}`,
+      title: title.trim() || "Public-source ECCN memo draft",
+      itemFamily: "Public-source draft",
+      owner: currentUser?.name ?? "You",
+      updatedAt: now,
+      documentCode: `PUB-${now.replaceAll("-", "")}-${memos.length + 1}`,
+      status: "draft",
+      dataClass: "public",
+      sourcePath: "self-classification",
+      attachments: [],
+      memoText
+    };
+    addMemo(memo);
+    addAuditEvent(
+      memo.id,
+      "Public-source draft created",
+      "Draft memo generated from public internet research. Reviewer validation is required before signoff.",
+      "review"
+    );
+    setAnalysisStates((current) => ({
+      ...current,
+      [memo.id]: {
+        status: "unanalyzed",
+        message: "Public-source draft is waiting for reviewer-initiated AI analysis."
+      }
+    }));
+    setActiveView("reviews");
+  };
+
   const handleCreateReview = (input: NewReviewInput) => {
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
@@ -660,6 +692,7 @@ export function App() {
                   onDecision={handleDecision}
                   onSendChat={handleSendMemoChat}
                   onApplyChatSuggestion={handleApplyChatSuggestion}
+                  onCreatePublicDraft={handleCreatePublicDraftMemo}
                   selectedFindingId={selectedFindingId}
                   onFindingSelect={setSelectedFindingId}
                 />
