@@ -22,6 +22,14 @@ output "audit_table" {
   value = aws_dynamodb_table.audit_events.name
 }
 
+output "auth_table" {
+  value = aws_dynamodb_table.auth.name
+}
+
+output "account_state_table" {
+  value = aws_dynamodb_table.account_state.name
+}
+
 output "worker_policy_arn" {
   value = aws_iam_policy.worker.arn
 }

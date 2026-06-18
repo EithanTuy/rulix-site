@@ -60,6 +60,48 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
   policy = data.aws_iam_policy_document.lambda_bedrock.json
 }
 
+data "aws_iam_policy_document" "lambda_auth" {
+  statement {
+    sid = "AuthAndAccountTables"
+    actions = [
+      "dynamodb:DeleteItem",
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:Query",
+      "dynamodb:UpdateItem"
+    ]
+    resources = [
+      aws_dynamodb_table.auth.arn,
+      aws_dynamodb_table.account_state.arn
+    ]
+  }
+
+  statement {
+    sid = "AuthEmailDelivery"
+    actions = [
+      "ses:SendEmail"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid = "TenantKmsForAuthTables"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey"
+    ]
+    resources = [aws_kms_key.tenant.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_auth" {
+  name   = "${local.fn_name}-auth"
+  role   = aws_iam_role.lambda_exec.id
+  policy = data.aws_iam_policy_document.lambda_auth.json
+}
+
 # ---- The function ----
 resource "aws_lambda_function" "app" {
   function_name    = local.fn_name
@@ -74,11 +116,20 @@ resource "aws_lambda_function" "app" {
   environment {
     variables = merge(
       {
-        NODE_ENV        = "production"
-        RULIX_DIST_DIR  = "dist"
-        BEDROCK_ENABLED = tostring(var.bedrock_enabled)
-        BEDROCK_MODEL   = var.bedrock_model
+        NODE_ENV                 = "production"
+        RULIX_DIST_DIR           = "dist"
+        BEDROCK_ENABLED          = tostring(var.bedrock_enabled)
+        BEDROCK_MODEL            = var.bedrock_model
+        RULIX_AUTH_TABLE         = aws_dynamodb_table.auth.name
+        RULIX_ACCOUNT_TABLE      = aws_dynamodb_table.account_state.name
+        RULIX_TENANT_ID          = var.tenant_slug
+        APP_BASE_URL             = var.app_base_url
+        AUTH_INVITE_TTL_HOURS    = tostring(var.auth_invite_ttl_hours)
+        AUTH_RESET_TTL_MINUTES   = tostring(var.auth_reset_ttl_minutes)
+        AUTH_SESSION_TTL_HOURS   = tostring(var.auth_session_ttl_hours)
       },
+      var.auth_email_from == "" ? {} : { AUTH_EMAIL_FROM = var.auth_email_from },
+      var.auth_bootstrap_secret == "" ? {} : { AUTH_BOOTSTRAP_SECRET = var.auth_bootstrap_secret },
       var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result }
     )
   }

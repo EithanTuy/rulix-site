@@ -49,3 +49,40 @@ variable "custom_domain" {
   type        = string
   default     = "app.rulix.cloud"
 }
+
+variable "app_base_url" {
+  description = "Public base URL used in invite and password reset emails."
+  type        = string
+  default     = "https://app.rulix.cloud"
+}
+
+variable "auth_email_from" {
+  description = "Verified SES sender address for invite and password reset emails. Empty disables email delivery while still creating invite/reset tokens."
+  type        = string
+  default     = ""
+}
+
+variable "auth_bootstrap_secret" {
+  description = "Optional one-time bootstrap secret for POST /api/auth/bootstrap-invite."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "auth_invite_ttl_hours" {
+  description = "Invite token lifetime in hours."
+  type        = number
+  default     = 72
+}
+
+variable "auth_reset_ttl_minutes" {
+  description = "Password reset token lifetime in minutes."
+  type        = number
+  default     = 30
+}
+
+variable "auth_session_ttl_hours" {
+  description = "Authenticated session lifetime in hours."
+  type        = number
+  default     = 8
+}

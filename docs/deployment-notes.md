@@ -14,6 +14,7 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 | Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` |
 | DNS | GoDaddy `rulix.cloud`: ACM validation CNAME + `app` to CloudFront |
 | AI mode | **local-rules** (deterministic) - `BEDROCK_ENABLED` not deployed |
+| Auth mode | Invite-only custom auth with DynamoDB tables and SESv2 email when `AUTH_EMAIL_FROM` is configured |
 
 Verified end-to-end: UI loads, `/api/health` 200, `/api/ai/review` returns
 grounded findings when called from an authenticated session.
@@ -89,10 +90,18 @@ public, sample, or authorized/redacted material. Real controlled technical data
 belongs in AWS GovCloud unless counsel and customer compliance approve another
 boundary.
 
+### 7. SES Sender and First Admin Bootstrap (ACTION REQUIRED ON NEXT DEPLOY)
+
+The app no longer supports public account creation. Before inviting production
+users, verify an SES sender for `AUTH_EMAIL_FROM` and configure a temporary
+`AUTH_BOOTSTRAP_SECRET` to create the first `export-control-officer` invite.
+After the first admin signs in, future invites should be created from the Users
+console and the bootstrap secret should be removed or rotated.
+
 ---
 
 ## Local Artifacts (Git-Ignored, Not Deployed)
 
-- `data/` - local single-node account store.
+- `data/` - local development/test account store fallback.
 - `lambda-build/` - esbuild output zipped by Terraform.
 - `infra/terraform/function.zip`, `.terraform/`, `*.tfstate*` - build/state.

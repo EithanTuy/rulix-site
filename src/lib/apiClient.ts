@@ -46,6 +46,45 @@ export interface AuthResponse {
   csrfToken: string | null;
 }
 
+export type InviteStatus = "pending" | "used" | "expired";
+
+export interface InviteSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: UserProfile["role"];
+  status: InviteStatus;
+  createdAt: string;
+  expiresAt: string;
+  invitedBy?: string;
+  usedAt?: string;
+}
+
+export interface InvitePublicInfo {
+  email: string;
+  name: string;
+  role: UserProfile["role"];
+  expiresAt: string;
+  status: InviteStatus;
+}
+
+export interface PasswordResetPublicInfo {
+  email: string;
+  expiresAt: string;
+  status: InviteStatus;
+}
+
+export interface EmailDeliveryResult {
+  sent: boolean;
+  reason?: string;
+}
+
+export interface InviteCreationResponse {
+  invite: InviteSummary;
+  inviteLink: string;
+  delivery: EmailDeliveryResult;
+}
+
 let csrfToken: string | undefined;
 
 export function setCsrfToken(token: string | undefined) {
@@ -101,13 +140,66 @@ export async function signIn(email: string, password: string) {
   return response;
 }
 
-export async function createAccount(name: string, email: string, password: string) {
-  const response = await fetchJson<AuthResponse>("/api/auth/register", {
+export async function listInvites(signal?: AbortSignal) {
+  const response = await fetchJson<{ invites: InviteSummary[] }>("/api/auth/invites", { signal });
+  return response.invites;
+}
+
+export async function createInvite(email: string, name: string, role: UserProfile["role"]) {
+  return fetchJson<InviteCreationResponse>("/api/auth/invites", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ name, email, password })
+    body: JSON.stringify({ email, name, role })
+  });
+}
+
+export async function validateInvite(token: string, signal?: AbortSignal) {
+  const response = await fetchJson<{ invite: InvitePublicInfo }>(
+    `/api/auth/invites/${encodeURIComponent(token)}`,
+    { signal }
+  );
+  return response.invite;
+}
+
+export async function acceptInvite(token: string, password: string, name?: string) {
+  const response = await fetchJson<AuthResponse>("/api/auth/invite/accept", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ token, password, name })
+  });
+  setCsrfToken(response.csrfToken ?? undefined);
+  return response;
+}
+
+export async function requestPasswordReset(email: string) {
+  await fetchJson<{ ok: true }>("/api/auth/password-reset/request", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function validatePasswordReset(token: string, signal?: AbortSignal) {
+  const response = await fetchJson<{ reset: PasswordResetPublicInfo }>(
+    `/api/auth/password-reset/${encodeURIComponent(token)}`,
+    { signal }
+  );
+  return response.reset;
+}
+
+export async function completePasswordReset(token: string, password: string) {
+  const response = await fetchJson<AuthResponse>("/api/auth/password-reset/complete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ token, password })
   });
   setCsrfToken(response.csrfToken ?? undefined);
   return response;

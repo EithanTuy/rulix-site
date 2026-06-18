@@ -12,7 +12,8 @@ import type {
   MemoChatMessage,
   MemoRecord,
   NewReviewInput,
-  ReviewerDecision
+  ReviewerDecision,
+  UserProfile
 } from "../src/types";
 import {
   draftMemoFromPublicWeb,
@@ -24,14 +25,15 @@ import {
 import {
   StoreError,
   createAccountStore,
+  sessionTtlMs,
   type AccountStore,
   type AuthSession,
   type SessionRecord
 } from "./store";
+import { sendInviteEmail, sendPasswordResetEmail } from "./email";
 
 const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
 const SESSION_COOKIE = "rulix_session";
-const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 8;
 
 interface CreateAppOptions {
   store?: AccountStore;
@@ -71,13 +73,65 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json(officialCorpus);
   });
 
-  app.post("/api/auth/register", (req, res) => {
+  app.post("/api/auth/register", (_req, res) => {
+    res.status(410).json({ error: "Accounts are invite-only. Use an invite link to create a workspace." });
+  });
+
+  app.post("/api/auth/bootstrap-invite", async (req, res) => {
+    const bootstrapSecret = process.env.AUTH_BOOTSTRAP_SECRET;
+    if (!bootstrapSecret || req.get("x-rulix-bootstrap-secret") !== bootstrapSecret) {
+      res.status(404).json({ error: "Not found." });
+      return;
+    }
+
     try {
-      const session = store.registerUser({
+      const invite = await store.createInvite({
         email: normalizeText(req.body?.email, ""),
         name: normalizeText(req.body?.name, ""),
-        password: normalizeText(req.body?.password, "")
+        role: coerceUserRole(req.body?.role) ?? "export-control-officer",
+        invitedBy: "bootstrap"
       });
+      const delivery = await sendInviteEmail(invite);
+      res.status(201).json({ invite: invite.invite, inviteLink: invite.inviteLink, delivery });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.get("/api/auth/invites", requireAuth(store), requireAdmin, async (_req, res) => {
+    res.json({ invites: await store.listInvites() });
+  });
+
+  app.post("/api/auth/invites", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    try {
+      const invite = await store.createInvite({
+        email: normalizeText(req.body?.email, ""),
+        name: normalizeText(req.body?.name, ""),
+        role: coerceUserRole(req.body?.role) ?? "reviewer",
+        invitedBy: res.locals.user.email
+      });
+      const delivery = await sendInviteEmail(invite);
+      res.status(201).json({ invite: invite.invite, inviteLink: invite.inviteLink, delivery });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.get("/api/auth/invites/:token", async (req, res) => {
+    try {
+      res.json({ invite: await store.getInviteByToken(authToken(req)) });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.post("/api/auth/invite/accept", async (req, res) => {
+    try {
+      const session = await store.acceptInvite(
+        normalizeText(req.body?.token, ""),
+        normalizeText(req.body?.password, ""),
+        normalizeText(req.body?.name, "")
+      );
       setSessionCookie(res, session);
       res.status(201).json({ user: session.user, csrfToken: session.csrfToken });
     } catch (error) {
@@ -85,9 +139,9 @@ export function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const session = store.authenticate(
+      const session = await store.authenticate(
         normalizeText(req.body?.email, ""),
         normalizeText(req.body?.password, "")
       );
@@ -98,8 +152,39 @@ export function createApp(options: CreateAppOptions = {}) {
     }
   });
 
-  app.get("/api/auth/me", (req, res) => {
-    const session = store.getSession(readSessionCookie(req));
+  app.post("/api/auth/password-reset/request", async (req, res) => {
+    try {
+      const reset = await store.requestPasswordReset(normalizeText(req.body?.email, ""));
+      if (reset.resetLink) await sendPasswordResetEmail(reset);
+      res.json({ ok: true });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.get("/api/auth/password-reset/:token", async (req, res) => {
+    try {
+      res.json({ reset: await store.getPasswordResetByToken(authToken(req)) });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.post("/api/auth/password-reset/complete", async (req, res) => {
+    try {
+      const session = await store.completePasswordReset(
+        normalizeText(req.body?.token, ""),
+        normalizeText(req.body?.password, "")
+      );
+      setSessionCookie(res, session);
+      res.json({ user: session.user, csrfToken: session.csrfToken });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    const session = await store.getSession(readSessionCookie(req));
     if (!session) {
       res.json({ user: null, csrfToken: null });
       return;
@@ -107,49 +192,53 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json({ user: session.user, csrfToken: session.session.csrfToken });
   });
 
-  app.post("/api/auth/logout", requireAuth(store), requireCsrf, (req, res) => {
-    store.destroySession(readSessionCookie(req));
+  app.post("/api/auth/logout", requireAuth(store), requireCsrf, async (req, res) => {
+    await store.destroySession(readSessionCookie(req));
     clearSessionCookie(res);
     res.status(204).end();
   });
 
-  app.get("/api/account/state", requireAuth(store), (_req, res) => {
-    res.json({ state: store.getAccountState(res.locals.user.id) });
+  app.get("/api/account/state", requireAuth(store), async (_req, res) => {
+    res.json({ state: await store.getAccountState(res.locals.user.id) });
   });
 
-  app.put("/api/account/state", requireAuth(store), requireCsrf, (req, res) => {
-    store.replaceAccountState(res.locals.user.id, req.body?.state as AccountReviewState);
-    res.json({ state: store.getAccountState(res.locals.user.id) });
+  app.put("/api/account/state", requireAuth(store), requireCsrf, async (req, res) => {
+    await store.replaceAccountState(res.locals.user.id, req.body?.state as AccountReviewState);
+    res.json({ state: await store.getAccountState(res.locals.user.id) });
   });
 
-  app.get("/api/reviews", requireAuth(store), (_req, res) => {
-    res.json(store.listReviews(res.locals.user.id));
+  app.get("/api/reviews", requireAuth(store), async (_req, res) => {
+    res.json(await store.listReviews(res.locals.user.id));
   });
 
-  app.post("/api/reviews", requireAuth(store), requireCsrf, (req, res) => {
+  app.post("/api/reviews", requireAuth(store), requireCsrf, async (req, res) => {
     const memo = createMemoRecord(req.body as Partial<NewReviewInput>, res.locals.user.name);
-    store.upsertReview(res.locals.user.id, memo);
-    store.appendAuditEvent(
-      res.locals.user.id,
-      createAuditEvent(
-        memo.id,
-        "Review created",
-        "Review was created through the authenticated Rulix API.",
-        memo.dataClass === "itar-risk" || memo.dataClass === "cui" ? "escalate" : "info",
-        res.locals.user.name
-      )
-    );
-    res.status(201).json({ review: memo });
+    try {
+      await store.upsertReview(res.locals.user.id, memo);
+      await store.appendAuditEvent(
+        res.locals.user.id,
+        createAuditEvent(
+          memo.id,
+          "Review created",
+          "Review was created through the authenticated Rulix API.",
+          memo.dataClass === "itar-risk" || memo.dataClass === "cui" ? "escalate" : "info",
+          res.locals.user.name
+        )
+      );
+      res.status(201).json({ review: memo });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
   });
 
-  app.get("/api/reviews/:id", requireAuth(store), (req, res) => {
-    const memo = store.findReview(res.locals.user.id, reviewId(req));
+  app.get("/api/reviews/:id", requireAuth(store), async (req, res) => {
+    const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
-    const state = store.getAccountState(res.locals.user.id);
+    const state = await store.getAccountState(res.locals.user.id);
     res.json({
       review: memo,
       decision: state.decisions[memo.id],
@@ -159,8 +248,8 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   });
 
-  app.patch("/api/reviews/:id", requireAuth(store), requireCsrf, (req, res) => {
-    const memo = store.findReview(res.locals.user.id, reviewId(req));
+  app.patch("/api/reviews/:id", requireAuth(store), requireCsrf, async (req, res) => {
+    const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
@@ -178,8 +267,8 @@ export function createApp(options: CreateAppOptions = {}) {
       updatedAt: new Date().toISOString().slice(0, 10),
       status: "draft" as const
     };
-    store.updateReview(res.locals.user.id, updatedMemo);
-    store.appendAuditEvent(
+    await store.updateReview(res.locals.user.id, updatedMemo);
+    await store.appendAuditEvent(
       res.locals.user.id,
       createAuditEvent(
         memo.id,
@@ -193,13 +282,13 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/reviews/:id/analyze", requireAuth(store), requireCsrf, async (req, res) => {
-    const memo = store.findReview(res.locals.user.id, reviewId(req));
+    const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
-    const state = store.getAccountState(res.locals.user.id);
+    const state = await store.getAccountState(res.locals.user.id);
     const depth = coerceReviewDepth(req.body?.depth);
     const result = await runCouncilAnalysis(memo, {
       depth,
@@ -209,7 +298,7 @@ export function createApp(options: CreateAppOptions = {}) {
       ...memo,
       status: deriveReviewStatus(result, state.decisions[memo.id])
     };
-    store.setAnalysisResult(res.locals.user.id, updatedMemo, result);
+    await store.setAnalysisResult(res.locals.user.id, updatedMemo, result);
     const auditEvent = createAuditEvent(
       memo.id,
       "Analysis completed",
@@ -217,11 +306,11 @@ export function createApp(options: CreateAppOptions = {}) {
       result.provider.live ? "info" : "review",
       res.locals.user.name
     );
-    store.appendAuditEvent(res.locals.user.id, auditEvent);
+    await store.appendAuditEvent(res.locals.user.id, auditEvent);
     res.json({
       review: updatedMemo,
       result,
-      auditEvents: memoAuditEvents(store, res.locals.user.id, memo.id)
+      auditEvents: await memoAuditEvents(store, res.locals.user.id, memo.id)
     });
   });
 
@@ -252,7 +341,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, async (req, res) => {
-    const memo = store.findReview(res.locals.user.id, reviewId(req));
+    const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found." });
       return;
@@ -264,11 +353,11 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const history = store.getAccountState(res.locals.user.id).chatMessages[memo.id] ?? [];
+    const history = (await store.getAccountState(res.locals.user.id)).chatMessages[memo.id] ?? [];
     const messages = await buildMemoChatMessages(memo, message, history);
-    const fullThread = store.appendChatMessages(res.locals.user.id, memo.id, messages);
+    const fullThread = await store.appendChatMessages(res.locals.user.id, memo.id, messages);
     if (messages.some((item) => item.proposedMemoText)) {
-      store.appendAuditEvent(
+      await store.appendAuditEvent(
         res.locals.user.id,
         createAuditEvent(
           memo.id,
@@ -281,12 +370,12 @@ export function createApp(options: CreateAppOptions = {}) {
     }
     res.json({
       messages: fullThread,
-      auditEvents: memoAuditEvents(store, res.locals.user.id, memo.id)
+      auditEvents: await memoAuditEvents(store, res.locals.user.id, memo.id)
     });
   });
 
-  app.post("/api/reviews/:id/decision", requireAuth(store), requireCsrf, (req, res) => {
-    const memo = store.findReview(res.locals.user.id, reviewId(req));
+  app.post("/api/reviews/:id/decision", requireAuth(store), requireCsrf, async (req, res) => {
+    const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
@@ -298,7 +387,7 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const state = store.getAccountState(res.locals.user.id);
+    const state = await store.getAccountState(res.locals.user.id);
     const result = state.analysisResults[memo.id] ?? analyzeMemo(memo);
     const updatedMemo = {
       ...memo,
@@ -311,7 +400,7 @@ export function createApp(options: CreateAppOptions = {}) {
       decision.action === "override" ? "escalate" : decision.action === "request-info" ? "review" : "info",
       res.locals.user.name
     );
-    store.setDecision(res.locals.user.id, updatedMemo, decision, decisionAuditEvent);
+    await store.setDecision(res.locals.user.id, updatedMemo, decision, decisionAuditEvent);
 
     res.json({ review: updatedMemo, decision });
   });
@@ -336,8 +425,8 @@ export function createApp(options: CreateAppOptions = {}) {
   return app;
 }
 
-function memoAuditEvents(store: AccountStore, userId: string, memoId: string) {
-  return store.getAccountState(userId).auditEvents.filter((event) => event.memoId === memoId);
+async function memoAuditEvents(store: AccountStore, userId: string, memoId: string) {
+  return (await store.getAccountState(userId)).auditEvents.filter((event) => event.memoId === memoId);
 }
 
 function createMemoRecord(input: Partial<NewReviewInput>, owner = "API User"): MemoRecord {
@@ -407,9 +496,23 @@ function reviewId(req: Request) {
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
+function authToken(req: Request) {
+  const raw = req.params.token;
+  return Array.isArray(raw) ? raw[0] : raw ?? "";
+}
+
+function coerceUserRole(value: unknown): UserProfile["role"] | undefined {
+  return value === "export-control-officer" ||
+    value === "reviewer" ||
+    value === "submitter" ||
+    value === "counsel"
+    ? value
+    : undefined;
+}
+
 function requireAuth(store: AccountStore) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const session = store.getSession(readSessionCookie(req));
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const session = await store.getSession(readSessionCookie(req));
     if (!session) {
       res.status(401).json({ error: "Sign in required." });
       return;
@@ -418,6 +521,15 @@ function requireAuth(store: AccountStore) {
     res.locals.session = session.session;
     next();
   };
+}
+
+function requireAdmin(_req: Request, res: Response, next: NextFunction) {
+  const user = res.locals.user as UserProfile | undefined;
+  if (user?.role !== "export-control-officer") {
+    res.status(403).json({ error: "Admin access required." });
+    return;
+  }
+  next();
 }
 
 function requireCsrf(_req: Request, res: Response, next: NextFunction) {
@@ -435,7 +547,7 @@ function setSessionCookie(res: Response, session: AuthSession) {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_MAX_AGE_MS,
+    maxAge: sessionTtlMs(),
     path: "/"
   });
 }

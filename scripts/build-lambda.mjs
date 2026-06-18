@@ -3,7 +3,7 @@
 // `lambda-build/` which Terraform zips into the function package.
 //
 //   lambda-build/
-//     handler.js     <- bundled server (export: handler)
+//     handler.cjs    <- bundled server (export: handler)
 //     dist/          <- built frontend (served by express.static at runtime)
 //
 // Run `npm run build` first so `dist/` exists.
@@ -34,11 +34,10 @@ await build({
   // The dist path is taken from RULIX_DIST_DIR at runtime, so import.meta.url is
   // never used in Lambda; define it to a valid placeholder to avoid the CJS warning.
   define: { "import.meta.url": JSON.stringify("file:///var/task/handler.cjs") },
-  // aws-sdk v3 is provided by the Lambda runtime; everything else is bundled.
-  external: ["@aws-sdk/*"],
+  // Bundle AWS SDK v3 clients so the Lambda artifact owns its auth/storage dependencies.
   logLevel: "info"
 });
 
 cpSync(distSrc, path.join(outDir, "dist"), { recursive: true });
 
-console.log("Lambda bundle ready at lambda-build/ (handler.js + dist/).");
+console.log("Lambda bundle ready at lambda-build/ (handler.cjs + dist/).");

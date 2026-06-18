@@ -11,10 +11,87 @@ servers:
 security:
   - cookieAuth: []
 paths:
-  /auth/register:
+  /auth/invites:
+    get:
+      summary: List invite status for the tenant
+      operationId: listInvites
+      responses:
+        "200":
+          description: Invite status list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invites]
+                properties:
+                  invites:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InviteSummary"
+        "403":
+          description: Admin access required
     post:
-      summary: Create an account and start a secure session
-      operationId: registerAccount
+      summary: Create an invite and send the one-time link through SES
+      operationId: createInvite
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                role:
+                  $ref: "#/components/schemas/UserRole"
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCreationResponse"
+        "403":
+          description: Admin access required
+        "409":
+          description: Account or pending invite already exists
+  /auth/invites/{token}:
+    get:
+      summary: Validate an invite token without exposing private account data
+      operationId: validateInvite
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invite]
+                properties:
+                  invite:
+                    $ref: "#/components/schemas/InvitePublicInfo"
+        "404":
+          description: Invite token is invalid
+        "410":
+          description: Invite token is expired or already used
+  /auth/invite/accept:
+    post:
+      summary: Accept an invite, set the initial password, and start a session
+      operationId: acceptInvite
       security: []
       requestBody:
         required: true
@@ -22,19 +99,98 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, password]
+              required: [token, password]
               properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 12
                 name:
                   type: string
+      responses:
+        "201":
+          description: Invite accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "410":
+          description: Invite token is expired or already used
+  /auth/password-reset/request:
+    post:
+      summary: Request a one-time password reset link
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
                 email:
                   type: string
                   format: email
+      responses:
+        "200":
+          description: Reset request accepted generically
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+  /auth/password-reset/{token}:
+    get:
+      summary: Validate a password reset token
+      operationId: validatePasswordReset
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reset token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reset]
+                properties:
+                  reset:
+                    $ref: "#/components/schemas/PasswordResetPublicInfo"
+        "404":
+          description: Reset token is invalid
+        "410":
+          description: Reset token is expired or already used
+  /auth/password-reset/complete:
+    post:
+      summary: Complete a password reset, revoke old sessions, and start a new session
+      operationId: completePasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
                 password:
                   type: string
                   minLength: 12
       responses:
-        "201":
-          description: Account created
+        "200":
+          description: Password reset completed
           content:
             application/json:
               schema:
@@ -447,6 +603,85 @@ components:
           oneOf:
             - type: string
             - type: "null"
+    UserRole:
+      type: string
+      enum: [export-control-officer, reviewer, submitter, counsel]
+    InviteStatus:
+      type: string
+      enum: [pending, used, expired]
+    InviteSummary:
+      type: object
+      required: [id, email, name, role, status, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/InviteStatus"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        invitedBy:
+          type: string
+        usedAt:
+          type: string
+          format: date-time
+    InvitePublicInfo:
+      type: object
+      required: [email, name, role, status, expiresAt]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/InviteStatus"
+        expiresAt:
+          type: string
+          format: date-time
+    PasswordResetPublicInfo:
+      type: object
+      required: [email, status, expiresAt]
+      properties:
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/InviteStatus"
+        expiresAt:
+          type: string
+          format: date-time
+    EmailDeliveryResult:
+      type: object
+      required: [sent]
+      properties:
+        sent:
+          type: boolean
+        reason:
+          type: string
+    InviteCreationResponse:
+      type: object
+      required: [invite, inviteLink, delivery]
+      properties:
+        invite:
+          $ref: "#/components/schemas/InviteSummary"
+        inviteLink:
+          type: string
+          format: uri
+        delivery:
+          $ref: "#/components/schemas/EmailDeliveryResult"
     UserProfile:
       type: object
       required: [id, email, name, role, createdAt]
@@ -459,8 +694,7 @@ components:
         name:
           type: string
         role:
-          type: string
-          enum: [export-control-officer, reviewer, submitter, counsel]
+          $ref: "#/components/schemas/UserRole"
         createdAt:
           type: string
           format: date-time

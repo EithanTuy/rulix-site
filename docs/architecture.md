@@ -32,7 +32,7 @@ One TypeScript codebase, two runtime halves served from a single origin:
                                  │  same origin, no CORS in prod
 ┌───────────────────────────────▼────────────────────────────────────────┐
 │  Express 5 (server/app.ts)                                              │
-│   • Auth:    /api/auth/register · login · me · logout  (cookie + CSRF)  │
+│   • Auth:    invites · login · me · logout · password reset             │
 │   • Account: /api/account/state  (per-account workspace store)          │
 │   • Reviews: /api/reviews [CRUD] · /:id/analyze · /:id/decision         │
 │   • AI:      /api/ai/review · /api/reviews/:id/chat                      │
@@ -65,10 +65,18 @@ Key design points:
   API, so the SPA uses relative `/api/*` paths (no CORS, no second host).
 
 ### Auth & data
+- Invite-only onboarding: admins create invites, users set their first password
+  through one-time links, and public self-registration is disabled.
 - Cookie-based sessions with a **CSRF** check on mutating routes
   (`requireAuth` + `requireCsrf`).
+- Password reset links are one-time tokens; completing a reset revokes old
+  sessions and starts a fresh session.
 - **Per-account workspaces**: each account has its own review/decision/audit
   state behind auth (`/api/account/state`).
+- Production Lambda uses DynamoDB for users, invites, sessions, reset tokens,
+  lockouts, and per-user review state when `RULIX_AUTH_TABLE` and
+  `RULIX_ACCOUNT_TABLE` are configured. The local JSON store remains a
+  development/test fallback.
 - The seed corpus (`src/data/corpus.ts`) and sample memos ship in the bundle.
 
 ---
@@ -93,7 +101,8 @@ original plan but is closed to new AWS accounts as of 2026-04-30 — see
   Lambda  rulix-prod-app  (Node 20)
       • handler.cjs = esbuild bundle of the Express app (serverless-http)
       • serves UI + /api from RULIX_DIST_DIR=dist
-      • env: BEDROCK_ENABLED, BEDROCK_MODEL, edge secret
+      • env: BEDROCK_ENABLED, BEDROCK_MODEL, DynamoDB auth/account tables,
+             SES sender/base URL/token TTLs, edge secret
 ```
 
 ### Resources (Terraform, `infra/terraform/`)
@@ -106,12 +115,14 @@ Hosting (`hosting.tf`):
   origin header from `random_password.edge_shared_secret`.
 - `aws_iam_role.lambda_exec` (+ basic-execution logs policy).
 
-Data layer (`main.tf`, intended multi-tenant foundation; the live app currently
-uses an in-process store, these back future persistence):
+Data layer (`main.tf`):
 - `aws_kms_key.tenant` (+ alias, key policy granting CloudWatch Logs usage).
 - `aws_s3_bucket` ×3 — uploads / corpus / evidence (versioned, KMS-encrypted,
   public access blocked).
 - `aws_dynamodb_table.audit_events` — audit trail (PITR, KMS).
+- `aws_dynamodb_table.auth` — users, invites, sessions, reset tokens, failed
+  login counters, and lockouts (PITR, KMS, TTL).
+- `aws_dynamodb_table.account_state` — per-tenant/user review state (PITR, KMS).
 - `aws_cloudwatch_log_group.application`.
 - `aws_iam_policy.worker` — scoped S3 / KMS / DynamoDB / Bedrock access.
 

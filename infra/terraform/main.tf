@@ -166,6 +166,65 @@ resource "aws_dynamodb_table" "audit_events" {
   tags = local.common_tags
 }
 
+resource "aws_dynamodb_table" "auth" {
+  name         = "${local.name_prefix}-auth"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAtEpoch"
+    enabled        = true
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.tenant.arn
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = merge(local.common_tags, {
+    DataClass = "auth"
+  })
+}
+
+resource "aws_dynamodb_table" "account_state" {
+  name         = "${local.name_prefix}-account-state"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.tenant.arn
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = merge(local.common_tags, {
+    DataClass = "account-review-state"
+  })
+}
+
 resource "aws_cloudwatch_log_group" "application" {
   name              = local.log_group_name
   retention_in_days = var.log_retention_days
@@ -203,14 +262,19 @@ data "aws_iam_policy_document" "worker" {
   }
 
   statement {
-    sid = "AuditTableAccess"
+    sid = "TenantTableAccess"
     actions = [
+      "dynamodb:DeleteItem",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:Query",
       "dynamodb:UpdateItem"
     ]
-    resources = [aws_dynamodb_table.audit_events.arn]
+    resources = [
+      aws_dynamodb_table.audit_events.arn,
+      aws_dynamodb_table.auth.arn,
+      aws_dynamodb_table.account_state.arn
+    ]
   }
 
   statement {

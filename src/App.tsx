@@ -5,15 +5,21 @@ import {
   ANALYSIS_MODE_CONFIG,
   type AnalysisMode,
   type BackendHealth,
+  acceptInvite,
   analyzeMemoWithBackend,
-  createAccount,
+  completePasswordReset,
   getBackendHealth,
   getCurrentUser,
   loadAccountState,
+  requestPasswordReset,
   saveAccountState,
   sendMemoChat,
   signIn,
-  signOut
+  signOut,
+  validateInvite,
+  validatePasswordReset,
+  type InvitePublicInfo,
+  type PasswordResetPublicInfo
 } from "./lib/apiClient";
 import { memoFromFile } from "./lib/documentIntake";
 import { buildReviewReport } from "./lib/report";
@@ -233,22 +239,47 @@ export function App() {
     window.addEventListener("pointerup", onUp, { once: true });
   };
 
-  const handleAuthenticated = async (mode: "signin" | "signup", values: AuthFormValues) => {
+  const completeAuthentication = async (response: { user: UserProfile | null }) => {
+    if (!response.user) throw new Error("Sign in failed.");
+    const state = await loadAccountState();
+    hydrateAccountState(state);
+    setAuth({ status: "signed-in", user: response.user });
+    setStateReady(true);
+    window.history.replaceState(null, "", window.location.pathname);
+  };
+
+  const handleSignIn = async (email: string, password: string) => {
     try {
       setAuth({ status: "checking" });
-      const response =
-        mode === "signup"
-          ? await createAccount(values.name, values.email, values.password)
-          : await signIn(values.email, values.password);
-      if (!response.user) throw new Error("Sign in failed.");
-      const state = await loadAccountState();
-      hydrateAccountState(state);
-      setAuth({ status: "signed-in", user: response.user });
-      setStateReady(true);
+      await completeAuthentication(await signIn(email, password));
     } catch (error) {
       setAuth({
         status: "signed-out",
         error: error instanceof Error ? readableApiError(error.message) : "Sign in failed."
+      });
+    }
+  };
+
+  const handleAcceptInvite = async (token: string, password: string, name?: string) => {
+    try {
+      setAuth({ status: "checking" });
+      await completeAuthentication(await acceptInvite(token, password, name));
+    } catch (error) {
+      setAuth({
+        status: "signed-out",
+        error: error instanceof Error ? readableApiError(error.message) : "Invite acceptance failed."
+      });
+    }
+  };
+
+  const handleCompletePasswordReset = async (token: string, password: string) => {
+    try {
+      setAuth({ status: "checking" });
+      await completeAuthentication(await completePasswordReset(token, password));
+    } catch (error) {
+      setAuth({
+        status: "signed-out",
+        error: error instanceof Error ? readableApiError(error.message) : "Password reset failed."
       });
     }
   };
@@ -617,7 +648,15 @@ export function App() {
   }
 
   if (auth.status === "signed-out") {
-    return <AuthScreen error={auth.error} onSubmit={handleAuthenticated} />;
+    return (
+      <AuthScreen
+        error={auth.error}
+        onSignIn={handleSignIn}
+        onAcceptInvite={handleAcceptInvite}
+        onRequestPasswordReset={requestPasswordReset}
+        onCompletePasswordReset={handleCompletePasswordReset}
+      />
+    );
   }
 
   return (
@@ -764,35 +803,133 @@ function PanelResizeHandle({
   );
 }
 
+type AuthMode = "signin" | "invite" | "reset-request" | "reset-complete";
+
 interface AuthFormValues {
-  name: string;
   email: string;
   password: string;
+  token: string;
 }
 
 function AuthScreen({
   error,
-  onSubmit
+  onSignIn,
+  onAcceptInvite,
+  onRequestPasswordReset,
+  onCompletePasswordReset
 }: {
   error?: string;
-  onSubmit: (mode: "signin" | "signup", values: AuthFormValues) => Promise<void>;
+  onSignIn: (email: string, password: string) => Promise<void>;
+  onAcceptInvite: (token: string, password: string, name?: string) => Promise<void>;
+  onRequestPasswordReset: (email: string) => Promise<void>;
+  onCompletePasswordReset: (token: string, password: string) => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [values, setValues] = useState<AuthFormValues>({ name: "", email: "", password: "" });
+  const params = new URLSearchParams(window.location.search);
+  const initialInviteToken = params.get("invite") ?? "";
+  const initialResetToken = params.get("reset") ?? "";
+  const [mode, setMode] = useState<AuthMode>(
+    initialInviteToken ? "invite" : initialResetToken ? "reset-complete" : "signin"
+  );
+  const [values, setValues] = useState<AuthFormValues>({
+    email: "",
+    password: "",
+    token: initialInviteToken || initialResetToken
+  });
+  const [inviteInfo, setInviteInfo] = useState<InvitePublicInfo | undefined>();
+  const [resetInfo, setResetInfo] = useState<PasswordResetPublicInfo | undefined>();
+  const [localError, setLocalError] = useState<string | undefined>();
+  const [notice, setNotice] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const token = values.token.trim();
+    setLocalError(undefined);
+    setNotice(undefined);
+    setInviteInfo(undefined);
+    setResetInfo(undefined);
+
+    if (!token || (mode !== "invite" && mode !== "reset-complete")) return;
+
+    const controller = new AbortController();
+    const validation = mode === "invite"
+      ? validateInvite(token, controller.signal).then((invite) => {
+          setInviteInfo(invite);
+          setValues((current) => ({ ...current, email: invite.email }));
+        })
+      : validatePasswordReset(token, controller.signal).then((reset) => {
+          setResetInfo(reset);
+          setValues((current) => ({ ...current, email: reset.email }));
+        });
+
+    validation.catch((validationError) => {
+      if (!controller.signal.aborted) {
+        setLocalError(
+          validationError instanceof Error
+            ? readableApiError(validationError.message)
+            : "This link is invalid or expired."
+        );
+      }
+    });
+
+    return () => controller.abort();
+  }, [mode, values.token]);
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setValues((current) => ({
+      email: nextMode === "signin" ? current.email : "",
+      password: "",
+      token: nextMode === "invite" ? initialInviteToken : nextMode === "reset-complete" ? initialResetToken : ""
+    }));
+    setInviteInfo(undefined);
+    setResetInfo(undefined);
+    setLocalError(undefined);
+    setNotice(undefined);
+    if (nextMode === "signin" || nextMode === "reset-request") {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    await onSubmit(mode, values);
+    setLocalError(undefined);
+    setNotice(undefined);
+    try {
+      if (mode === "signin") {
+        await onSignIn(values.email, values.password);
+      } else if (mode === "invite") {
+        await onAcceptInvite(values.token, values.password, inviteInfo?.name);
+      } else if (mode === "reset-request") {
+        await onRequestPasswordReset(values.email);
+        setNotice("If that account exists, a reset link has been sent.");
+      } else {
+        await onCompletePasswordReset(values.token, values.password);
+      }
+    } catch (submitError) {
+      setLocalError(
+        submitError instanceof Error ? readableApiError(submitError.message) : "Request failed."
+      );
+    }
     setBusy(false);
   };
+
+  const activeError = localError ?? (mode === "signin" ? error : undefined);
+  const linkValidated = mode === "invite" ? Boolean(inviteInfo) : mode === "reset-complete" ? Boolean(resetInfo) : true;
+  const primaryLabel = mode === "signin"
+    ? "Sign in"
+    : mode === "invite"
+      ? "Set password"
+      : mode === "reset-request"
+        ? "Send reset link"
+        : "Reset password";
 
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
         <RulixLogo />
         <div>
-          <h1>{mode === "signin" ? "Sign in to Rulix" : "Create secure workspace"}</h1>
+          <h1>{authHeading(mode)}</h1>
           <p>
             Store memos, decisions, evidence chats, and audit events under your account.
           </p>
@@ -801,61 +938,131 @@ function AuthScreen({
           <button
             type="button"
             className={mode === "signin" ? "active" : ""}
-            onClick={() => setMode("signin")}
+            onClick={() => switchMode("signin")}
           >
             Sign in
           </button>
           <button
             type="button"
-            className={mode === "signup" ? "active" : ""}
-            onClick={() => setMode("signup")}
+            className={mode === "invite" ? "active" : ""}
+            onClick={() => switchMode("invite")}
           >
-            Create account
+            Use invite link
+          </button>
+          <button
+            type="button"
+            className={mode === "reset-request" || mode === "reset-complete" ? "active" : ""}
+            onClick={() => switchMode("reset-request")}
+          >
+            Forgot password
           </button>
         </div>
-        {mode === "signup" && (
+        {mode === "invite" && (
+          <>
+            <label>
+              Invite token
+              <input
+                value={values.token}
+                onChange={(event) => setValues((current) => ({ ...current, token: event.target.value }))}
+                autoComplete="one-time-code"
+                required
+              />
+            </label>
+            {inviteInfo && (
+              <div className="auth-link-status">
+                <strong>{inviteInfo.name}</strong>
+                <span>{inviteInfo.email}</span>
+                <small>{roleLabel(inviteInfo.role)} | Expires {formatDateTime(inviteInfo.expiresAt)}</small>
+              </div>
+            )}
+          </>
+        )}
+        {mode === "reset-complete" && (
+          <>
+            <label>
+              Reset token
+              <input
+                value={values.token}
+                onChange={(event) => setValues((current) => ({ ...current, token: event.target.value }))}
+                autoComplete="one-time-code"
+                required
+              />
+            </label>
+            {resetInfo && (
+              <div className="auth-link-status">
+                <strong>{resetInfo.email}</strong>
+                <span>Password reset link verified</span>
+                <small>Expires {formatDateTime(resetInfo.expiresAt)}</small>
+              </div>
+            )}
+          </>
+        )}
+        {(mode === "signin" || mode === "reset-request") && (
           <label>
-            Name
+            Email
             <input
-              value={values.name}
-              onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
-              autoComplete="name"
+              value={values.email}
+              onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
+              autoComplete="email"
+              type="email"
+              required
             />
           </label>
         )}
-        <label>
-          Email
-          <input
-            value={values.email}
-            onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
-            autoComplete="email"
-            type="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            value={values.password}
-            onChange={(event) => setValues((current) => ({ ...current, password: event.target.value }))}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            type="password"
-            minLength={12}
-            required
-          />
-        </label>
-        {mode === "signup" && (
+        {mode !== "reset-request" && (
+          <label>
+            Password
+            <input
+              value={values.password}
+              onChange={(event) => setValues((current) => ({ ...current, password: event.target.value }))}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              type="password"
+              minLength={12}
+              required
+            />
+          </label>
+        )}
+        {(mode === "invite" || mode === "reset-complete") && (
           <p className="auth-hint">
-            Minimum 12 characters with a mix of letters, numbers, and symbols.
+            Minimum 12 characters with a mix of upper/lowercase letters, numbers, and symbols.
           </p>
         )}
-        {error && <div className="auth-error">{error}</div>}
-        <button className="button primary full" type="submit" disabled={busy}>
-          {busy ? "Securing..." : mode === "signin" ? "Sign in" : "Create account"}
+        {notice && <div className="auth-success">{notice}</div>}
+        {activeError && <div className="auth-error">{activeError}</div>}
+        <button className="button primary full" type="submit" disabled={busy || !linkValidated}>
+          {busy ? "Securing..." : primaryLabel}
         </button>
+        {mode === "reset-request" && (
+          <button className="button ghost full" type="button" onClick={() => switchMode("reset-complete")}>
+            I already have a reset link
+          </button>
+        )}
       </form>
     </div>
   );
+}
+
+function authHeading(mode: AuthMode) {
+  if (mode === "invite") return "Accept Rulix invite";
+  if (mode === "reset-request") return "Reset password";
+  if (mode === "reset-complete") return "Set new password";
+  return "Sign in to Rulix";
+}
+
+function roleLabel(role: UserProfile["role"]) {
+  if (role === "export-control-officer") return "Export Control Officer";
+  if (role === "submitter") return "Submitter";
+  if (role === "counsel") return "Counsel";
+  return "Reviewer";
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
 }
 
 function RulixLogo() {

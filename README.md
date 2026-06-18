@@ -12,6 +12,8 @@ npm run dev
 
 The Vite app runs on `http://127.0.0.1:5173` by default and proxies `/api` to the backend at `http://127.0.0.1:8787`.
 
+Auth is invite-only. In local development the server falls back to a git-ignored JSON store unless `RULIX_AUTH_TABLE` and `RULIX_ACCOUNT_TABLE` point at DynamoDB tables. A first operator can create an invite through the bootstrap endpoint when `AUTH_BOOTSTRAP_SECRET` is set, or through the Users console after signing in as an export-control officer.
+
 Enable live Bedrock calls only from your local shell or deployment environment. The Bedrock SDK uses the AWS default credential chain, so keep credentials in an AWS profile, IAM role, or temporary environment variables:
 
 ```bash
@@ -44,14 +46,14 @@ Security and storage guide: `docs/security-auth-storage.md`.
 
 - React/Vite dashboard based on the generated concept in `design/eccn-dashboard-concept.png`.
 - Express backend with `/api/health`, `/api/corpus`, `/api/reviews`, `/api/reviews/:id/analyze`, `/api/ai/review`, and reviewer decision endpoints.
-- Authenticated account workspace with server-stored memos, decisions, analysis results, memo chat history, and audit events.
+- Invite-only authenticated account workspace with DynamoDB-ready storage for users, invites, sessions, reset tokens, memos, decisions, analysis results, memo chat history, and audit events.
 - Review queue, upload/paste intake, highlighted memo viewer, editable memo text, memo chat-assisted edits, AI council panel, source citations, decision notes, and report export.
 - Backend Bedrock Claude Haiku council adapter with deterministic citation/range validation and safe local fallback.
 - Local review engine that recommends candidate ECCNs/EAR99 review paths, labels evidence as strong/weak/missing/conflict, verifies citations against the official corpus, and preserves human signoff as a hard gate.
 - Seed official corpus metadata for EAR/ITAR/BIS/ITA sources, with a downloader for full raw snapshots.
 - AWS/GovCloud architecture notes in `docs/aws-govcloud-architecture.md`.
 - API contract in `api/openapi.yaml`.
-- Terraform starter in `infra/terraform/` for single-tenant AWS or GovCloud-ready storage, audit, KMS, and worker permissions.
+- Terraform starter in `infra/terraform/` for single-tenant AWS or GovCloud-ready storage, auth/account tables, audit, KMS, SES-capable Lambda permissions, and worker permissions.
 
 ## Product Boundary
 

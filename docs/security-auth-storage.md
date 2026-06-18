@@ -1,29 +1,52 @@
 # Security, Authentication, and Storage
 
-Rulix now requires sign-in before any memo review state is visible. New accounts start with an empty workspace; no demo memos are seeded into the app or backend.
+Rulix requires sign-in before any memo review state is visible. Onboarding is invite-only: admins create invites, invitees set their initial password from a one-time link, and public self-registration returns `410 Gone`.
 
-## Implemented Local/Single-Node Baseline
+## Current Auth Baseline
 
 - Passwords are salted and hashed server-side with PBKDF2-SHA256.
-- Sessions use random server-side tokens stored only as hashes, with httpOnly, sameSite=strict cookies.
-- Mutating API calls require a CSRF token returned by the authenticated session endpoint.
-- Review memos, decisions, analysis results, memo chat history, and audit events are stored per account in the backend account store.
-- Runtime account data is written to a git-ignored `data/rulix-store.json` file by default for local/single-node pilots, or to `RULIX_STORE_PATH` when configured.
-- Lambda deployments can block direct Function URL bypass by setting `RULIX_EDGE_SHARED_SECRET`; Terraform wires this automatically for the CloudFront custom-domain path.
+- Passwords must be at least 12 characters and include 3 of 4 character classes.
+- Login errors are generic, and 6 failed attempts lock the account for 10 minutes.
+- Sessions use random server-side tokens stored only as SHA-256 hashes.
+- Session cookies are httpOnly, sameSite=strict, and secure in production.
+- Mutating API calls require the CSRF token returned by `/api/auth/me`, login, invite acceptance, or password reset completion.
+- Password reset links are one-time tokens. Completing a reset revokes existing sessions and starts a fresh session.
 
-This local store is appropriate for development, demos, and tightly controlled single-node pilots. It is not the final storage layer for regulated customer production.
+## Production Store
 
-## Production Hardening Target
+Production uses DynamoDB when both environment variables are present:
 
-For the most secure production version, use managed identity and managed storage instead of custom passwords:
+- `RULIX_AUTH_TABLE`
+- `RULIX_ACCOUNT_TABLE`
 
-1. Put API Gateway or an equivalent edge auth layer in front of Lambda.
-2. Use tenant SSO/OIDC or Amazon Cognito with MFA, short session lifetimes, and JWT authorizers.
-3. Store memo metadata, decisions, chat messages, and audit indexes in DynamoDB or Postgres keyed by tenant and authenticated subject.
-4. Store raw memo files, extracted text, attachments, evidence bundles, and exports in S3 with tenant-scoped KMS keys, versioning, and object lock where retention requires it.
-5. Keep immutable audit trails for upload, extraction, AI prompt/version, model output, reviewer edits, decisions, overrides, exports, and signer identity.
-6. Add least-privilege IAM, CloudTrail, CloudWatch log encryption, rate limiting, WAF rules, malware/type checks, and data-classification gates.
-7. For real ITAR/CUI/export-controlled technical data, deploy the tenant environment in AWS GovCloud unless counsel and customer compliance approve another boundary.
+The auth table stores users, invites, sessions, failed-login counters, lockouts, and password reset tokens under tenant-scoped partition keys. Raw invite, reset, and session tokens are never stored; only token hashes are persisted.
+
+The account table stores review memos, decisions, analysis results, chat history, and audit events per tenant/user key. The Terraform module creates both tables with KMS encryption and point-in-time recovery. The auth table enables TTL on `expiresAtEpoch` for sessions, invites, reset tokens, and lockouts.
+
+## Local Development
+
+If the DynamoDB env vars are absent, the server uses `LocalAccountStore` for tests and local development. By default it writes to git-ignored `data/rulix-store.json`, or to `RULIX_STORE_PATH` when configured. Treat this store as non-durable development data only.
+
+## Email Delivery
+
+Invites and password resets are delivered through SESv2 when `AUTH_EMAIL_FROM` is set to a verified SES sender. If the sender is missing, the API still creates the token and returns delivery status showing email is not configured.
+
+Relevant environment variables:
+
+- `AUTH_EMAIL_FROM`
+- `APP_BASE_URL`
+- `AUTH_INVITE_TTL_HOURS` (default `72`)
+- `AUTH_RESET_TTL_MINUTES` (default `30`)
+- `AUTH_SESSION_TTL_HOURS` (default `8`)
+- `AUTH_BOOTSTRAP_SECRET` for the optional bootstrap invite endpoint
+
+## Production Hardening Still Ahead
+
+1. Add tenant SSO/OIDC or Cognito when customers require managed identity and MFA.
+2. Add WAF/rate limiting at the edge for login, invite, and reset endpoints.
+3. Move raw memo files, extracted text, attachments, evidence bundles, and exports into S3 with tenant-scoped KMS keys, versioning, and object lock where retention requires it.
+4. Keep immutable audit trails for upload, extraction, AI prompt/version, model output, reviewer edits, decisions, overrides, exports, and signer identity.
+5. For real ITAR/CUI/export-controlled technical data, deploy the tenant environment in AWS GovCloud unless counsel and customer compliance approve another boundary.
 
 ## Memo Chat and Edits
 

@@ -4,8 +4,9 @@ This starter provisions the single-tenant AWS foundation for the app:
 
 - KMS key for tenant data
 - S3 buckets for uploads, official corpus snapshots, and immutable evidence bundles
-- DynamoDB audit event table
+- DynamoDB audit, auth, and account-state tables
 - CloudWatch log group for worker/API logs
+- Lambda hosting with DynamoDB auth/account access and SES send permissions
 - IAM policy document for application workers
 
 It is partition-aware through `data.aws_partition.current`, so the same module shape can run in commercial AWS or AWS GovCloud after provider credentials and region are configured.

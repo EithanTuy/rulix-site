@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -8,7 +8,10 @@ import {
   FileText,
   Filter,
   LockKeyhole,
+  Mail,
+  RefreshCw,
   Search,
+  Send,
   ShieldCheck,
   UsersRound
 } from "lucide-react";
@@ -21,6 +24,7 @@ import type {
   ReviewerDecision,
   ReviewResult
 } from "../types";
+import { createInvite, listInvites, type InviteSummary } from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
 
 interface AdminConsoleProps {
@@ -305,22 +309,119 @@ function statusLabel(status: EvidenceStatus) {
 }
 
 function UsersPanel() {
-  const roles = [
-    ["Export Control Officer", "Can approve, override, and export records"],
-    ["Research Compliance Reviewer", "Can request info and prepare evidence maps"],
-    ["Principal Investigator", "Can submit memos and answer technical requests"],
-    ["Counsel", "Can review escalations and jurisdiction conflicts"]
-  ];
+  const [invites, setInvites] = useState<InviteSummary[]>([]);
+  const [values, setValues] = useState({
+    email: "",
+    name: "",
+    role: "reviewer" as InviteSummary["role"]
+  });
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
+
+  const loadInvites = async () => {
+    setError(undefined);
+    try {
+      setInvites(await listInvites());
+    } catch (loadError) {
+      setError(readableApiError(loadError instanceof Error ? loadError.message : "Invite list unavailable."));
+    }
+  };
+
+  useEffect(() => {
+    void loadInvites();
+  }, []);
+
+  const submitInvite = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setNotice(undefined);
+    setError(undefined);
+    try {
+      const created = await createInvite(values.email, values.name, values.role);
+      setValues({ email: "", name: "", role: "reviewer" });
+      setInvites((current) => [created.invite, ...current.filter((invite) => invite.id !== created.invite.id)]);
+      setNotice(
+        created.delivery.sent
+          ? `Invite sent to ${created.invite.email}.`
+          : `Invite created. Email delivery is not configured: ${created.delivery.reason ?? "no delivery result"}. Link: ${created.inviteLink}`
+      );
+    } catch (inviteError) {
+      setError(readableApiError(inviteError instanceof Error ? inviteError.message : "Invite failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <section className="console-section users-grid">
-      {roles.map(([role, permissions]) => (
-        <div className="user-role-card" key={role}>
-          <UsersRound size={22} />
-          <strong>{role}</strong>
-          <p>{permissions}</p>
-        </div>
-      ))}
+    <section className="console-section users-admin-panel">
+      <div className="console-section-title">
+        <UsersRound size={20} />
+        <h2>Invite-only access</h2>
+        <span>{invites.length} invite{invites.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <form className="invite-form" onSubmit={submitInvite}>
+        <label>
+          Name
+          <input
+            value={values.name}
+            onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
+            placeholder="Garry Reviewer"
+          />
+        </label>
+        <label>
+          Email
+          <input
+            value={values.email}
+            onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))}
+            placeholder="reviewer@example.com"
+            type="email"
+            required
+          />
+        </label>
+        <label>
+          Role
+          <select
+            value={values.role}
+            onChange={(event) => setValues((current) => ({ ...current, role: event.target.value as InviteSummary["role"] }))}
+          >
+            <option value="reviewer">Reviewer</option>
+            <option value="export-control-officer">Export Control Officer</option>
+            <option value="submitter">Submitter</option>
+            <option value="counsel">Counsel</option>
+          </select>
+        </label>
+        <button className="button primary" type="submit" disabled={busy}>
+          <Send size={16} />
+          {busy ? "Sending" : "Create invite"}
+        </button>
+      </form>
+
+      {notice && <div className="admin-notice success">{notice}</div>}
+      {error && <div className="admin-notice error">{error}</div>}
+
+      <div className="invite-list-header">
+        <strong>Invite status</strong>
+        <button className="icon-action" type="button" aria-label="Refresh invites" title="Refresh invites" onClick={() => void loadInvites()}>
+          <RefreshCw size={16} />
+        </button>
+      </div>
+      <div className="invite-list">
+        {invites.map((invite) => (
+          <div className="invite-row" key={invite.id}>
+            <Mail size={18} />
+            <span>
+              <strong>{invite.name}</strong>
+              <small>{invite.email}</small>
+            </span>
+            <span>{roleLabel(invite.role)}</span>
+            <span className={`invite-status ${invite.status}`}>{invite.status}</span>
+            <small>{invite.status === "used" && invite.usedAt ? `Used ${formatDateTime(invite.usedAt)}` : `Expires ${formatDateTime(invite.expiresAt)}`}</small>
+          </div>
+        ))}
+        {invites.length === 0 && <div className="empty-list">No invites have been created yet.</div>}
+      </div>
     </section>
   );
 }
@@ -411,6 +512,13 @@ function viewTitle(view: AppView) {
   };
 }
 
+function roleLabel(role: InviteSummary["role"]) {
+  if (role === "export-control-officer") return "Export Control Officer";
+  if (role === "submitter") return "Submitter";
+  if (role === "counsel") return "Counsel";
+  return "Reviewer";
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -418,4 +526,13 @@ function formatDateTime(value: string) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function readableApiError(message: string) {
+  try {
+    const parsed = JSON.parse(message) as { error?: string };
+    return parsed.error ?? message;
+  } catch {
+    return message;
+  }
 }

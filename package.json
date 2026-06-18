@@ -17,6 +17,9 @@
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.31.0",
+    "@aws-sdk/client-dynamodb": "^3.1072.0",
+    "@aws-sdk/client-sesv2": "^3.1072.0",
+    "@aws-sdk/lib-dynamodb": "^3.1072.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "lucide-react": "^0.468.0",

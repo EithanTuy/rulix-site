@@ -40,6 +40,25 @@ The Lambda uses its execution role, not an Anthropic API key. The role policy in
 against `var.bedrock_resource_arns`; scope those ARNs explicitly for production.
 The default model is `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
 
+### 3. Auth Email and First Admin
+
+Production auth uses DynamoDB tables created by Terraform and sends invite/reset
+links with SESv2. Verify a sender address in SES, then deploy with:
+
+```powershell
+terraform apply `
+  -var tenant_slug=prod `
+  -var aws_region=us-east-1 `
+  -var auth_email_from=security@rulix.cloud `
+  -var auth_bootstrap_secret="<one-time-random-secret>"
+```
+
+`auth_email_from` may be left empty during dry runs; invites will be created but
+email delivery will report that `AUTH_EMAIL_FROM` is not configured. Use
+`POST /api/auth/bootstrap-invite` with header `x-rulix-bootstrap-secret` only to
+create the first export-control-officer invite, then remove or rotate the
+bootstrap secret after an admin can create invites from the Users console.
+
 ## Build the Lambda Bundle
 
 ```powershell
@@ -78,6 +97,18 @@ https://app.rulix.cloud.
 
 If `custom_domain = ""`, no edge secret is injected and the Function URL remains
 usable for AWS smoke tests.
+
+## Auth Smoke Test
+
+After deploy, verify the durable login path:
+
+1. Create the first admin invite through `POST /api/auth/bootstrap-invite` or
+   create an invite from the Users console while signed in as an admin.
+2. Open the invite link, set a password, and confirm sign-in succeeds.
+3. Call `/api/account/state` from the signed-in browser session.
+4. Request a password reset, complete it, and confirm the old session no longer
+   reaches `/api/account/state`.
+5. Sign out and confirm the prior session cookie is rejected.
 
 ## DNS at GoDaddy (`rulix.cloud` -> DNS)
 

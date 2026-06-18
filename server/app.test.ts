@@ -3,15 +3,19 @@
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { reviewFixtures } from "../src/test/reviewFixtures";
-import type { AccountReviewState } from "../src/types";
+import type { AccountReviewState, UserProfile } from "../src/types";
 import { createApp } from "./app";
-import { createAccountStore, emptyAccountState } from "./store";
+import { createAccountStore, emptyAccountState, type AccountStore } from "./store";
 
 const originalBedrockEnabled = process.env.BEDROCK_ENABLED;
+const originalAuthTable = process.env.RULIX_AUTH_TABLE;
+const originalAccountTable = process.env.RULIX_ACCOUNT_TABLE;
 
 describe("Rulix ECCN API", () => {
   beforeEach(() => {
     delete process.env.BEDROCK_ENABLED;
+    delete process.env.RULIX_AUTH_TABLE;
+    delete process.env.RULIX_ACCOUNT_TABLE;
   });
 
   afterEach(() => {
@@ -19,6 +23,16 @@ describe("Rulix ECCN API", () => {
       process.env.BEDROCK_ENABLED = originalBedrockEnabled;
     } else {
       delete process.env.BEDROCK_ENABLED;
+    }
+    if (originalAuthTable) {
+      process.env.RULIX_AUTH_TABLE = originalAuthTable;
+    } else {
+      delete process.env.RULIX_AUTH_TABLE;
+    }
+    if (originalAccountTable) {
+      process.env.RULIX_ACCOUNT_TABLE = originalAccountTable;
+    } else {
+      delete process.env.RULIX_ACCOUNT_TABLE;
     }
   });
 
@@ -41,12 +55,149 @@ describe("Rulix ECCN API", () => {
     await request(testApp()).get("/api/reviews").expect(401);
   });
 
+  it("rejects public self-registration", async () => {
+    await request(testApp())
+      .post("/api/auth/register")
+      .send({
+        name: "Public User",
+        email: "public-register@example.com",
+        password: "Correct-Horse-2026"
+      })
+      .expect(410);
+  });
+
   it("creates a secure account with an empty memo store", async () => {
     const { agent, csrfToken } = await signedInAgent("empty-state@example.com");
     const response = await agent.get("/api/account/state").expect(200);
 
     expect(csrfToken).toEqual(expect.any(String));
     expect(response.body.state.memos).toEqual([]);
+  });
+
+  it("accepts an invite and then signs in with the invited account", async () => {
+    const { app, store } = testHarness();
+    const invite = await store.createInvite({
+      name: "Invited Reviewer",
+      email: "invited@example.com",
+      role: "reviewer"
+    });
+
+    const publicInfo = await request(app)
+      .get(`/api/auth/invites/${encodeURIComponent(invite.rawToken)}`)
+      .expect(200);
+    expect(publicInfo.body.invite.email).toBe("invited@example.com");
+
+    await request(app)
+      .post("/api/auth/invite/accept")
+      .send({ token: invite.rawToken, password: "Correct-Horse-2026" })
+      .expect(201);
+
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "invited@example.com", password: "Correct-Horse-2026" })
+      .expect(200);
+    expect(login.body.user.email).toBe("invited@example.com");
+  });
+
+  it("fails expired, used, invalid, and wrong-purpose tokens", async () => {
+    const { app, store } = testHarness();
+    const expired = await store.createInvite({
+      email: "expired-invite@example.com",
+      expiresAt: new Date(Date.now() - 1000).toISOString()
+    });
+    await request(app).get(`/api/auth/invites/${encodeURIComponent(expired.rawToken)}`).expect(410);
+    await request(app)
+      .post("/api/auth/invite/accept")
+      .send({ token: expired.rawToken, password: "Correct-Horse-2026" })
+      .expect(410);
+
+    const used = await store.createInvite({ email: "used-invite@example.com" });
+    await request(app)
+      .post("/api/auth/invite/accept")
+      .send({ token: used.rawToken, password: "Correct-Horse-2026" })
+      .expect(201);
+    await request(app).get(`/api/auth/invites/${encodeURIComponent(used.rawToken)}`).expect(410);
+    await request(app).get("/api/auth/invites/not-a-token").expect(404);
+
+    const reset = await store.requestPasswordReset("used-invite@example.com");
+    expect(reset.rawToken).toEqual(expect.any(String));
+    await request(app).get(`/api/auth/invites/${encodeURIComponent(reset.rawToken ?? "")}`).expect(404);
+    await request(app).get(`/api/auth/password-reset/${encodeURIComponent(used.rawToken)}`).expect(404);
+  });
+
+  it("handles duplicate invite and existing account email conflicts deterministically", async () => {
+    const admin = await signedInAgent("admin-invites@example.com", "export-control-officer");
+    await admin.agent
+      .post("/api/auth/invites")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({ email: "duplicate@example.com", name: "Duplicate Reviewer", role: "reviewer" })
+      .expect(201);
+    const duplicateInvite = await admin.agent
+      .post("/api/auth/invites")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({ email: "duplicate@example.com", name: "Duplicate Reviewer", role: "reviewer" })
+      .expect(409);
+    expect(duplicateInvite.body.error).toContain("pending invite");
+
+    const existing = await admin.store.createInvite({ email: "existing-account@example.com" });
+    await request(admin.app)
+      .post("/api/auth/invite/accept")
+      .send({ token: existing.rawToken, password: "Correct-Horse-2026" })
+      .expect(201);
+    const existingAccountInvite = await admin.agent
+      .post("/api/auth/invites")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({ email: "existing-account@example.com", name: "Existing", role: "reviewer" })
+      .expect(409);
+    expect(existingAccountInvite.body.error).toContain("already exists");
+  });
+
+  it("revokes old sessions after password reset", async () => {
+    const { app, store, agent } = await signedInAgent("reset-revoke@example.com");
+    const reset = await store.requestPasswordReset("reset-revoke@example.com");
+
+    await request(app)
+      .post("/api/auth/password-reset/complete")
+      .send({ token: reset.rawToken, password: "Reset-Horse-2026" })
+      .expect(200);
+
+    await agent.get("/api/account/state").expect(401);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: "reset-revoke@example.com", password: "Reset-Horse-2026" })
+      .expect(200);
+  });
+
+  it("locks out repeated failed logins and clears the lockout after reset", async () => {
+    const { app, store } = await signedInAgent("lockout@example.com");
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await request(app)
+        .post("/api/auth/login")
+        .send({ email: "lockout@example.com", password: "Wrong-Horse-2026" })
+        .expect(401);
+    }
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: "lockout@example.com", password: "Correct-Horse-2026" })
+      .expect(429);
+
+    const reset = await store.requestPasswordReset("lockout@example.com");
+    await request(app)
+      .post("/api/auth/password-reset/complete")
+      .send({ token: reset.rawToken, password: "Reset-Horse-2026" })
+      .expect(200);
+    await request(app)
+      .post("/api/auth/login")
+      .send({ email: "lockout@example.com", password: "Reset-Horse-2026" })
+      .expect(200);
+  });
+
+  it("still blocks mutating routes without a CSRF token", async () => {
+    const { agent } = await signedInAgent("csrf@example.com");
+    await agent
+      .post("/api/ai/review")
+      .send({ memo: reviewFixtures[0] })
+      .expect(403);
   });
 
   it("analyzes an ad hoc memo through the authenticated fallback backend path", async () => {
@@ -141,21 +292,37 @@ describe("Rulix ECCN API", () => {
 });
 
 function testApp() {
-  return createApp({ store: createAccountStore({ persist: false }) });
+  return testHarness().app;
 }
 
-async function signedInAgent(email: string) {
-  const agent = request.agent(testApp());
+function testHarness() {
+  const store = createAccountStore({ persist: false });
+  return { app: createApp({ store }), store };
+}
+
+async function signedInAgent(email: string, role: UserProfile["role"] = "reviewer") {
+  const { app, store } = testHarness();
+  const agent = request.agent(app);
+  const invite = await store.createInvite({
+    name: "Garry Reviewer",
+    email,
+    role
+  });
   const response = await agent
-    .post("/api/auth/register")
+    .post("/api/auth/invite/accept")
     .send({
-      name: "Garry Reviewer",
-      email,
+      token: invite.rawToken,
       password: "Correct-Horse-2026"
     })
     .expect(201);
 
-  return { agent, csrfToken: response.body.csrfToken as string };
+  return {
+    app,
+    store: store as AccountStore,
+    agent,
+    csrfToken: response.body.csrfToken as string,
+    user: response.body.user as UserProfile
+  };
 }
 
 async function saveState(
