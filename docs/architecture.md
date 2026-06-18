@@ -41,8 +41,8 @@ One TypeScript codebase, two runtime halves served from a single origin:
 └───────────────┬─────────────────────────────────┬──────────────────────┘
                 │                                   │
    ┌────────────▼───────────┐         ┌─────────────▼──────────────┐
-   │ Deterministic engine    │        │ Anthropic council (live AI) │
-   │ src/lib/eccnReview.ts    │        │ server/anthropicCouncil.ts  │
+   │ Deterministic engine    │        │ Bedrock council (live AI)   │
+   │ src/lib/eccnReview.ts    │        │ server/bedrockCouncil.ts    │
    │ rules + missing-checks   │        │ 7 bounded subagents, tool   │
    │ classify / jurisdiction  │        │ schema, citation + range    │
    │ ALWAYS runs (baseline)   │        │ validation against corpus   │
@@ -52,12 +52,13 @@ One TypeScript codebase, two runtime halves served from a single origin:
 Key design points:
 
 - **AI with a deterministic floor.** Every analysis first computes a local
-  rules result. If `ANTHROPIC_API_KEY` is set, the Claude council runs and its
-  output is merged — but citation IDs are validated against the real corpus and
-  evidence excerpts are re-located in the actual memo text, so the model cannot
-  fabricate sources or highlights. With no key, the deterministic result is
-  shown and labeled as such. Default model is the **Haiku council**
-  (`claude-haiku-4-5`), escalatable to Sonnet.
+  rules result. If `BEDROCK_ENABLED=true`, the Claude council runs through
+  Amazon Bedrock and its output is merged, but citation IDs are validated
+  against the real corpus and evidence excerpts are re-located in the actual
+  memo text, so the model cannot fabricate sources or highlights. With Bedrock
+  disabled, the deterministic result is shown and labeled as such. Default
+  model is the **Haiku council** through the global Bedrock inference profile
+  (`global.anthropic.claude-haiku-4-5-20251001-v1:0`).
 - **Human signoff is a hard gate** — status is derived from findings + reviewer
   decision; only an explicit accept stamps signoff.
 - **Single origin.** In production Express serves both the built client and the
@@ -92,7 +93,7 @@ original plan but is closed to new AWS accounts as of 2026-04-30 — see
   Lambda  rulix-prod-app  (Node 20)
       • handler.cjs = esbuild bundle of the Express app (serverless-http)
       • serves UI + /api from RULIX_DIST_DIR=dist
-      • env: ANTHROPIC_MODEL, (optional) ANTHROPIC_API_KEY, edge secret
+      • env: BEDROCK_ENABLED, BEDROCK_MODEL, edge secret
 ```
 
 ### Resources (Terraform, `infra/terraform/`)
@@ -164,8 +165,8 @@ hosting switch, the App Runner attempt, and the UI revamp.
 2. CloudFront terminates TLS (ACM cert), forwards to the Lambda Function URL,
    adding the secret origin header.
 3. Express (in Lambda) checks the edge secret, serves the SPA or handles `/api`.
-4. Authed reviewer submits a memo → deterministic engine runs; if a key is
-   configured, the Claude **Haiku council** also runs and is merged with
+4. Authed reviewer submits a memo → deterministic engine runs; if Bedrock is
+   enabled, the Claude **Haiku council** also runs and is merged with
    citation/range validation.
 5. Findings + recommendation render; reviewer records a decision; signoff gates
    the final status.
@@ -186,9 +187,10 @@ GoDaddy validation record → CloudFront). Subsequent deploys are a single apply
 
 ## 8. Security & compliance posture
 
-- **Secrets** (AWS keys, Anthropic key) are never committed and never deployed by
-  the assistant — the operator provides them locally / at apply time. The app
-  runs without a key in deterministic local-rules mode.
+- **Secrets** (AWS access keys and deployment credentials) are never committed
+  and never deployed by the assistant. Live AI uses the AWS credential chain or
+  Lambda execution role plus explicit `BEDROCK_ENABLED=true`; without that flag
+  the app runs in deterministic local-rules mode.
 - **Edge secret** prevents direct Function URL access in custom-domain deploys.
 - **Auth + CSRF** protect account data and mutating routes.
 - **Compliance:** this public commercial deployment is a sample/redacted-data

@@ -7,22 +7,22 @@ import type { AccountReviewState } from "../src/types";
 import { createApp } from "./app";
 import { createAccountStore, emptyAccountState } from "./store";
 
-const originalKey = process.env.ANTHROPIC_API_KEY;
+const originalBedrockEnabled = process.env.BEDROCK_ENABLED;
 
 describe("Rulix ECCN API", () => {
   beforeEach(() => {
-    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.BEDROCK_ENABLED;
   });
 
   afterEach(() => {
-    if (originalKey) {
-      process.env.ANTHROPIC_API_KEY = originalKey;
+    if (originalBedrockEnabled) {
+      process.env.BEDROCK_ENABLED = originalBedrockEnabled;
     } else {
-      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.BEDROCK_ENABLED;
     }
   });
 
-  it("reports health and whether the Anthropic backend is configured", async () => {
+  it("reports health and whether the Bedrock backend is configured", async () => {
     const response = await request(testApp()).get("/api/health").expect(200);
 
     expect(response.body.ok).toBe(true);

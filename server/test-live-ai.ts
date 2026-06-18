@@ -1,10 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import { verifyCitations } from "../src/lib/eccnReview";
-import { runCouncilAnalysis } from "./anthropicCouncil";
+import { runCouncilAnalysis } from "./bedrockCouncil";
 
-if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-  throw new Error("ANTHROPIC_API_KEY is required for the live AI smoke test.");
+if (process.env.BEDROCK_ENABLED?.trim().toLowerCase() !== "true") {
+  throw new Error("BEDROCK_ENABLED=true, AWS credentials, and AWS_REGION are required for the live Bedrock smoke test.");
 }
 
 const result = await runCouncilAnalysis(reviewFixtures[0], {
@@ -12,8 +12,8 @@ const result = await runCouncilAnalysis(reviewFixtures[0], {
   maxTokens: 1800
 });
 
-if (!result.provider.live || result.provider.source !== "anthropic") {
-  throw new Error(`Expected a live Anthropic result, got ${result.provider.source}.`);
+if (!result.provider.live || result.provider.source !== "bedrock") {
+  throw new Error(`Expected a live Bedrock result, got ${result.provider.source}.`);
 }
 
 const invalidCitations = verifyCitations(result);

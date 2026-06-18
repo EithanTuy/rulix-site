@@ -692,7 +692,7 @@ components:
           properties:
             source:
               type: string
-              enum: [anthropic, local-rules, fallback]
+              enum: [bedrock, local-rules, fallback]
             label:
               type: string
             model:
@@ -730,4 +730,4 @@ components:
     AnalysisDepth:
       type: string
       enum: [standard, deep]
-      description: Review depth requested by the browser. Provider model selection is server-owned through ANTHROPIC_MODEL.
+      description: Review depth requested by the browser. Provider model selection is server-owned through BEDROCK_MODEL.

@@ -13,7 +13,7 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 | Compute | Lambda `rulix-prod-app` (Node 20, Express UI + `/api`) |
 | Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` |
 | DNS | GoDaddy `rulix.cloud`: ACM validation CNAME + `app` to CloudFront |
-| AI mode | **local-rules** (deterministic) - no Anthropic key deployed |
+| AI mode | **local-rules** (deterministic) - `BEDROCK_ENABLED` not deployed |
 
 Verified end-to-end: UI loads, `/api/health` 200, `/api/ai/review` returns
 grounded findings when called from an authenticated session.
@@ -40,19 +40,20 @@ decrypt, re-encrypt, data-key, and describe permissions for the log-group ARN.
 with account-root administration and scoped CloudWatch Logs usage for the
 application log group ARN.
 
-### 2. Deployed in Local-Rules Mode, Not Live Claude (BY DESIGN)
+### 2. Deployed in Local-Rules Mode, Not Live Bedrock (BY DESIGN)
 
-No `ANTHROPIC_API_KEY` is deployed, so the app uses the deterministic council.
-This is intentional: secrets are not handled by the deploy assistant.
+`BEDROCK_ENABLED` was not deployed, so the app uses the deterministic council.
+This is intentional until the Lambda role has approved Bedrock model access and
+the operator explicitly enables live AI.
 
-To enable live AI, redeploy with the key kept on the operator side:
+To enable live AI, redeploy with Bedrock enabled:
 
 ```bash
-terraform apply -var tenant_slug=prod -var aws_region=us-east-1 -var anthropic_api_key="sk-ant-..."
+terraform apply -var tenant_slug=prod -var aws_region=us-east-1 -var bedrock_enabled=true
 ```
 
-The key is injected as a Lambda env var. For production, move it to Secrets
-Manager and reference it instead of passing it inline.
+The Lambda uses its execution role for AWS credentials. Ensure the account has
+Bedrock model access for the configured Anthropic model/profile in `us-east-1`.
 
 ### 3. AWS App Runner Was Unavailable (RESOLVED)
 

@@ -31,7 +31,7 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
         <Globe2 size={19} />
         <div>
           <strong>Public-Source Draft</strong>
-          <span>Research public sources and draft a starting memo.</span>
+          <span>Draft a starting memo and verify public-source facts.</span>
         </div>
       </div>
 
@@ -51,13 +51,13 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
         disabled={busy || !item.trim()}
       >
         <Search size={16} />
-        {busy ? "Researching..." : "Research and Draft Memo"}
+        {busy ? "Drafting..." : "Draft Memo"}
       </button>
       {error && <p className="memo-chat-error">{error}</p>}
 
       {draft && (
         <div className="public-draft-result">
-          <div className={draft.provider.live ? "provider-box anthropic compact" : "provider-box fallback compact"}>
+          <div className={draft.provider.live ? "provider-box bedrock compact" : "provider-box fallback compact"}>
             <Globe2 size={16} />
             <p>{draft.provider.message}</p>
           </div>

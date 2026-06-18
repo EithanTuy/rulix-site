@@ -16,7 +16,7 @@
     "download:corpus": "node scripts/download-official-corpus.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
+    "@anthropic-ai/bedrock-sdk": "^0.31.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "lucide-react": "^0.468.0",

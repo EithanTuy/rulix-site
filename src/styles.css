@@ -2293,11 +2293,11 @@ button {
   grid-column: 2;
 }
 
-.provider-box.anthropic {
+.provider-box.bedrock {
   background: #f4fbf8;
 }
 
-.provider-box.anthropic svg {
+.provider-box.bedrock svg {
   color: var(--green);
 }
 

@@ -332,7 +332,7 @@ export function App() {
     addAuditEvent(
       memo.id,
       "Public-source draft created",
-      "Draft memo generated from public internet research. Reviewer validation is required before signoff.",
+      "Draft memo generated from Bedrock model knowledge. Public manufacturer and official-source verification is required before signoff.",
       "review"
     );
     setAnalysisStates((current) => ({
@@ -502,7 +502,7 @@ export function App() {
         }));
         return;
       }
-      const failedToUseLiveAi = backendHealth?.provider.configured && result.provider.source !== "anthropic";
+      const failedToUseLiveAi = backendHealth?.provider.configured && result.provider.source !== "bedrock";
       setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
       if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
       setAnalysisStates((current) => ({

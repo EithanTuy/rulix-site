@@ -1,6 +1,6 @@
 # Rulix ECCN
 
-Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned official-source corpus. It ingests memo text, runs a backend AI council when `ANTHROPIC_API_KEY` is configured, falls back to deterministic local rules when the provider is unavailable, highlights memo evidence, maps findings to citations, and requires human export-control signoff before any result is treated as final.
+Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned official-source corpus. It ingests memo text, runs a backend AI council through Amazon Bedrock when `BEDROCK_ENABLED=true`, falls back to deterministic local rules when the provider is unavailable, highlights memo evidence, maps findings to citations, and requires human export-control signoff before any result is treated as final.
 
 ## Run
 
@@ -12,10 +12,16 @@ npm run dev
 
 The Vite app runs on `http://127.0.0.1:5173` by default and proxies `/api` to the backend at `http://127.0.0.1:8787`.
 
-Set the Anthropic key only in your shell or deployment secret store:
+Enable live Bedrock calls only from your local shell or deployment environment. The Bedrock SDK uses the AWS default credential chain, so keep credentials in an AWS profile, IAM role, or temporary environment variables:
 
 ```bash
-ANTHROPIC_API_KEY=... npm run dev:server
+BEDROCK_ENABLED=true AWS_PROFILE=rulix-bedrock AWS_REGION=us-east-1 npm run dev:server
+```
+
+Optional model override:
+
+```bash
+BEDROCK_MODEL=global.anthropic.claude-haiku-4-5-20251001-v1:0
 ```
 
 Useful checks:
@@ -30,7 +36,7 @@ npm run download:corpus
 Reviewer workflow guide: `docs/reviewer-guide.md`.
 Security and storage guide: `docs/security-auth-storage.md`.
 
-`npm run test:ai` requires `ANTHROPIC_API_KEY` and verifies that the backend returns a live Anthropic result. Do not commit `.env` files or API keys.
+`npm run test:ai` requires `BEDROCK_ENABLED=true`, AWS credentials, Bedrock model access, and `AWS_REGION`. It verifies that the backend returns a live Bedrock result. Do not commit `.env` files or AWS access keys.
 
 `npm run download:corpus` downloads official source pages into `corpus/raw/` and writes `corpus/manifest.generated.json`. Those generated files are ignored by Git so a tenant can refresh snapshots without polluting source control.
 
@@ -40,7 +46,7 @@ Security and storage guide: `docs/security-auth-storage.md`.
 - Express backend with `/api/health`, `/api/corpus`, `/api/reviews`, `/api/reviews/:id/analyze`, `/api/ai/review`, and reviewer decision endpoints.
 - Authenticated account workspace with server-stored memos, decisions, analysis results, memo chat history, and audit events.
 - Review queue, upload/paste intake, highlighted memo viewer, editable memo text, memo chat-assisted edits, AI council panel, source citations, decision notes, and report export.
-- Backend Anthropic Sonnet council adapter with deterministic citation/range validation and safe local fallback.
+- Backend Bedrock Claude Haiku council adapter with deterministic citation/range validation and safe local fallback.
 - Local review engine that recommends candidate ECCNs/EAR99 review paths, labels evidence as strong/weak/missing/conflict, verifies citations against the official corpus, and preserves human signoff as a hard gate.
 - Seed official corpus metadata for EAR/ITAR/BIS/ITA sources, with a downloader for full raw snapshots.
 - AWS/GovCloud architecture notes in `docs/aws-govcloud-architecture.md`.

@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import { verifyCitations } from "../src/lib/eccnReview";
 import type { AgentRole, MemoRecord, ReviewResult } from "../src/types";
-import { runCouncilAnalysis } from "./anthropicCouncil";
+import { runCouncilAnalysis } from "./bedrockCouncil";
 
 const EXPECTED_ROLES: AgentRole[] = [
   "memo-parser",
@@ -48,8 +48,8 @@ const EXPECTATIONS: Record<string, {
   }
 };
 
-if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-  throw new Error("ANTHROPIC_API_KEY is required for the deep live AI council test.");
+if (process.env.BEDROCK_ENABLED?.trim().toLowerCase() !== "true") {
+  throw new Error("BEDROCK_ENABLED=true, AWS credentials, and AWS_REGION are required for the deep live Bedrock council test.");
 }
 
 const summaries: string[] = [];
@@ -80,7 +80,7 @@ async function runLiveCouncilWithRetry(memo: MemoRecord) {
     depth: "deep",
     maxTokens: 3600
   });
-  if (result.provider.source !== "anthropic") {
+  if (result.provider.source !== "bedrock") {
     result = await runCouncilAnalysis(memo, {
       depth: "deep",
       maxTokens: 3600
@@ -95,8 +95,8 @@ function assertQuality(memo: MemoRecord, result: ReviewResult) {
     throw new Error(`No deep-test expectation is registered for ${memo.id}.`);
   }
 
-  if (!result.provider.live || result.provider.source !== "anthropic") {
-    throw new Error(`${memo.id}: expected a live Anthropic result, got ${result.provider.source}.`);
+  if (!result.provider.live || result.provider.source !== "bedrock") {
+    throw new Error(`${memo.id}: expected a live Bedrock result, got ${result.provider.source}.`);
   }
 
   if (result.provider.model.toLowerCase().includes("sonnet")) {

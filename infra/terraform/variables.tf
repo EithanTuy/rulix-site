@@ -27,21 +27,20 @@ variable "bedrock_resource_arns" {
 
 # ---- App hosting (Lambda + Function URL + CloudFront) ----
 
-variable "anthropic_api_key" {
-  description = "Anthropic API key injected as a Lambda env var. Empty = run in local-rules mode (no live AI)."
-  type        = string
-  default     = ""
-  sensitive   = true
+variable "bedrock_enabled" {
+  description = "Enables live Bedrock AI calls when true. False keeps the app in deterministic local-rules mode."
+  type        = bool
+  default     = false
 }
 
-variable "anthropic_model" {
-  description = "Server-owned Anthropic model id. Default uses the currently supported Haiku council model."
+variable "bedrock_model" {
+  description = "Server-owned Bedrock model or inference-profile id. Default uses global Claude Haiku 4.5 routing."
   type        = string
-  default     = "claude-haiku-4-5"
+  default     = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
 
   validation {
-    condition     = can(regex("^claude-[a-z0-9-]+$", var.anthropic_model))
-    error_message = "anthropic_model must be a Claude model id, for example claude-haiku-4-5."
+    condition     = can(regex("^(global|us|eu|apac|jp)\\.anthropic\\.claude-[a-z0-9-]+-[0-9]{8}-v[0-9]:[0-9]$", var.bedrock_model))
+    error_message = "bedrock_model must be a Bedrock Anthropic inference-profile id, for example global.anthropic.claude-haiku-4-5-20251001-v1:0."
   }
 }
 

@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { officialCorpus } from "../src/data/corpus";
 import { analyzeMemo } from "../src/lib/eccnReview";
 import type {
@@ -14,25 +14,22 @@ import type {
   ReviewResult
 } from "../src/types";
 
-export const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5";
-export const LEGACY_HAIKU_35_MODEL = "claude-3-5-haiku-20241022";
+export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
 export type CouncilDepth = "standard" | "deep";
 
 interface CouncilOptions {
-  apiKey?: string;
   model?: string;
   depth?: CouncilDepth;
   maxTokens?: number;
 }
 
 interface MemoChatOptions {
-  apiKey?: string;
   model?: string;
   maxTokens?: number;
 }
 
 export interface MemoChatAiResult {
-  source: "anthropic";
+  source: "bedrock";
   model: string;
   text: string;
   proposedMemoText?: string;
@@ -182,16 +179,17 @@ const MEMO_CHAT_SCHEMA = {
 } as const;
 
 const PUBLIC_MEMO_DRAFT_PROMPT = `You are Rulix public-source memo drafting assistant.
-Use public web information to draft an ECCN self-classification memo for the requested item.
-Use web search before drafting unless the request is too vague.
-Do not make a final legal determination. If public facts are insufficient, say what must be verified.
+Draft a cautious ECCN self-classification memo for the requested item from general model knowledge only.
+Amazon Bedrock does not provide server-side public web search here. Do not claim live research was performed, do not invent URLs, and do not cite sources as verified.
+Do not make a final legal determination. Clearly list the manufacturer, official, and public-source facts that must be independently verified before relying on the memo.
 Return only valid JSON with title, memoText, and sources.
-The memoText must be markdown and include: item, owner placeholder, proposed classification/review path, item description, public-source facts, performance parameters, software/technical data notes, use/end-use assumptions, order-of-review notes, self-classification rationale, information still needed, and source list.`;
+The sources array must be empty.
+The memoText must be markdown and include: item, owner placeholder, proposed classification/review path, item description, unverified background assumptions, performance parameters to verify, software/technical data notes, use/end-use assumptions, order-of-review notes, self-classification rationale, information still needed, and verification checklist.`;
 
-export function getAnthropicRuntime() {
+export function getBedrockRuntime() {
   return {
-    configured: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
-    model: process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL
+    configured: process.env.BEDROCK_ENABLED?.trim().toLowerCase() === "true",
+    model: process.env.BEDROCK_MODEL?.trim() || DEFAULT_BEDROCK_MODEL
   };
 }
 
@@ -200,25 +198,25 @@ export async function runCouncilAnalysis(
   options: CouncilOptions = {}
 ): Promise<ReviewResult> {
   const localResult = analyzeMemo(memo);
-  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  const model = options.model ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
+  const runtime = getBedrockRuntime();
+  const model = options.model ?? runtime.model;
   const depth = options.depth ?? "standard";
 
-  if (!apiKey?.trim()) {
+  if (!runtime.configured) {
     return withProvider(localResult, {
       source: "local-rules",
       label: "Local rules council",
       model: "local-rule-engine-v1",
       depth,
       live: false,
-      message: "No Anthropic key is configured on the backend, so the deterministic council is displayed.",
+      message: "Bedrock is not enabled on the backend, so the deterministic council is displayed.",
       checkedAt: new Date().toISOString()
     });
   }
 
   const startedAt = Date.now();
   try {
-    const client = new Anthropic({ apiKey });
+    const client = new AnthropicBedrock();
     const response = await client.messages.create({
       model,
       max_tokens: options.maxTokens ?? 2600,
@@ -252,7 +250,7 @@ export async function runCouncilAnalysis(
     const checkedAt = new Date().toISOString();
 
     return withProvider(mergeAiPayload(memo, localResult, payload, { model, depth }), {
-      source: "anthropic",
+      source: "bedrock",
       label: providerLabel(model),
       model,
       depth,
@@ -270,7 +268,7 @@ export async function runCouncilAnalysis(
       model,
       depth,
       live: false,
-      message: `Live Anthropic analysis failed (${safeError(error, apiKey)}). Showing deterministic backend fallback.`,
+      message: `Live Bedrock analysis failed (${safeError(error)}). Showing deterministic backend fallback.`,
       checkedAt,
       latencyMs: Date.now() - startedAt
     });
@@ -283,12 +281,12 @@ export async function runMemoChatWithHaiku(
   history: MemoChatMessage[] = [],
   options: MemoChatOptions = {}
 ): Promise<MemoChatAiResult | undefined> {
-  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  const model = options.model ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
-  if (!apiKey?.trim()) return undefined;
+  const runtime = getBedrockRuntime();
+  const model = options.model ?? runtime.model;
+  if (!runtime.configured) return undefined;
 
   const startedAt = Date.now();
-  const client = new Anthropic({ apiKey });
+  const client = new AnthropicBedrock();
   const response = await client.messages.create({
     model,
     max_tokens: options.maxTokens ?? 1400,
@@ -331,7 +329,7 @@ export async function runMemoChatWithHaiku(
     : undefined;
 
   return {
-    source: "anthropic",
+    source: "bedrock",
     model,
     text: proposedMemoText
       ? responseText
@@ -345,9 +343,9 @@ export async function draftMemoFromPublicWeb(
   item: string,
   options: MemoChatOptions = {}
 ): Promise<PublicMemoDraftResult> {
-  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  const model = options.model ?? process.env.ANTHROPIC_WEB_MODEL ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
-  if (!apiKey?.trim()) {
+  const runtime = getBedrockRuntime();
+  const model = options.model ?? runtime.model;
+  if (!runtime.configured) {
     return {
       title: `Public-source memo draft - ${item}`,
       memoText: buildOfflinePublicDraft(item),
@@ -356,31 +354,24 @@ export async function draftMemoFromPublicWeb(
         configured: false,
         model: "local-template",
         live: false,
-        message: "No Anthropic key is configured, so a public-search draft could not be generated."
+        message: "Bedrock is not enabled, so a public-source draft could not be generated."
       }
     };
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = new AnthropicBedrock();
   try {
     const response = await client.messages.create({
       model,
       max_tokens: options.maxTokens ?? 3200,
       system: PUBLIC_MEMO_DRAFT_PROMPT,
-      tools: [
-        {
-          type: "web_search_20250305",
-          name: "web_search",
-          max_uses: 5
-        } as never
-      ],
       messages: [
         {
           role: "user",
           content: JSON.stringify({
             item,
             task:
-              "Research public web sources and draft a cautious ECCN self-classification memo. Cite public sources used."
+              "Draft a cautious ECCN self-classification memo from model knowledge only. Do not claim web research was performed. Return sources as an empty array and list facts that must be independently verified."
           })
         }
       ]
@@ -391,27 +382,16 @@ export async function draftMemoFromPublicWeb(
       .join("\n")
       .trim();
     const payload = parseJsonPayload(rawText) as Record<string, unknown>;
-    const sources = Array.isArray(payload.sources)
-      ? payload.sources
-          .map((source) => asRecord(source))
-          .filter((source): source is Record<string, unknown> => Boolean(source))
-          .map((source) => ({
-            title: asString(source.title, "Public source"),
-            url: asString(source.url, "")
-          }))
-          .filter((source) => source.url)
-          .slice(0, 8)
-      : [];
-
     return {
       title: asString(payload.title, `Public-source memo draft - ${item}`),
       memoText: asLongString(payload.memoText, buildOfflinePublicDraft(item), 12000),
-      sources,
+      sources: [],
       provider: {
         configured: true,
         model,
         live: true,
-        message: "Draft generated with Claude web search from public internet sources."
+        message:
+          "Drafted on Bedrock from model knowledge; public web search is unavailable on Bedrock, so all facts must be verified against manufacturer and official sources."
       }
     };
   } catch (error) {
@@ -423,7 +403,7 @@ export async function draftMemoFromPublicWeb(
         configured: true,
         model,
         live: false,
-        message: `Public web draft failed (${safeError(error, apiKey)}).`
+        message: `Public draft failed (${safeError(error)}).`
       }
     };
   }
@@ -438,7 +418,7 @@ function buildOfflinePublicDraft(item: string) {
 
 ## Drafting Note
 
-Public web research was unavailable from this backend session. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
+Live Bedrock drafting was unavailable or failed in this backend session. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
 
 ## Information Needed
 
@@ -700,9 +680,9 @@ function memoSupportsCategory(memoText: string, category: string) {
 
 function providerLabel(model: string) {
   const normalized = model.toLowerCase();
-  if (normalized.includes("haiku")) return "Claude Haiku council";
-  if (normalized.includes("opus")) return "Claude Opus council";
-  return "Claude council";
+  if (normalized.includes("haiku")) return "Claude Haiku council via Bedrock";
+  if (normalized.includes("opus")) return "Claude Opus council via Bedrock";
+  return "Claude council via Bedrock";
 }
 
 function normalizeJurisdiction(
@@ -896,7 +876,7 @@ function asConfidence(value: unknown, fallback: number) {
   return Math.max(0, Math.min(0.99, numberValue));
 }
 
-function safeError(error: unknown, apiKey?: string) {
+function safeError(error: unknown) {
   const message = error instanceof Error ? error.message : "unknown provider error";
-  return apiKey ? message.replaceAll(apiKey, "[redacted]") : message;
+  return message;
 }

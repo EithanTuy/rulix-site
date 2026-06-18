@@ -16,11 +16,11 @@ import type {
 } from "../src/types";
 import {
   draftMemoFromPublicWeb,
-  getAnthropicRuntime,
+  getBedrockRuntime,
   runCouncilAnalysis,
   runMemoChatWithHaiku,
   type CouncilDepth
-} from "./anthropicCouncil";
+} from "./bedrockCouncil";
 import {
   StoreError,
   createAccountStore,
@@ -57,7 +57,7 @@ export function createApp(options: CreateAppOptions = {}) {
   app.use(express.json({ limit: "5mb" }));
 
   app.get("/api/health", (_req, res) => {
-    const provider = getAnthropicRuntime();
+    const provider = getBedrockRuntime();
     res.json({
       ok: true,
       service: "rulix-eccn-api",

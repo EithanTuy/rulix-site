@@ -100,7 +100,7 @@ export interface CouncilAgentRun {
   summary: string;
 }
 
-export type AnalysisSource = "anthropic" | "local-rules" | "fallback";
+export type AnalysisSource = "bedrock" | "local-rules" | "fallback";
 
 export interface AnalysisProviderStatus {
   source: AnalysisSource;

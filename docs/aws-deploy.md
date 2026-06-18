@@ -25,17 +25,20 @@ locally so Terraform reads it without the secret going through any chat:
 $env:AWS_PROFILE = "rulix-deploy"
 ```
 
-### 2. Optional Anthropic API Key for Live AI
+### 2. Optional Bedrock Live AI
 
-Without a key the app runs in deterministic local-rules mode. To enable live
-analysis, pass the key at apply time (stored only as a Lambda env var):
+Without `BEDROCK_ENABLED=true` the app runs in deterministic local-rules mode.
+To enable live analysis, grant the Lambda execution role Bedrock model access
+and set the deployment flag:
 
 ```powershell
-terraform apply -var anthropic_api_key="sk-ant-..."
+terraform apply -var bedrock_enabled=true
 ```
 
-For production, wire the secret through Secrets Manager instead of passing it
-inline.
+The Lambda uses its execution role, not an Anthropic API key. The role policy in
+`hosting.tf` allows `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream`
+against `var.bedrock_resource_arns`; scope those ARNs explicitly for production.
+The default model is `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
 
 ## Build the Lambda Bundle
 

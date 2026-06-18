@@ -43,6 +43,23 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+data "aws_iam_policy_document" "lambda_bedrock" {
+  statement {
+    sid = "BedrockModelInvocation"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream"
+    ]
+    resources = var.bedrock_resource_arns
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_bedrock" {
+  name   = "${local.fn_name}-bedrock"
+  role   = aws_iam_role.lambda_exec.id
+  policy = data.aws_iam_policy_document.lambda_bedrock.json
+}
+
 # ---- The function ----
 resource "aws_lambda_function" "app" {
   function_name    = local.fn_name
@@ -59,10 +76,10 @@ resource "aws_lambda_function" "app" {
       {
         NODE_ENV        = "production"
         RULIX_DIST_DIR  = "dist"
-        ANTHROPIC_MODEL = var.anthropic_model
+        BEDROCK_ENABLED = tostring(var.bedrock_enabled)
+        BEDROCK_MODEL   = var.bedrock_model
       },
-      var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result },
-      var.anthropic_api_key == "" ? {} : { ANTHROPIC_API_KEY = var.anthropic_api_key }
+      var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result }
     )
   }
 
