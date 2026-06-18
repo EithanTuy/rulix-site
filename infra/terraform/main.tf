@@ -21,7 +21,7 @@ data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix = "rulix-${var.tenant_slug}"
+  name_prefix    = "rulix-${var.tenant_slug}"
   log_group_name = "/aws/rulix/${var.tenant_slug}/application"
   log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
   common_tags = {
