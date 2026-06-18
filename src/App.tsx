@@ -685,7 +685,7 @@ export function App() {
           "--analysis-panel-width": `${panelSizes.analysis}px`
         } as CSSProperties}
       >
-        <SidebarRail activeView={activeView} onViewChange={setActiveView} />
+        <SidebarRail activeView={activeView} onViewChange={setActiveView} userRole={auth.user.role} />
         {activeView === "reviews" ? (
           <>
             <ReviewList

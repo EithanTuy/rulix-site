@@ -3108,7 +3108,24 @@ button {
   }
 
   .side-rail {
-    display: none;
+    min-height: 58px;
+    flex-direction: row;
+    justify-content: center;
+    padding: 7px 12px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .rail-items {
+    display: flex;
+    gap: 10px;
+  }
+
+  .rail-button {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
   }
 
   .review-list,
