@@ -20,6 +20,11 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 Verified end-to-end: UI loads, `/api/health` 200, `/api/ai/review` returns
 grounded findings when called from an authenticated session.
 
+Deep Sonnet reviews are bounded to 50 seconds and CloudFront waits up to 60
+seconds for the Lambda origin. If Sonnet exceeds the deadline, the backend
+returns and records the deterministic fallback instead of exposing a
+CloudFront 504 page.
+
 ---
 
 ## Known Issues

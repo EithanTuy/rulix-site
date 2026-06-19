@@ -124,6 +124,10 @@ After deploy, verify the durable login path:
 
 CloudFront takes roughly 5-15 minutes to deploy.
 
+The CloudFront Lambda origin read timeout is 60 seconds. Live Bedrock council
+calls use a shorter backend deadline so Rulix can persist and return its
+deterministic fallback before the edge connection closes.
+
 ## Tear Down
 
 ```powershell

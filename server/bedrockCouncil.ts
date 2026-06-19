@@ -35,6 +35,7 @@ interface CouncilOptions {
   model?: string;
   depth?: CouncilDepth;
   maxTokens?: number;
+  timeoutMs?: number;
   onUsage?: (sample: UsageSample) => void;
 }
 
@@ -241,26 +242,32 @@ export async function runCouncilAnalysis(
   const startedAt = Date.now();
   try {
     const client = new AnthropicBedrock();
-    const response = await client.messages.create({
-      model,
-      max_tokens: options.maxTokens ?? 2600,
-      system: SYSTEM_PROMPT,
-      tools: [
-        {
-          name: "record_eccn_review",
-          description:
-            "Return the ECCN memo review as normalized structured data for the Rulix reviewer UI.",
-          input_schema: AI_REVIEW_SCHEMA
-        }
-      ],
-      tool_choice: { type: "tool", name: "record_eccn_review" },
-      messages: [
-        {
-          role: "user",
-          content: buildCouncilPrompt(memo, localResult, depth)
-        }
-      ]
-    });
+    const response = await client.messages.create(
+      {
+        model,
+        max_tokens: options.maxTokens ?? 2600,
+        system: SYSTEM_PROMPT,
+        tools: [
+          {
+            name: "record_eccn_review",
+            description:
+              "Return the ECCN memo review as normalized structured data for the Rulix reviewer UI.",
+            input_schema: AI_REVIEW_SCHEMA
+          }
+        ],
+        tool_choice: { type: "tool", name: "record_eccn_review" },
+        messages: [
+          {
+            role: "user",
+            content: buildCouncilPrompt(memo, localResult, depth)
+          }
+        ]
+      },
+      {
+        signal: AbortSignal.timeout(options.timeoutMs ?? bedrockDeadlineMs()),
+        maxRetries: 0
+      }
+    );
     emitUsage(options.onUsage, model, "council", response.usage, Date.now() - startedAt);
 
     const toolBlock = response.content.find(
@@ -712,6 +719,13 @@ function providerLabel(model: string) {
   if (normalized.includes("sonnet")) return "Claude Sonnet council via Bedrock";
   if (normalized.includes("opus")) return "Claude Opus council via Bedrock";
   return "Claude council via Bedrock";
+}
+
+function bedrockDeadlineMs() {
+  const configured = Number(process.env.RULIX_BEDROCK_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 5_000
+    ? Math.min(configured, 52_000)
+    : 50_000;
 }
 
 function normalizeJurisdiction(
