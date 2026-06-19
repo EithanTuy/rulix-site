@@ -181,3 +181,73 @@ export interface NewReviewInput {
   memoText: string;
   attachments: string[];
 }
+
+export type UsageCallType = "council" | "memo-chat" | "public-draft";
+
+// A single billed Bedrock model invocation. Token counts are stored raw; the
+// dollar cost is derived at aggregation time so price-table changes apply
+// consistently (see server/bedrockPricing.ts + server/metrics.ts).
+export interface UsageEvent {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  at: string;
+  model: string;
+  callType: UsageCallType;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  latencyMs?: number;
+}
+
+export interface MetricTotals {
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  calls: number;
+  avgLatencyMs: number;
+}
+
+export interface MetricBucket {
+  key: string;
+  label: string;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  calls: number;
+}
+
+export interface UserUsageSummary {
+  userId: string;
+  email: string;
+  name: string;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  calls: number;
+}
+
+export interface AdminMetrics {
+  generatedAt: string;
+  rangeDays: number;
+  totals: MetricTotals;
+  byModel: MetricBucket[];
+  byCallType: MetricBucket[];
+  daily: MetricBucket[];
+  topUsers: UserUsageSummary[];
+  users: { total: number; online: number };
+}
+
+export interface UserAdminSummary {
+  id: string;
+  email: string;
+  name: string;
+  role: UserProfile["role"];
+  createdAt: string;
+  lastSeenAt?: string;
+  online: boolean;
+  usage: { costUsd: number; inputTokens: number; outputTokens: number; calls: number };
+}

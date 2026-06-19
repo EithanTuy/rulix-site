@@ -17,6 +17,7 @@ import type {
   MemoRecord,
   ReviewResult,
   ReviewerDecision,
+  UsageEvent,
   UserProfile
 } from "../src/types";
 
@@ -87,7 +88,15 @@ interface PersistedStore {
   invites: InviteRecord[];
   resets: ResetRecord[];
   accounts: Record<string, AccountReviewState>;
+  usage: UsageEvent[];
 }
+
+export interface ActiveSessionSummary {
+  userId: string;
+  lastSeenAt: string;
+}
+
+const USAGE_TTL_DAYS = 90;
 
 interface CreateStoreOptions {
   filePath?: string;
@@ -174,6 +183,10 @@ export interface AccountStore {
   setDecision(userId: string, memo: MemoRecord, decision: ReviewerDecision, auditEvent: AuditEvent): Promise<void>;
   appendAuditEvent(userId: string, event: AuditEvent): Promise<void>;
   appendChatMessages(userId: string, memoId: string, messages: MemoChatMessage[]): Promise<MemoChatMessage[]>;
+  recordUsage(event: UsageEvent): Promise<void>;
+  getUsage(rangeDays?: number): Promise<UsageEvent[]>;
+  listUsers(): Promise<UserProfile[]>;
+  listActiveSessions(): Promise<ActiveSessionSummary[]>;
 }
 
 export class LocalAccountStore implements AccountStore {
@@ -184,6 +197,7 @@ export class LocalAccountStore implements AccountStore {
   private invites = new Map<string, InviteRecord>();
   private resets = new Map<string, ResetRecord>();
   private accounts = new Map<string, AccountReviewState>();
+  private usage: UsageEvent[] = [];
 
   constructor(options: CreateStoreOptions = {}) {
     this.filePath = options.filePath ?? defaultStorePath();
@@ -418,6 +432,26 @@ export class LocalAccountStore implements AccountStore {
     return state.chatMessages[memoId];
   }
 
+  async recordUsage(event: UsageEvent) {
+    this.usage.push(event);
+    this.persist();
+  }
+
+  async getUsage(rangeDays?: number) {
+    const cutoff = rangeDaysCutoff(rangeDays);
+    return this.usage.filter((event) => Date.parse(event.at) >= cutoff);
+  }
+
+  async listUsers() {
+    return Array.from(this.users.values()).map(publicUser);
+  }
+
+  async listActiveSessions(): Promise<ActiveSessionSummary[]> {
+    return Array.from(this.sessions.values())
+      .filter((session) => !isExpired(session.expiresAt))
+      .map((session) => ({ userId: session.userId, lastSeenAt: session.lastSeenAt }));
+  }
+
   private createSession(user: UserRecord): AuthSession {
     const rawToken = randomBytes(32).toString("base64url");
     const csrfToken = randomBytes(24).toString("base64url");
@@ -470,12 +504,14 @@ export class LocalAccountStore implements AccountStore {
           normalizeAccountState(state)
         ])
       );
+      this.usage = Array.isArray(parsed.usage) ? parsed.usage : [];
     } catch {
       this.users = new Map();
       this.sessions = new Map();
       this.invites = new Map();
       this.resets = new Map();
       this.accounts = new Map();
+      this.usage = [];
     }
   }
 
@@ -488,7 +524,8 @@ export class LocalAccountStore implements AccountStore {
       sessions: Array.from(this.sessions.values()).filter((session) => !isExpired(session.expiresAt)),
       invites: Array.from(this.invites.values()),
       resets: Array.from(this.resets.values()),
-      accounts: Object.fromEntries(this.accounts.entries())
+      accounts: Object.fromEntries(this.accounts.entries()),
+      usage: this.usage
     };
     writeFileSync(this.filePath, JSON.stringify(payload, null, 2));
   }
@@ -728,6 +765,32 @@ export class DynamoAccountStore implements AccountStore {
     state.chatMessages[memoId] = [...(state.chatMessages[memoId] ?? []), ...messages];
     await this.putAccountState(userId, state);
     return state.chatMessages[memoId];
+  }
+
+  async recordUsage(event: UsageEvent) {
+    const expiresAtEpoch = Math.floor(Date.now() / 1000) + USAGE_TTL_DAYS * 24 * 60 * 60;
+    await this.putAuthItem(usageKey(event.at, event.id), { ...event, expiresAtEpoch });
+  }
+
+  async getUsage(rangeDays?: number) {
+    const cutoff = rangeDaysCutoff(rangeDays);
+    const items = await this.queryAuthByPrefix("USAGE#");
+    return items
+      .map((item) => item.record as UsageEvent)
+      .filter((event) => event && Date.parse(event.at) >= cutoff);
+  }
+
+  async listUsers() {
+    const items = await this.queryAuthByPrefix("USER#");
+    return items.map((item) => publicUser(item.record as UserRecord));
+  }
+
+  async listActiveSessions(): Promise<ActiveSessionSummary[]> {
+    const items = await this.queryAuthByPrefix("SESSION#");
+    return items
+      .map((item) => item.record as SessionRecord)
+      .filter((session) => session && !isExpired(session.expiresAt))
+      .map((session) => ({ userId: session.userId, lastSeenAt: session.lastSeenAt }));
   }
 
   private async createSession(user: UserRecord): Promise<AuthSession> {
@@ -1157,6 +1220,15 @@ function sessionKey(tokenHash: string) {
 
 function lockoutKey(email: string) {
   return `LOCKOUT#${email}`;
+}
+
+function usageKey(at: string, id: string) {
+  return `USAGE#${at}#${id}`;
+}
+
+function rangeDaysCutoff(rangeDays?: number) {
+  const days = rangeDays && rangeDays > 0 ? rangeDays : 365;
+  return Date.now() - days * 24 * 60 * 60 * 1000;
 }
 
 function accountKey(tenantId: string, userId: string) {

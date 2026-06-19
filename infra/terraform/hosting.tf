@@ -146,10 +146,11 @@ resource "aws_lambda_function_url" "app" {
 
 # ---- Custom domain: CloudFront + ACM (us-east-1, required for CloudFront) ----
 resource "aws_acm_certificate" "app" {
-  count             = var.custom_domain == "" ? 0 : 1
-  domain_name       = var.custom_domain
-  validation_method = "DNS"
-  tags              = local.common_tags
+  count                     = var.custom_domain == "" ? 0 : 1
+  domain_name               = var.custom_domain
+  subject_alternative_names = var.dashboard_domain == "" ? [] : [var.dashboard_domain]
+  validation_method         = "DNS"
+  tags                      = local.common_tags
 
   lifecycle {
     create_before_destroy = true
@@ -165,7 +166,7 @@ resource "aws_cloudfront_distribution" "app" {
   enabled         = true
   is_ipv6_enabled = true
   comment         = "Rulix ECCN ${var.tenant_slug}"
-  aliases         = [var.custom_domain]
+  aliases         = compact([var.custom_domain, var.dashboard_domain])
 
   origin {
     domain_name = local.fn_url_host

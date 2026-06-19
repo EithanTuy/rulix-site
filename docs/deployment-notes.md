@@ -8,11 +8,12 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 | Item | Value |
 |---|---|
 | Public URL | https://app.rulix.cloud |
+| Operations URL | https://dashboard.rulix.cloud |
 | Fallback URL | Lambda Function URL, protected by CloudFront origin secret when `custom_domain` is set |
 | AWS account | 431445330783, region `us-east-1` |
 | Compute | Lambda `rulix-prod-app` (Node 20, Express UI + `/api`) |
-| Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` |
-| DNS | GoDaddy `rulix.cloud`: ACM validation CNAME + `app` to CloudFront |
+| Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` and `dashboard.rulix.cloud` |
+| DNS | GoDaddy `rulix.cloud`: ACM validation CNAMEs + `app` and `dashboard` to CloudFront |
 | AI mode | **local-rules** (deterministic) - `BEDROCK_ENABLED` not deployed |
 | Auth mode | Invite-only custom auth with DynamoDB tables and SESv2 email when `AUTH_EMAIL_FROM` is configured |
 

@@ -289,6 +289,43 @@ describe("Rulix ECCN API", () => {
     await userA.agent.get(`/api/reviews/${reviewFixtures[0].id}`).expect(200);
     await userB.agent.get(`/api/reviews/${reviewFixtures[0].id}`).expect(404);
   });
+
+  it("blocks non-admins from the admin dashboard endpoints", async () => {
+    const reviewer = await signedInAgent("reviewer-metrics@example.com", "reviewer");
+    await reviewer.agent.get("/api/admin/metrics").expect(403);
+    await reviewer.agent.get("/api/admin/users").expect(403);
+  });
+
+  it("reports admin metrics including recorded Bedrock usage and online users", async () => {
+    const admin = await signedInAgent("ops@example.com", "export-control-officer");
+    await admin.store.recordUsage({
+      id: "usage-test-1",
+      userId: admin.user.id,
+      userEmail: admin.user.email,
+      at: new Date().toISOString(),
+      model: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+      callType: "council",
+      inputTokens: 1_000_000,
+      outputTokens: 200_000,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      latencyMs: 1200
+    });
+
+    const metrics = (await admin.agent.get("/api/admin/metrics").expect(200)).body.metrics;
+    expect(metrics.totals.calls).toBe(1);
+    expect(metrics.totals.inputTokens).toBe(1_000_000);
+    // Haiku default pricing: 1M input @ $1 + 0.2M output @ $5 = $2.00
+    expect(metrics.totals.costUsd).toBeCloseTo(2, 2);
+    expect(metrics.users.total).toBeGreaterThanOrEqual(1);
+    expect(metrics.users.online).toBeGreaterThanOrEqual(1);
+    expect(metrics.byModel[0].label).toContain("Haiku");
+
+    const users = (await admin.agent.get("/api/admin/users").expect(200)).body.users;
+    const me = users.find((entry: { email: string }) => entry.email === "ops@example.com");
+    expect(me.usage.calls).toBe(1);
+    expect(me.online).toBe(true);
+  });
 });
 
 function testApp() {

@@ -50,6 +50,12 @@ variable "custom_domain" {
   default     = "app.rulix.cloud"
 }
 
+variable "dashboard_domain" {
+  description = "Optional operations dashboard domain served by the same CloudFront distribution and Lambda bundle."
+  type        = string
+  default     = "dashboard.rulix.cloud"
+}
+
 variable "app_base_url" {
   description = "Public base URL used in invite and password reset emails."
   type        = string

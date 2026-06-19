@@ -11,21 +11,36 @@ import type {
   JurisdictionFinding,
   MemoChatMessage,
   MemoRecord,
-  ReviewResult
+  ReviewResult,
+  UsageCallType
 } from "../src/types";
 
 export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
 export type CouncilDepth = "standard" | "deep";
 
+// Emitted (best-effort) after each live Bedrock call so callers can record
+// token usage for the admin dashboard. Never fires in local-fallback mode.
+export interface UsageSample {
+  model: string;
+  callType: UsageCallType;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  latencyMs: number;
+}
+
 interface CouncilOptions {
   model?: string;
   depth?: CouncilDepth;
   maxTokens?: number;
+  onUsage?: (sample: UsageSample) => void;
 }
 
 interface MemoChatOptions {
   model?: string;
   maxTokens?: number;
+  onUsage?: (sample: UsageSample) => void;
 }
 
 export interface MemoChatAiResult {
@@ -237,6 +252,7 @@ export async function runCouncilAnalysis(
         }
       ]
     });
+    emitUsage(options.onUsage, model, "council", response.usage, Date.now() - startedAt);
 
     const toolBlock = response.content.find(
       (block) => block.type === "tool_use" && block.name === "record_eccn_review"
@@ -307,6 +323,7 @@ export async function runMemoChatWithHaiku(
       }
     ]
   });
+  emitUsage(options.onUsage, model, "memo-chat", response.usage, Date.now() - startedAt);
 
   const toolBlock = response.content.find(
     (block) => block.type === "tool_use" && block.name === "record_memo_chat_response"
@@ -360,6 +377,7 @@ export async function draftMemoFromPublicWeb(
   }
 
   const client = new AnthropicBedrock();
+  const startedAt = Date.now();
   try {
     const response = await client.messages.create({
       model,
@@ -376,6 +394,7 @@ export async function draftMemoFromPublicWeb(
         }
       ]
     });
+    emitUsage(options.onUsage, model, "public-draft", response.usage, Date.now() - startedAt);
     const rawText = response.content
       .filter((block) => block.type === "text")
       .map((block) => block.text)
@@ -879,4 +898,32 @@ function asConfidence(value: unknown, fallback: number) {
 function safeError(error: unknown) {
   const message = error instanceof Error ? error.message : "unknown provider error";
   return message;
+}
+
+function emitUsage(
+  onUsage: ((sample: UsageSample) => void) | undefined,
+  model: string,
+  callType: UsageCallType,
+  usage: unknown,
+  latencyMs: number
+) {
+  if (!onUsage) return;
+  const record = asRecord(usage) ?? {};
+  try {
+    onUsage({
+      model,
+      callType,
+      inputTokens: usageNumber(record.input_tokens),
+      outputTokens: usageNumber(record.output_tokens),
+      cacheReadTokens: usageNumber(record.cache_read_input_tokens),
+      cacheWriteTokens: usageNumber(record.cache_creation_input_tokens),
+      latencyMs
+    });
+  } catch {
+    // Usage accounting is best-effort and must never break a request.
+  }
+}
+
+function usageNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }

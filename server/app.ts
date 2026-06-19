@@ -13,6 +13,7 @@ import type {
   MemoRecord,
   NewReviewInput,
   ReviewerDecision,
+  UsageEvent,
   UserProfile
 } from "../src/types";
 import {
@@ -20,7 +21,8 @@ import {
   getBedrockRuntime,
   runCouncilAnalysis,
   runMemoChatWithHaiku,
-  type CouncilDepth
+  type CouncilDepth,
+  type UsageSample
 } from "./bedrockCouncil";
 import {
   StoreError,
@@ -30,6 +32,7 @@ import {
   type AuthSession,
   type SessionRecord
 } from "./store";
+import { buildAdminMetrics, summarizeUsers } from "./metrics";
 import { sendInviteEmail, sendPasswordResetEmail } from "./email";
 
 const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
@@ -115,6 +118,25 @@ export function createApp(options: CreateAppOptions = {}) {
     } catch (error) {
       sendStoreError(res, error);
     }
+  });
+
+  app.get("/api/admin/metrics", requireAuth(store), requireAdmin, async (req, res) => {
+    const rangeDays = coercePositiveInt(req.query.rangeDays, 30);
+    const [usage, users, sessions] = await Promise.all([
+      store.getUsage(rangeDays),
+      store.listUsers(),
+      store.listActiveSessions()
+    ]);
+    res.json({ metrics: buildAdminMetrics({ usage, users, sessions, rangeDays }) });
+  });
+
+  app.get("/api/admin/users", requireAuth(store), requireAdmin, async (_req, res) => {
+    const [usage, users, sessions] = await Promise.all([
+      store.getUsage(),
+      store.listUsers(),
+      store.listActiveSessions()
+    ]);
+    res.json({ users: summarizeUsers({ users, usage, sessions }) });
   });
 
   app.get("/api/auth/invites/:token", async (req, res) => {
@@ -292,7 +314,8 @@ export function createApp(options: CreateAppOptions = {}) {
     const depth = coerceReviewDepth(req.body?.depth);
     const result = await runCouncilAnalysis(memo, {
       depth,
-      maxTokens: depth === "deep" ? 3600 : undefined
+      maxTokens: depth === "deep" ? 3600 : undefined,
+      onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
     });
     const updatedMemo = {
       ...memo,
@@ -324,7 +347,8 @@ export function createApp(options: CreateAppOptions = {}) {
     const depth = coerceReviewDepth(req.body?.depth);
     const result = await runCouncilAnalysis(memo, {
       depth,
-      maxTokens: depth === "deep" ? 3600 : undefined
+      maxTokens: depth === "deep" ? 3600 : undefined,
+      onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
     });
     res.json({ result });
   });
@@ -336,7 +360,9 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const draft = await draftMemoFromPublicWeb(item);
+    const draft = await draftMemoFromPublicWeb(item, {
+      onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+    });
     res.json(draft);
   });
 
@@ -354,7 +380,9 @@ export function createApp(options: CreateAppOptions = {}) {
     }
 
     const history = (await store.getAccountState(res.locals.user.id)).chatMessages[memo.id] ?? [];
-    const messages = await buildMemoChatMessages(memo, message, history);
+    const messages = await buildMemoChatMessages(memo, message, history, (sample) =>
+      recordUsageSafe(store, res.locals.user, sample)
+    );
     const fullThread = await store.appendChatMessages(res.locals.user.id, memo.id, messages);
     if (messages.some((item) => item.proposedMemoText)) {
       await store.appendAuditEvent(
@@ -583,10 +611,36 @@ function sendStoreError(res: Response, error: unknown) {
   res.status(500).json({ error: "Unexpected account error." });
 }
 
+// Persist a Bedrock usage sample for the admin dashboard. Best-effort: a
+// failure here must never affect the user-facing AI response.
+function recordUsageSafe(store: AccountStore, user: UserProfile, sample: UsageSample) {
+  const event: UsageEvent = {
+    id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    userId: user.id,
+    userEmail: user.email,
+    at: new Date().toISOString(),
+    model: sample.model,
+    callType: sample.callType,
+    inputTokens: sample.inputTokens,
+    outputTokens: sample.outputTokens,
+    cacheReadTokens: sample.cacheReadTokens,
+    cacheWriteTokens: sample.cacheWriteTokens,
+    latencyMs: sample.latencyMs
+  };
+  void store.recordUsage(event).catch(() => undefined);
+}
+
+function coercePositiveInt(value: unknown, fallback: number) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = typeof raw === "string" ? Number.parseInt(raw, 10) : Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 async function buildMemoChatMessages(
   memo: MemoRecord,
   reviewerMessage: string,
-  history: MemoChatMessage[]
+  history: MemoChatMessage[],
+  onUsage?: (sample: UsageSample) => void
 ): Promise<MemoChatMessage[]> {
   const now = new Date().toISOString();
   const trimmedMessage = reviewerMessage.trim();
@@ -598,7 +652,9 @@ async function buildMemoChatMessages(
     createdAt: now
   };
 
-  const aiResult = await runMemoChatWithHaiku(memo, trimmedMessage, history).catch(() => undefined);
+  const aiResult = await runMemoChatWithHaiku(memo, trimmedMessage, history, { onUsage }).catch(
+    () => undefined
+  );
   if (aiResult) {
     return [
       userMessage,

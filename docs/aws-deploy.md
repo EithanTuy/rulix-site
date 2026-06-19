@@ -1,9 +1,10 @@
-# Deploying Rulix ECCN to AWS (app.rulix.cloud)
+# Deploying Rulix ECCN to AWS (app.rulix.cloud + dashboard.rulix.cloud)
 
 This runs the app on **AWS Lambda** as a single Node service (Express serving
 the built Vite client + the `/api` routes), exposed to CloudFront through a
 Lambda Function URL origin and fronted by **CloudFront** for the custom domain
-`app.rulix.cloud` with a managed ACM certificate. No App Runner (closed to new
+`app.rulix.cloud` and the officer-only operations surface at
+`dashboard.rulix.cloud` with a managed ACM certificate. No App Runner (closed to new
 accounts), no containers, no S3 static origin.
 
 > Compliance note: per the project README this public commercial deployment is a
@@ -83,7 +84,8 @@ terraform apply -target=aws_lambda_function_url.app `
 terraform apply -target=aws_acm_certificate.app `
   -var tenant_slug=prod -var aws_region=us-east-1
 
-# Add app_cert_validation_records to GoDaddy DNS, wait for ISSUED:
+# Add every app_cert_validation_records entry to GoDaddy DNS, including the
+# dashboard.rulix.cloud SAN validation record, then wait for ISSUED:
 # aws acm wait certificate-validated --certificate-arn <arn> --region us-east-1
 
 # Phase 2b: full apply creates CloudFront and the origin secret.
@@ -92,8 +94,9 @@ terraform apply -var tenant_slug=prod -var aws_region=us-east-1
 
 When `custom_domain` is set, Terraform generates a shared origin secret and
 wires it into both CloudFront and Lambda. Direct requests to `app_function_url`
-without the `x-rulix-edge-secret` header return 403. The user-facing URL is
-https://app.rulix.cloud.
+without the `x-rulix-edge-secret` header return 403. The user-facing URLs are
+https://app.rulix.cloud and https://dashboard.rulix.cloud. The client selects
+the operations dashboard by hostname while both surfaces share the same API.
 
 If `custom_domain = ""`, no edge secret is injected and the Function URL remains
 usable for AWS smoke tests.
@@ -115,8 +118,9 @@ After deploy, verify the durable login path:
 1. **Cert validation** (phase 2a): add each record from
    `app_cert_validation_records` as a **CNAME**. Use the Name without the
    `.rulix.cloud` suffix.
-2. **App domain** (after phase 2b): add a **CNAME** with Name `app` and Value
-   `app_custom_domain_cname_target`, the CloudFront `*.cloudfront.net` domain.
+2. **App domains** (after phase 2b): add **CNAME** records with Names `app` and
+   `dashboard`, both pointing to `app_custom_domain_cname_target`, the
+   CloudFront `*.cloudfront.net` domain.
 
 CloudFront takes roughly 5-15 minutes to deploy.
 

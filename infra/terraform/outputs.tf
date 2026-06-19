@@ -51,7 +51,7 @@ output "app_cert_validation_records" {
 }
 
 output "app_custom_domain_cname_target" {
-  description = "CloudFront domain to point app.rulix.cloud at via a CNAME at GoDaddy."
+  description = "CloudFront domain to point app.rulix.cloud and dashboard.rulix.cloud at via CNAME records."
   value       = var.custom_domain == "" ? "" : aws_cloudfront_distribution.app[0].domain_name
 }
 

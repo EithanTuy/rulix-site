@@ -1,10 +1,12 @@
 import type {
   AccountReviewState,
+  AdminMetrics,
   AuditEvent,
   CorpusSnapshot,
   MemoChatMessage,
   MemoRecord,
   ReviewResult,
+  UserAdminSummary,
   UserProfile
 } from "../types";
 
@@ -153,6 +155,19 @@ export async function createInvite(email: string, name: string, role: UserProfil
     },
     body: JSON.stringify({ email, name, role })
   });
+}
+
+export async function getAdminMetrics(rangeDays = 30, signal?: AbortSignal) {
+  const response = await fetchJson<{ metrics: AdminMetrics }>(
+    `/api/admin/metrics?rangeDays=${encodeURIComponent(String(rangeDays))}`,
+    { signal }
+  );
+  return response.metrics;
+}
+
+export async function listAdminUsers(signal?: AbortSignal) {
+  const response = await fetchJson<{ users: UserAdminSummary[] }>("/api/admin/users", { signal });
+  return response.users;
 }
 
 export async function validateInvite(token: string, signal?: AbortSignal) {
