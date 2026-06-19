@@ -18,7 +18,10 @@ function isDashboardSurface() {
   );
 }
 
-const Root = isDashboardSurface() ? DashboardApp : App;
+const dashboardSurface = isDashboardSurface();
+const Root = dashboardSurface ? DashboardApp : App;
+
+document.title = dashboardSurface ? "Rulix Dash" : "Rulix ECCN";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
