@@ -27,3 +27,5 @@ backend-server.log
 backend-server.err.log
 *-qa.log
 *-qa.err.log
+.claude/
+dash-verify-store.json
