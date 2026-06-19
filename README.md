@@ -26,6 +26,10 @@ Optional model override:
 BEDROCK_MODEL=global.anthropic.claude-haiku-4-5-20251001-v1:0
 ```
 
+Deep council reviews use Claude Sonnet 4.6 by default. Override that server-side
+with `BEDROCK_DEEP_MODEL`; standard reviews, memo chat, and drafting remain on
+`BEDROCK_MODEL`.
+
 Useful checks:
 
 ```bash

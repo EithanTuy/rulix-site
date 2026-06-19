@@ -99,12 +99,8 @@ function assertQuality(memo: MemoRecord, result: ReviewResult) {
     throw new Error(`${memo.id}: expected a live Bedrock result, got ${result.provider.source}.`);
   }
 
-  if (result.provider.model.toLowerCase().includes("sonnet")) {
-    throw new Error(`${memo.id}: result unexpectedly used Sonnet (${result.provider.model}).`);
-  }
-
-  if (!/haiku/i.test(result.provider.model)) {
-    throw new Error(`${memo.id}: result should use a Haiku model, got ${result.provider.model}.`);
+  if (!/sonnet/i.test(result.provider.model)) {
+    throw new Error(`${memo.id}: deep review should use a Sonnet model, got ${result.provider.model}.`);
   }
 
   if (result.provider.depth !== "deep") {

@@ -44,6 +44,17 @@ variable "bedrock_model" {
   }
 }
 
+variable "bedrock_deep_model" {
+  description = "Server-owned Bedrock inference-profile id for deep council reviews."
+  type        = string
+  default     = "global.anthropic.claude-sonnet-4-6"
+
+  validation {
+    condition     = can(regex("^(global|us|eu|apac|jp)\\.anthropic\\.claude-[a-z0-9-]+(?:-[0-9]{8}-v[0-9]:[0-9])?$", var.bedrock_deep_model))
+    error_message = "bedrock_deep_model must be a Bedrock Anthropic inference-profile id."
+  }
+}
+
 variable "custom_domain" {
   description = "Public custom domain for the app, e.g. app.rulix.cloud. Empty = use the default Function URL only (no CloudFront)."
   type        = string

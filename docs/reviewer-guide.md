@@ -49,9 +49,12 @@ If live AI does not finish within 3 minutes, Rulix records a deterministic resul
 ## Analysis Modes
 
 - Full AI Council uses the server-configured Claude Haiku model. It runs the seven-agent council for routine first-pass triage, missing-information checks, citation validation, and evidence mapping.
-- Deep Council Pass uses the same server-configured Claude Haiku model with a stricter prompt. It asks the council to look for user-facing blockers: ambiguous next steps, unsupported confidence, overblocking a ready memo, or underblocking a risky memo.
+- Deep Council Pass uses the server-configured Claude Sonnet model with a stricter prompt. It asks the council to look for user-facing blockers: ambiguous next steps, unsupported confidence, overblocking a ready memo, or underblocking a risky memo.
 
-The browser never chooses the provider model directly. Model selection stays on the backend through `BEDROCK_MODEL`, with `global.anthropic.claude-haiku-4-5-20251001-v1:0` as the supported default.
+The browser never chooses the provider model directly. Standard model selection
+stays on the backend through `BEDROCK_MODEL`, with Haiku 4.5 as the default.
+Deep reviews use `BEDROCK_DEEP_MODEL`, with
+`global.anthropic.claude-sonnet-4-6` as the default.
 
 ## Evidence Labels
 

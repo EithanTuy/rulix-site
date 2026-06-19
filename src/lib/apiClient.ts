@@ -22,7 +22,7 @@ export const ANALYSIS_MODE_CONFIG = {
   deep: {
     label: "Deep Council Pass",
     depth: "deep",
-    cost: "Haiku deeper pass",
+    cost: "Sonnet deep review",
     description: "Use when blockers, user friction, or signoff risk need a stricter second look."
   }
 } as const satisfies Record<AnalysisMode, {
@@ -40,6 +40,7 @@ export interface BackendHealth {
   provider: {
     configured: boolean;
     model: string;
+    deepModel: string;
   };
 }
 

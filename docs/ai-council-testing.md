@@ -31,11 +31,14 @@ npm run test:ai:deep
 - wrong broad ECCN family
 - missing council roles
 - invalid source chunk IDs
-- Sonnet used unexpectedly
+- deep review did not use Sonnet
 - risky memos without blockers
 - ready EAR99-style memo overblocked
 - overconfident legal/export language
 
 ## Model Notes
 
-The supported default is `global.anthropic.claude-haiku-4-5-20251001-v1:0`, the global Bedrock inference profile for Claude Haiku 4.5. Override it with `BEDROCK_MODEL` when a tenant requires a regional profile such as `us.anthropic.claude-haiku-4-5-20251001-v1:0`.
+The supported standard default is
+`global.anthropic.claude-haiku-4-5-20251001-v1:0`. Deep reviews default to
+`global.anthropic.claude-sonnet-4-6`. Override them independently with
+`BEDROCK_MODEL` and `BEDROCK_DEEP_MODEL`.

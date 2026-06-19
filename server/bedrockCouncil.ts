@@ -16,6 +16,7 @@ import type {
 } from "../src/types";
 
 export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
+export const DEFAULT_DEEP_BEDROCK_MODEL = "global.anthropic.claude-sonnet-4-6";
 export type CouncilDepth = "standard" | "deep";
 
 // Emitted (best-effort) after each live Bedrock call so callers can record
@@ -204,8 +205,16 @@ The memoText must be markdown and include: item, owner placeholder, proposed cla
 export function getBedrockRuntime() {
   return {
     configured: process.env.BEDROCK_ENABLED?.trim().toLowerCase() === "true",
-    model: process.env.BEDROCK_MODEL?.trim() || DEFAULT_BEDROCK_MODEL
+    model: process.env.BEDROCK_MODEL?.trim() || DEFAULT_BEDROCK_MODEL,
+    deepModel: process.env.BEDROCK_DEEP_MODEL?.trim() || DEFAULT_DEEP_BEDROCK_MODEL
   };
+}
+
+export function councilModelForDepth(
+  depth: CouncilDepth,
+  runtime = getBedrockRuntime()
+) {
+  return depth === "deep" ? runtime.deepModel : runtime.model;
 }
 
 export async function runCouncilAnalysis(
@@ -214,8 +223,8 @@ export async function runCouncilAnalysis(
 ): Promise<ReviewResult> {
   const localResult = analyzeMemo(memo);
   const runtime = getBedrockRuntime();
-  const model = options.model ?? runtime.model;
   const depth = options.depth ?? "standard";
+  const model = options.model ?? councilModelForDepth(depth, runtime);
 
   if (!runtime.configured) {
     return withProvider(localResult, {
@@ -700,6 +709,7 @@ function memoSupportsCategory(memoText: string, category: string) {
 function providerLabel(model: string) {
   const normalized = model.toLowerCase();
   if (normalized.includes("haiku")) return "Claude Haiku council via Bedrock";
+  if (normalized.includes("sonnet")) return "Claude Sonnet council via Bedrock";
   if (normalized.includes("opus")) return "Claude Opus council via Bedrock";
   return "Claude council via Bedrock";
 }

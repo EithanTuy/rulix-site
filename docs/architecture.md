@@ -57,8 +57,9 @@ Key design points:
   against the real corpus and evidence excerpts are re-located in the actual
   memo text, so the model cannot fabricate sources or highlights. With Bedrock
   disabled, the deterministic result is shown and labeled as such. Default
-  model is the **Haiku council** through the global Bedrock inference profile
-  (`global.anthropic.claude-haiku-4-5-20251001-v1:0`).
+  standard model is the **Haiku council** through the global Bedrock inference
+  profile (`global.anthropic.claude-haiku-4-5-20251001-v1:0`). Deep council
+  reviews use Claude Sonnet 4.6.
 - **Human signoff is a hard gate** — status is derived from findings + reviewer
   decision; only an explicit accept stamps signoff.
 - **Single origin.** In production Express serves both the built client and the
