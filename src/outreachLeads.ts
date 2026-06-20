@@ -1,4 +1,4 @@
-﻿import type { OutreachLead } from "./types";
+import type { OutreachLead } from "./types";
 
 export const outreachLeads: OutreachLead[] = [
   {
@@ -252,4 +252,3 @@ export const outreachLeads: OutreachLead[] = [
     "outreachAngle": "Review the reasoning and source support behind internal export-control and research-compliance memos."
   }
 ];
-
