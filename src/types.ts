@@ -162,6 +162,29 @@ export interface MemoChatMessage {
   applied?: boolean;
 }
 
+export interface OutreachLead {
+  leadId: string;
+  organization: string;
+  email: string;
+  persona: string;
+  segment: string;
+  city: string;
+  state: string;
+  outreachAngle: string;
+}
+
+export interface OutreachDraft {
+  leadId: string;
+  organization: string;
+  email: string;
+  subject: string;
+  body: string;
+  model: string;
+  updatedAt: string;
+  generatedAt?: string;
+  sentAt?: string;
+}
+
 export interface AccountReviewState {
   memos: MemoRecord[];
   selectedMemoId?: string;
@@ -169,6 +192,7 @@ export interface AccountReviewState {
   auditEvents: AuditEvent[];
   analysisResults: Record<string, ReviewResult>;
   chatMessages: Record<string, MemoChatMessage[]>;
+  outreachDrafts?: Record<string, OutreachDraft>;
 }
 
 export interface NewReviewInput {
@@ -182,7 +206,7 @@ export interface NewReviewInput {
   attachments: string[];
 }
 
-export type UsageCallType = "council" | "memo-chat" | "public-draft";
+export type UsageCallType = "council" | "memo-chat" | "public-draft" | "outreach-writer";
 
 // A single billed Bedrock model invocation. Token counts are stored raw; the
 // dollar cost is derived at aggregation time so price-table changes apply

@@ -55,6 +55,12 @@ variable "bedrock_deep_model" {
   }
 }
 
+variable "bedrock_outreach_model" {
+  description = "Bedrock inference-profile id used by the authenticated operations outreach writer."
+  type        = string
+  default     = "us.anthropic.claude-opus-4-6-v1"
+}
+
 variable "custom_domain" {
   description = "Public custom domain for the app, e.g. app.rulix.cloud. Empty = use the default Function URL only (no CloudFront)."
   type        = string

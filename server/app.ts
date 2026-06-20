@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { officialCorpus } from "../src/data/corpus";
+import { outreachLeads } from "../src/outreachLeads";
 import { analyzeMemo } from "../src/lib/eccnReview";
 import { createAuditEvent, deriveReviewStatus } from "../src/lib/reviewLifecycle";
 import type {
@@ -12,6 +13,7 @@ import type {
   MemoChatMessage,
   MemoRecord,
   NewReviewInput,
+  OutreachDraft,
   ReviewerDecision,
   UsageEvent,
   UserProfile
@@ -34,6 +36,7 @@ import {
 } from "./store";
 import { buildAdminMetrics, summarizeUsers } from "./metrics";
 import { sendInviteEmail, sendPasswordResetEmail } from "./email";
+import { generateOutreachDraft, outreachModel, outreachReady } from "./outreachWriter";
 
 const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
 const SESSION_COOKIE = "rulix_session";
@@ -137,6 +140,83 @@ export function createApp(options: CreateAppOptions = {}) {
       store.listActiveSessions()
     ]);
     res.json({ users: summarizeUsers({ users, usage, sessions }) });
+  });
+
+  app.get("/api/admin/outreach", requireAuth(store), requireAdmin, async (_req, res) => {
+    const state = await store.getAccountState(res.locals.user.id);
+    res.json({
+      leads: outreachLeads,
+      drafts: state.outreachDrafts ?? {},
+      bedrock: {
+        ready: outreachReady(),
+        model: outreachModel(),
+        region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1"
+      }
+    });
+  });
+
+  app.post("/api/admin/outreach/generate", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const lead = outreachLeads.find((item) => item.leadId === normalizeText(req.body?.leadId, ""));
+    if (!lead) {
+      res.status(404).json({ error: "Outreach lead not found." });
+      return;
+    }
+    try {
+      const draft = await generateOutreachDraft(
+        lead,
+        normalizeText(req.body?.direction, ""),
+        (sample) => recordUsageSafe(store, res.locals.user, sample)
+      );
+      const state = await store.getAccountState(res.locals.user.id);
+      (state.outreachDrafts ??= {})[lead.leadId] = draft;
+      await store.replaceAccountState(res.locals.user.id, state);
+      res.json({ lead, draft });
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "Bedrock generation failed." });
+    }
+  });
+
+  app.put("/api/admin/outreach/drafts/:leadId", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const lead = outreachLeads.find((item) => item.leadId === req.params.leadId);
+    if (!lead) {
+      res.status(404).json({ error: "Outreach lead not found." });
+      return;
+    }
+    const subject = normalizeText(req.body?.subject, "");
+    const body = normalizeText(req.body?.body, "");
+    if (!subject || !body) {
+      res.status(400).json({ error: "Subject and body are required." });
+      return;
+    }
+    const state = await store.getAccountState(res.locals.user.id);
+    const previous = state.outreachDrafts?.[lead.leadId];
+    const draft: OutreachDraft = {
+      leadId: lead.leadId,
+      organization: lead.organization,
+      email: lead.email,
+      subject,
+      body,
+      model: previous?.model ?? outreachModel(),
+      generatedAt: previous?.generatedAt,
+      sentAt: previous?.sentAt,
+      updatedAt: new Date().toISOString()
+    };
+    (state.outreachDrafts ??= {})[lead.leadId] = draft;
+    await store.replaceAccountState(res.locals.user.id, state);
+    res.json({ lead, draft });
+  });
+
+  app.post("/api/admin/outreach/drafts/:leadId/mark-sent", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const state = await store.getAccountState(res.locals.user.id);
+    const draft = state.outreachDrafts?.[req.params.leadId];
+    if (!draft) {
+      res.status(404).json({ error: "Save a draft before marking it sent." });
+      return;
+    }
+    draft.sentAt = new Date().toISOString();
+    draft.updatedAt = draft.sentAt;
+    await store.replaceAccountState(res.locals.user.id, state);
+    res.json({ draft });
   });
 
   app.get("/api/auth/invites/:token", async (req, res) => {

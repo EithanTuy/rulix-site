@@ -121,6 +121,7 @@ resource "aws_lambda_function" "app" {
         BEDROCK_ENABLED        = tostring(var.bedrock_enabled)
         BEDROCK_MODEL          = var.bedrock_model
         BEDROCK_DEEP_MODEL     = var.bedrock_deep_model
+        BEDROCK_OUTREACH_MODEL = var.bedrock_outreach_model
         RULIX_AUTH_TABLE       = aws_dynamodb_table.auth.name
         RULIX_ACCOUNT_TABLE    = aws_dynamodb_table.account_state.name
         RULIX_TENANT_ID        = var.tenant_slug

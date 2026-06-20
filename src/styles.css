@@ -4375,3 +4375,47 @@ button {
     padding: 24px;
   }
 }
+
+/* ===== Bedrock outreach writer ===== */
+.outreach-panel {
+  scroll-margin-top: 24px;
+  margin-top: 22px;
+  padding: 24px;
+  border: 1px solid var(--dash-line, #d8e0dc);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(22, 35, 28, 0.06);
+}
+.outreach-head, .outreach-status, .outreach-actions, .outreach-meta {
+  display: flex;
+  align-items: center;
+}
+.outreach-head { justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.outreach-head h2 { margin: 3px 0 4px; }
+.outreach-head p { margin: 0; color: #647168; }
+.outreach-status { gap: 12px; flex-wrap: wrap; justify-content: flex-end; color: #647168; font-size: 13px; }
+.outreach-status strong { color: #17201b; }
+.outreach-status .dash-badge { display: inline-flex; align-items: center; gap: 5px; }
+.outreach-grid { display: grid; grid-template-columns: minmax(270px, 0.72fr) minmax(0, 1.6fr); gap: 18px; }
+.outreach-lead-card, .outreach-compose { border: 1px solid #dce4de; border-radius: 14px; padding: 18px; background: #fbfcfa; }
+.outreach-panel label { display: grid; gap: 7px; margin-bottom: 14px; color: #55635a; font-size: 13px; font-weight: 700; }
+.outreach-panel input, .outreach-panel select, .outreach-panel textarea {
+  width: 100%; border: 1px solid #d3ddd6; border-radius: 9px; padding: 10px 11px;
+  background: #fff; color: #17201b; font: inherit; line-height: 1.45;
+}
+.outreach-panel textarea { resize: vertical; }
+.outreach-lead-detail { display: grid; gap: 6px; margin: 4px 0 18px; padding: 14px; border-radius: 10px; background: #eef4f0; color: #5b6960; font-size: 13px; }
+.outreach-lead-detail strong { color: #17201b; font-size: 15px; }
+.outreach-lead-detail p { margin: 5px 0 0; }
+.outreach-meta { gap: 10px; margin-bottom: 14px; }
+.outreach-meta > span { display: grid; gap: 3px; min-width: 0; flex: 1; padding: 10px; border-radius: 9px; background: #eef4f0; }
+.outreach-meta small { color: #6a776f; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; font-weight: 800; }
+.outreach-meta strong { overflow-wrap: anywhere; font-size: 13px; }
+.outreach-actions { gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.outreach-actions button { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 900px) {
+  .outreach-head { align-items: flex-start; flex-direction: column; }
+  .outreach-status { justify-content: flex-start; }
+  .outreach-grid { grid-template-columns: 1fr; }
+  .outreach-meta { align-items: stretch; flex-direction: column; }
+}

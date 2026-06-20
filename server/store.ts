@@ -916,7 +916,8 @@ export function emptyAccountState(): AccountReviewState {
     decisions: {},
     auditEvents: [],
     analysisResults: {},
-    chatMessages: {}
+    chatMessages: {},
+    outreachDrafts: {}
   };
 }
 
@@ -1035,7 +1036,8 @@ function normalizeAccountState(state: Partial<AccountReviewState> | undefined): 
     analysisResults: isRecord(state?.analysisResults)
       ? state.analysisResults as Record<string, ReviewResult>
       : {},
-    chatMessages: normalizeChatMessages(state?.chatMessages)
+    chatMessages: normalizeChatMessages(state?.chatMessages),
+    outreachDrafts: isRecord(state?.outreachDrafts) ? state.outreachDrafts : {}
   };
 }
 
@@ -1043,7 +1045,8 @@ function mergeAccountState(existing: AccountReviewState, incoming: AccountReview
   return {
     ...incoming,
     auditEvents: mergeById(incoming.auditEvents, existing.auditEvents),
-    chatMessages: mergeChatMessages(existing.chatMessages, incoming.chatMessages)
+    chatMessages: mergeChatMessages(existing.chatMessages, incoming.chatMessages),
+    outreachDrafts: { ...(existing.outreachDrafts ?? {}), ...(incoming.outreachDrafts ?? {}) }
   };
 }
 

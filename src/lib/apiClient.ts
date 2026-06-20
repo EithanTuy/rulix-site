@@ -5,6 +5,8 @@ import type {
   CorpusSnapshot,
   MemoChatMessage,
   MemoRecord,
+  OutreachDraft,
+  OutreachLead,
   ReviewResult,
   UserAdminSummary,
   UserProfile
@@ -272,6 +274,42 @@ export async function draftPublicMemo(item: string, signal?: AbortSignal) {
     },
     body: JSON.stringify({ item })
   });
+}
+
+export interface OutreachWorkspace {
+  leads: OutreachLead[];
+  drafts: Record<string, OutreachDraft>;
+  bedrock: { ready: boolean; model: string; region: string };
+}
+
+export async function getOutreachWorkspace(signal?: AbortSignal) {
+  return fetchJson<OutreachWorkspace>("/api/admin/outreach", { signal });
+}
+
+export async function generateOutreachEmail(leadId: string, direction: string) {
+  return fetchJson<{ lead: OutreachLead; draft: OutreachDraft }>("/api/admin/outreach/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leadId, direction })
+  });
+}
+
+export async function saveOutreachDraft(leadId: string, subject: string, body: string) {
+  return fetchJson<{ lead: OutreachLead; draft: OutreachDraft }>(
+    `/api/admin/outreach/drafts/${encodeURIComponent(leadId)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body })
+    }
+  );
+}
+
+export async function markOutreachSent(leadId: string) {
+  return fetchJson<{ draft: OutreachDraft }>(
+    `/api/admin/outreach/drafts/${encodeURIComponent(leadId)}/mark-sent`,
+    { method: "POST" }
+  );
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

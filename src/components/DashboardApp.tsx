@@ -9,6 +9,7 @@ import {
   Cpu,
   ExternalLink,
   LayoutDashboard,
+  Mail,
   LogOut,
   RefreshCw,
   Send,
@@ -29,6 +30,7 @@ import {
   type InviteSummary
 } from "../lib/apiClient";
 import type { AdminMetrics, MetricBucket, UserAdminSummary, UserProfile } from "../types";
+import { OutreachWriterPanel } from "./OutreachWriterPanel";
 
 const ADMIN_ROLE: UserProfile["role"] = "export-control-officer";
 const RANGE_OPTIONS = [7, 30, 90] as const;
@@ -208,6 +210,9 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
           <a href="#access">
             <Users size={18} /> <span>Access</span>
           </a>
+          <a href="#writer">
+            <Mail size={18} /> <span>Bedrock Writer</span>
+          </a>
         </nav>
         <div className="dash-rail-status">
           <span className="dash-status-dot" />
@@ -305,6 +310,8 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
         ) : (
           <DashboardSkeleton />
         )}
+
+        <OutreachWriterPanel />
 
         <section className="dash-grid" id="access">
           <UsersTable users={users} />

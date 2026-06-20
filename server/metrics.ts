@@ -180,5 +180,6 @@ function modelLabel(model: string) {
 function callTypeLabel(type: UsageEvent["callType"]) {
   if (type === "council") return "Council review";
   if (type === "memo-chat") return "Memo chat";
+  if (type === "outreach-writer") return "Outreach writer";
   return "Public draft";
 }
