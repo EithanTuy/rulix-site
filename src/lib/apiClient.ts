@@ -279,6 +279,26 @@ export async function draftPublicMemo(item: string, signal?: AbortSignal) {
   });
 }
 
+export interface OutreachProviderConfig {
+  provider: "bedrock" | "anthropic";
+  anthropicKeyMasked?: string;
+}
+
+export async function getOutreachProviderConfig(signal?: AbortSignal) {
+  return fetchJson<OutreachProviderConfig>("/api/admin/outreach-config", { signal });
+}
+
+export async function setOutreachProviderConfig(config: {
+  provider: "bedrock" | "anthropic";
+  anthropicApiKey?: string;
+}) {
+  return fetchJson<OutreachProviderConfig>("/api/admin/outreach-config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config)
+  });
+}
+
 export interface OutreachWorkspace {
   leads: OutreachLead[];
   drafts: Record<string, OutreachDraft>;
@@ -287,6 +307,7 @@ export interface OutreachWorkspace {
   outreachJobs: OutreachJob[];
   bedrock: {
     ready: boolean;
+    provider: "bedrock" | "anthropic";
     model: string;
     personalizationModel: string;
     leadSearchModel: string;

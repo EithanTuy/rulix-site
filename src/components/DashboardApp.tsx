@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Send,
   Server,
+  Settings,
   ShieldCheck,
   Target,
   Workflow,
@@ -26,11 +27,14 @@ import {
   createInvite,
   getAdminMetrics,
   getCurrentUser,
+  getOutreachProviderConfig,
   listAdminUsers,
   listInvites,
+  setOutreachProviderConfig,
   signIn,
   signOut,
-  type InviteSummary
+  type InviteSummary,
+  type OutreachProviderConfig
 } from "../lib/apiClient";
 import type { AdminMetrics, MetricBucket, UserAdminSummary, UserProfile } from "../types";
 import { OutreachWriterPanel } from "./OutreachWriterPanel";
@@ -40,7 +44,7 @@ import { OutreachJobsPanel } from "./OutreachJobsPanel";
 
 const ADMIN_ROLE: UserProfile["role"] = "export-control-officer";
 const RANGE_OPTIONS = [7, 30, 90] as const;
-type DashboardTab = "overview" | "usage" | "accounts" | "invites" | "leads" | "review" | "jobs" | "writer";
+type DashboardTab = "overview" | "usage" | "accounts" | "invites" | "leads" | "review" | "jobs" | "writer" | "settings";
 
 const DASHBOARD_TABS: Array<{
   id: DashboardTab;
@@ -104,6 +108,13 @@ const DASHBOARD_TABS: Array<{
     heading: "Bedrock Writer",
     description: "Generate, edit, and save project-first outreach drafts.",
     icon: Mail
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    heading: "AI provider settings",
+    description: "Switch between Amazon Bedrock and the direct Anthropic API for email and lead features.",
+    icon: Settings
   }
 ];
 
@@ -416,6 +427,7 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
           {activeTab === "review" && <LeadReviewQueue />}
           {activeTab === "jobs" && <OutreachJobsPanel />}
           {activeTab === "writer" && <OutreachWriterPanel />}
+          {activeTab === "settings" && <ProviderSettingsPanel />}
         </div>
 
         <footer className="dash-footer">
@@ -819,6 +831,99 @@ function InvitePanel({ onChanged }: { onChanged: () => Promise<void> }) {
         ))}
         {invites.length === 0 && <div className="dash-empty compact"><Send size={20} /><span>No invitations yet.</span></div>}
       </div>
+    </div>
+  );
+}
+
+function ProviderSettingsPanel() {
+  const [config, setConfig] = useState<OutreachProviderConfig | undefined>();
+  const [provider, setProvider] = useState<"bedrock" | "anthropic">("bedrock");
+  const [apiKey, setApiKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
+
+  useEffect(() => {
+    getOutreachProviderConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        setProvider(cfg.provider);
+      })
+      .catch(() => setError("Could not load provider settings."));
+  }, []);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      const updated = await setOutreachProviderConfig({
+        provider,
+        anthropicApiKey: provider === "anthropic" ? apiKey || undefined : undefined
+      });
+      setConfig(updated);
+      setApiKey("");
+      setNotice(
+        provider === "anthropic"
+          ? `Saved. Outreach and leads will now use the Anthropic API directly${updated.anthropicKeyMasked ? ` (key: ${updated.anthropicKeyMasked})` : ""}.`
+          : "Saved. Outreach and leads will use Amazon Bedrock."
+      );
+    } catch (err) {
+      setError(toMessage(err, "Failed to save settings."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="dash-panel">
+      <div className="dash-panel-head">
+        <div>
+          <span className="dash-panel-icon"><Settings size={18} /></span>
+          <div>
+            <h2>AI provider</h2>
+            <p>Controls which API is used for email drafting, personalization, and lead search</p>
+          </div>
+        </div>
+      </div>
+
+      <form className="dash-invite-form" onSubmit={save}>
+        <label>
+          <span>Provider</span>
+          <select value={provider} onChange={(e) => { setProvider(e.target.value as "bedrock" | "anthropic"); setNotice(undefined); }}>
+            <option value="bedrock">Amazon Bedrock (default)</option>
+            <option value="anthropic">Anthropic API (direct)</option>
+          </select>
+        </label>
+
+        {provider === "anthropic" && (
+          <label>
+            <span>Anthropic API key{config?.anthropicKeyMasked ? ` (current: ${config.anthropicKeyMasked})` : ""}</span>
+            <input
+              type="password"
+              placeholder={config?.anthropicKeyMasked ? "Enter a new key to replace the current one" : "sk-ant-…"}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="off"
+              required={!config?.anthropicKeyMasked || config.provider !== "anthropic"}
+            />
+          </label>
+        )}
+
+        {provider === "bedrock" && (
+          <div className="dash-notice">
+            Bedrock uses IAM credentials from the Lambda execution role. No key needed here.
+          </div>
+        )}
+
+        {notice && <div className="dash-notice">{notice}</div>}
+        {error && <div className="dash-error">{error}</div>}
+
+        <button type="submit" className="dash-primary" disabled={busy || config === undefined}>
+          <Send size={16} /> {busy ? "Saving…" : "Save provider settings"}
+        </button>
+      </form>
     </div>
   );
 }

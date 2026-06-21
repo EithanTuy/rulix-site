@@ -20,6 +20,7 @@ import type {
   UsageEvent,
   UserProfile
 } from "../src/types";
+import { defaultOutreachConfig, type StoredOutreachConfig } from "./aiClient";
 
 const PASSWORD_ITERATIONS = 210_000;
 const DEFAULT_SESSION_TTL_HOURS = 8;
@@ -89,6 +90,7 @@ interface PersistedStore {
   resets: ResetRecord[];
   accounts: Record<string, AccountReviewState>;
   usage: UsageEvent[];
+  outreachConfig?: StoredOutreachConfig;
 }
 
 export interface ActiveSessionSummary {
@@ -187,6 +189,8 @@ export interface AccountStore {
   getUsage(rangeDays?: number): Promise<UsageEvent[]>;
   listUsers(): Promise<UserProfile[]>;
   listActiveSessions(): Promise<ActiveSessionSummary[]>;
+  getOutreachConfig(): Promise<StoredOutreachConfig>;
+  setOutreachConfig(config: StoredOutreachConfig): Promise<void>;
 }
 
 export class LocalAccountStore implements AccountStore {
@@ -198,6 +202,7 @@ export class LocalAccountStore implements AccountStore {
   private resets = new Map<string, ResetRecord>();
   private accounts = new Map<string, AccountReviewState>();
   private usage: UsageEvent[] = [];
+  private outreachConfig: StoredOutreachConfig = defaultOutreachConfig();
 
   constructor(options: CreateStoreOptions = {}) {
     this.filePath = options.filePath ?? defaultStorePath();
@@ -452,6 +457,15 @@ export class LocalAccountStore implements AccountStore {
       .map((session) => ({ userId: session.userId, lastSeenAt: session.lastSeenAt }));
   }
 
+  async getOutreachConfig(): Promise<StoredOutreachConfig> {
+    return { ...this.outreachConfig };
+  }
+
+  async setOutreachConfig(config: StoredOutreachConfig): Promise<void> {
+    this.outreachConfig = { ...config };
+    this.persist();
+  }
+
   private createSession(user: UserRecord): AuthSession {
     const rawToken = randomBytes(32).toString("base64url");
     const csrfToken = randomBytes(24).toString("base64url");
@@ -505,6 +519,7 @@ export class LocalAccountStore implements AccountStore {
         ])
       );
       this.usage = Array.isArray(parsed.usage) ? parsed.usage : [];
+      this.outreachConfig = parsed.outreachConfig ?? defaultOutreachConfig();
     } catch {
       this.users = new Map();
       this.sessions = new Map();
@@ -512,6 +527,7 @@ export class LocalAccountStore implements AccountStore {
       this.resets = new Map();
       this.accounts = new Map();
       this.usage = [];
+      this.outreachConfig = defaultOutreachConfig();
     }
   }
 
@@ -525,7 +541,8 @@ export class LocalAccountStore implements AccountStore {
       invites: Array.from(this.invites.values()),
       resets: Array.from(this.resets.values()),
       accounts: Object.fromEntries(this.accounts.entries()),
-      usage: this.usage
+      usage: this.usage,
+      outreachConfig: this.outreachConfig
     };
     writeFileSync(this.filePath, JSON.stringify(payload, null, 2));
   }
@@ -791,6 +808,15 @@ export class DynamoAccountStore implements AccountStore {
       .map((item) => item.record as SessionRecord)
       .filter((session) => session && !isExpired(session.expiresAt))
       .map((session) => ({ userId: session.userId, lastSeenAt: session.lastSeenAt }));
+  }
+
+  async getOutreachConfig(): Promise<StoredOutreachConfig> {
+    const record = await this.getAuthRecord<StoredOutreachConfig>("CONFIG#outreach");
+    return record ?? defaultOutreachConfig();
+  }
+
+  async setOutreachConfig(config: StoredOutreachConfig): Promise<void> {
+    await this.putAuthItem("CONFIG#outreach", config);
   }
 
   private async createSession(user: UserRecord): Promise<AuthSession> {

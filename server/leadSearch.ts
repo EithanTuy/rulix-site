@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { LeadSearchActivity, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
-import { createAIClient, outreachProviderReady, resolveModel } from "./aiClient";
+import { createAIClient, outreachProviderReady, resolveModel, type StoredOutreachConfig } from "./aiClient";
 
 export const DEFAULT_LEAD_SEARCH_MODEL = "global.anthropic.claude-sonnet-4-6";
 
@@ -93,19 +93,25 @@ export function leadSearchModel() {
 export async function discoverLeads({
   existingLeads,
   durationSeconds,
-  onUsage
+  onUsage,
+  config = { provider: "bedrock" }
 }: {
   existingLeads: OutreachLead[];
   durationSeconds: number;
   onUsage?: (sample: UsageSample) => void;
+  config?: StoredOutreachConfig;
 }): Promise<{ leads: OutreachLead[]; activity: LeadSearchActivity[]; model: string }> {
-  if (!outreachProviderReady()) {
-    throw new Error("Amazon Bedrock is not enabled for this deployment.");
+  if (!outreachProviderReady(config)) {
+    throw new Error(
+      config.provider === "anthropic"
+        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
+        : "Amazon Bedrock is not enabled for this deployment."
+    );
   }
 
   const startedAt = Date.now();
   const model = leadSearchModel();
-  const apiModel = resolveModel(model);
+  const apiModel = resolveModel(model, config);
   const targetCount = durationSeconds <= 15 ? 3 : durationSeconds <= 30 ? 6 : 10;
   const activity = [
     log(`Loaded ${existingLeads.length} existing leads and built duplicate guards.`),
@@ -117,7 +123,7 @@ export async function discoverLeads({
     activity
   );
   activity.push(log(`Collected ${webEvidence.length} public search results for model review.`));
-  const client = createAIClient();
+  const client = createAIClient(config);
   const response = await client.messages.create(
     {
       model: apiModel,

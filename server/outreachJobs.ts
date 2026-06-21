@@ -18,6 +18,7 @@ import {
 } from "./outreachWriter";
 import { createAccountStore, type AccountStore } from "./store";
 import type { UsageSample } from "./bedrockCouncil";
+import type { StoredOutreachConfig } from "./aiClient";
 
 export interface OutreachWorkerEvent {
   source: "rulix.outreach-worker";
@@ -101,6 +102,8 @@ export async function processOutreachJob(
     return;
   }
 
+  const config = await store.getOutreachConfig();
+
   job.status = "running";
   job.startedAt ??= new Date().toISOString();
   job.updatedAt = new Date().toISOString();
@@ -111,14 +114,14 @@ export async function processOutreachJob(
 
   try {
     if (job.type === "lead-search") {
-      await processLeadSearchJob(store, state, job, event);
+      await processLeadSearchJob(store, state, job, event, config);
       completeJob(job, `Lead search completed with ${job.completedCount} accepted candidates.`);
     } else {
       const leadId = job.itemIds[job.cursor];
       if (!leadId) {
         completeJob(job, "All queued items have been processed.");
       } else {
-        await processLeadItem(store, state, job, event, leadId);
+        await processLeadItem(store, state, job, event, leadId, config);
         job.cursor += 1;
         job.completedCount += 1;
         job.retryCount = 0;
@@ -170,7 +173,8 @@ async function processLeadItem(
   state: Awaited<ReturnType<AccountStore["getAccountState"]>>,
   job: OutreachJob,
   event: OutreachWorkerEvent,
-  leadId: string
+  leadId: string,
+  config: StoredOutreachConfig
 ) {
   const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
     .find((candidate) => candidate.leadId === leadId);
@@ -179,7 +183,7 @@ async function processLeadItem(
 
   if (job.type === "draft-missing") {
     if (state.outreachDrafts?.[leadId]) return;
-    const draft = await generateOutreachDraft(lead, job.direction ?? "", onUsage);
+    const draft = await generateOutreachDraft(lead, job.direction ?? "", onUsage, config);
     (state.outreachDrafts ??= {})[leadId] = draft;
     updateWorkflow(state, leadId, { reviewStatus: "pending-review", lifecycleStatus: "drafted" });
     return;
@@ -188,7 +192,7 @@ async function processLeadItem(
   const draft = state.outreachDrafts?.[leadId];
   if (!draft) throw new Error(`Lead ${leadId} has no draft to personalize.`);
   if (draft.sentAt || draft.personalizationStatus === "personalized") return;
-  const personalized = await personalizeOutreachDraft(lead, draft, onUsage);
+  const personalized = await personalizeOutreachDraft(lead, draft, onUsage, config);
   state.outreachDrafts![leadId] = personalized;
   updateWorkflow(state, leadId, {
     reviewStatus: personalized.personalizationStatus === "personalized" ? "pending-review" : "needs-research",
@@ -200,12 +204,14 @@ async function processLeadSearchJob(
   store: AccountStore,
   state: Awaited<ReturnType<AccountStore["getAccountState"]>>,
   job: OutreachJob,
-  event: OutreachWorkerEvent
+  event: OutreachWorkerEvent,
+  config: StoredOutreachConfig
 ) {
   const result = await discoverLeads({
     existingLeads: mergeOutreachLeads(state.discoveredLeads ?? []),
     durationSeconds: job.searchDurationSeconds ?? 30,
-    onUsage: usageRecorder(store, event)
+    onUsage: usageRecorder(store, event),
+    config
   });
   state.discoveredLeads = mergeOutreachLeads([...(state.discoveredLeads ?? []), ...result.leads])
     .filter((lead) => lead.leadId.startsWith("AI-"));

@@ -1,20 +1,34 @@
 import Anthropic from "@anthropic-ai/sdk";
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 
-export function isAnthropicDirect() {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+export interface StoredOutreachConfig {
+  provider: "bedrock" | "anthropic";
+  anthropicApiKey?: string;
 }
 
-// Ready if either the direct Anthropic API key or Bedrock is configured.
-export function outreachProviderReady() {
-  return isAnthropicDirect() || process.env.BEDROCK_ENABLED === "true";
+export function defaultOutreachConfig(): StoredOutreachConfig {
+  return { provider: "bedrock" };
+}
+
+export function outreachProviderReady(config: StoredOutreachConfig): boolean {
+  if (config.provider === "anthropic") {
+    return Boolean(config.anthropicApiKey?.trim());
+  }
+  return process.env.BEDROCK_ENABLED === "true";
 }
 
 // Returns a client compatible with the Anthropic messages API.
-// Uses the direct Anthropic API when ANTHROPIC_API_KEY is set, otherwise Bedrock.
-export function createAIClient(): Anthropic {
-  if (isAnthropicDirect()) {
-    return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Uses the direct Anthropic API when provider is "anthropic", otherwise Bedrock.
+export function createAIClient(config: StoredOutreachConfig): Anthropic {
+  if (config.provider === "anthropic" && config.anthropicApiKey?.trim()) {
+    return new Anthropic({ apiKey: config.anthropicApiKey.trim() });
+  }
+  if (!outreachProviderReady(config)) {
+    throw new Error(
+      config.provider === "anthropic"
+        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
+        : "Amazon Bedrock is not enabled for this deployment."
+    );
   }
   return new AnthropicBedrock() as unknown as Anthropic;
 }
@@ -23,9 +37,14 @@ export function createAIClient(): Anthropic {
 // for the direct Anthropic API.
 // e.g. "global.anthropic.claude-sonnet-4-6" → "claude-sonnet-4-6"
 //      "us.anthropic.claude-opus-4-6-v1"    → "claude-opus-4-6"
-export function resolveModel(bedrockModelId: string): string {
-  if (!isAnthropicDirect()) return bedrockModelId;
+export function resolveModel(bedrockModelId: string, config: StoredOutreachConfig): string {
+  if (config.provider !== "anthropic") return bedrockModelId;
   return bedrockModelId
     .replace(/^(?:global|us)\.anthropic\./, "")
     .replace(/-v\d+(?::\d+)?$/, "");
+}
+
+export function maskApiKey(key: string): string {
+  if (key.length <= 12) return "****";
+  return `${key.slice(0, 8)}${"*".repeat(Math.min(20, key.length - 12))}${key.slice(-4)}`;
 }

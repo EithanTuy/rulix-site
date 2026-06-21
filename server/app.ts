@@ -41,11 +41,11 @@ import { sendInviteEmail, sendPasswordResetEmail } from "./email";
 import {
   generateOutreachDraft,
   outreachModel,
-  outreachReady,
   personalizeOutreachDraft,
   personalizationModel
 } from "./outreachWriter";
 import { discoverLeads, leadSearchModel } from "./leadSearch";
+import { maskApiKey, outreachProviderReady } from "./aiClient";
 import {
   createOutreachJob,
   estimateJobCost,
@@ -157,8 +157,35 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json({ users: summarizeUsers({ users, usage, sessions }) });
   });
 
+  app.get("/api/admin/outreach-config", requireAuth(store), requireAdmin, async (_req, res) => {
+    const config = await store.getOutreachConfig();
+    res.json({
+      provider: config.provider,
+      anthropicKeyMasked: config.anthropicApiKey ? maskApiKey(config.anthropicApiKey) : undefined
+    });
+  });
+
+  app.put("/api/admin/outreach-config", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const provider = req.body?.provider === "anthropic" ? "anthropic" as const : "bedrock" as const;
+    const anthropicApiKey = typeof req.body?.anthropicApiKey === "string"
+      ? req.body.anthropicApiKey.trim() || undefined
+      : undefined;
+    if (provider === "anthropic" && !anthropicApiKey) {
+      res.status(400).json({ error: "An Anthropic API key is required when using the direct API." });
+      return;
+    }
+    await store.setOutreachConfig({ provider, anthropicApiKey });
+    res.json({
+      provider,
+      anthropicKeyMasked: anthropicApiKey ? maskApiKey(anthropicApiKey) : undefined
+    });
+  });
+
   app.get("/api/admin/outreach", requireAuth(store), requireAdmin, async (_req, res) => {
-    const state = await store.getAccountState(res.locals.user.id);
+    const [state, config] = await Promise.all([
+      store.getAccountState(res.locals.user.id),
+      store.getOutreachConfig()
+    ]);
     const leads = mergeOutreachLeads(state.discoveredLeads ?? []);
     res.json({
       leads,
@@ -167,7 +194,8 @@ export function createApp(options: CreateAppOptions = {}) {
       leadWorkflows: state.leadWorkflows ?? {},
       outreachJobs: state.outreachJobs ?? [],
       bedrock: {
-        ready: outreachReady(),
+        ready: outreachProviderReady(config),
+        provider: config.provider,
         model: outreachModel(),
         personalizationModel: personalizationModel(),
         leadSearchModel: leadSearchModel(),
@@ -177,7 +205,10 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/admin/outreach/generate", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
-    const state = await store.getAccountState(res.locals.user.id);
+    const [state, config] = await Promise.all([
+      store.getAccountState(res.locals.user.id),
+      store.getOutreachConfig()
+    ]);
     const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
       .find((item) => item.leadId === normalizeText(req.body?.leadId, ""));
     if (!lead) {
@@ -188,7 +219,8 @@ export function createApp(options: CreateAppOptions = {}) {
       const draft = await generateOutreachDraft(
         lead,
         normalizeText(req.body?.direction, ""),
-        (sample) => recordUsageSafe(store, res.locals.user, sample)
+        (sample) => recordUsageSafe(store, res.locals.user, sample),
+        config
       );
       (state.outreachDrafts ??= {})[lead.leadId] = draft;
       setLeadWorkflow(state, lead.leadId, {
@@ -259,7 +291,10 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/admin/outreach/drafts/:leadId/personalize", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
-    const state = await store.getAccountState(res.locals.user.id);
+    const [state, config] = await Promise.all([
+      store.getAccountState(res.locals.user.id),
+      store.getOutreachConfig()
+    ]);
     const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
       .find((item) => item.leadId === req.params.leadId);
     const draft = state.outreachDrafts?.[req.params.leadId];
@@ -275,7 +310,8 @@ export function createApp(options: CreateAppOptions = {}) {
       const personalized = await personalizeOutreachDraft(
         lead,
         draft,
-        (sample) => recordUsageSafe(store, res.locals.user, sample)
+        (sample) => recordUsageSafe(store, res.locals.user, sample),
+        config
       );
       (state.outreachDrafts ??= {})[lead.leadId] = personalized;
       setLeadWorkflow(state, lead.leadId, {
@@ -406,13 +442,17 @@ export function createApp(options: CreateAppOptions = {}) {
   app.post("/api/admin/leads/search", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
     const durationSeconds = clampNumber(Number(req.body?.durationSeconds) || 30, 15, 45);
     const startedAt = new Date().toISOString();
-    const state = await store.getAccountState(res.locals.user.id);
+    const [state, config] = await Promise.all([
+      store.getAccountState(res.locals.user.id),
+      store.getOutreachConfig()
+    ]);
     const existingLeads = mergeOutreachLeads(state.discoveredLeads ?? []);
     try {
       const result = await discoverLeads({
         existingLeads,
         durationSeconds,
-        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample),
+        config
       });
       state.discoveredLeads = mergeOutreachLeads([
         ...(state.discoveredLeads ?? []),

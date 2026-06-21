@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { OutreachDraft, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
-import { createAIClient, outreachProviderReady, resolveModel } from "./aiClient";
+import { createAIClient, outreachProviderReady, resolveModel, type StoredOutreachConfig } from "./aiClient";
 
 export const DEFAULT_OUTREACH_MODEL = "us.anthropic.claude-opus-4-6-v1";
 export const DEFAULT_PERSONALIZATION_MODEL = "global.anthropic.claude-sonnet-4-6";
@@ -83,8 +83,8 @@ export function outreachModel() {
   return process.env.BEDROCK_OUTREACH_MODEL?.trim() || DEFAULT_OUTREACH_MODEL;
 }
 
-export function outreachReady() {
-  return outreachProviderReady();
+export function outreachReady(config: StoredOutreachConfig) {
+  return outreachProviderReady(config);
 }
 
 export function personalizationModel() {
@@ -94,13 +94,13 @@ export function personalizationModel() {
 export async function generateOutreachDraft(
   lead: OutreachLead,
   direction = "",
-  onUsage?: (sample: UsageSample) => void
+  onUsage?: (sample: UsageSample) => void,
+  config: StoredOutreachConfig = { provider: "bedrock" }
 ): Promise<OutreachDraft> {
-  if (!outreachReady()) throw new Error("Amazon Bedrock is not enabled for this deployment.");
   const model = outreachModel();
-  const apiModel = resolveModel(model);
+  const apiModel = resolveModel(model, config);
   const startedAt = Date.now();
-  const client = createAIClient();
+  const client = createAIClient(config);
   const response = await client.messages.create(
     {
       model: apiModel,
@@ -171,9 +171,9 @@ export async function generateOutreachDraft(
 export async function personalizeOutreachDraft(
   lead: OutreachLead,
   draft: OutreachDraft,
-  onUsage?: (sample: UsageSample) => void
+  onUsage?: (sample: UsageSample) => void,
+  config: StoredOutreachConfig = { provider: "bedrock" }
 ): Promise<OutreachDraft> {
-  if (!outreachReady()) throw new Error("Amazon Bedrock is not enabled for this deployment.");
   const sources = await collectPublicSources(lead);
   if (!sources.length) {
     return {
@@ -188,9 +188,9 @@ export async function personalizeOutreachDraft(
   }
 
   const model = personalizationModel();
-  const apiModel = resolveModel(model);
+  const apiModel = resolveModel(model, config);
   const startedAt = Date.now();
-  const client = createAIClient();
+  const client = createAIClient(config);
   const response = await client.messages.create(
     {
       model: apiModel,
