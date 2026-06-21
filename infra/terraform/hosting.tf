@@ -77,6 +77,14 @@ data "aws_iam_policy_document" "lambda_auth" {
   }
 
   statement {
+    sid     = "InvokeOutreachWorker"
+    actions = ["lambda:InvokeFunction"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.fn_name}"
+    ]
+  }
+
+  statement {
     sid = "AuthEmailDelivery"
     actions = [
       "ses:SendEmail"
@@ -116,19 +124,21 @@ resource "aws_lambda_function" "app" {
   environment {
     variables = merge(
       {
-        NODE_ENV               = "production"
-        RULIX_DIST_DIR         = "dist"
-        BEDROCK_ENABLED        = tostring(var.bedrock_enabled)
-        BEDROCK_MODEL          = var.bedrock_model
-        BEDROCK_DEEP_MODEL     = var.bedrock_deep_model
-        BEDROCK_OUTREACH_MODEL = var.bedrock_outreach_model
-        RULIX_AUTH_TABLE       = aws_dynamodb_table.auth.name
-        RULIX_ACCOUNT_TABLE    = aws_dynamodb_table.account_state.name
-        RULIX_TENANT_ID        = var.tenant_slug
-        APP_BASE_URL           = var.app_base_url
-        AUTH_INVITE_TTL_HOURS  = tostring(var.auth_invite_ttl_hours)
-        AUTH_RESET_TTL_MINUTES = tostring(var.auth_reset_ttl_minutes)
-        AUTH_SESSION_TTL_HOURS = tostring(var.auth_session_ttl_hours)
+        NODE_ENV                      = "production"
+        RULIX_DIST_DIR                = "dist"
+        BEDROCK_ENABLED               = tostring(var.bedrock_enabled)
+        BEDROCK_MODEL                 = var.bedrock_model
+        BEDROCK_DEEP_MODEL            = var.bedrock_deep_model
+        BEDROCK_OUTREACH_MODEL        = var.bedrock_outreach_model
+        BEDROCK_PERSONALIZATION_MODEL = var.bedrock_personalization_model
+        BEDROCK_LEAD_SEARCH_MODEL     = var.bedrock_lead_search_model
+        RULIX_AUTH_TABLE              = aws_dynamodb_table.auth.name
+        RULIX_ACCOUNT_TABLE           = aws_dynamodb_table.account_state.name
+        RULIX_TENANT_ID               = var.tenant_slug
+        APP_BASE_URL                  = var.app_base_url
+        AUTH_INVITE_TTL_HOURS         = tostring(var.auth_invite_ttl_hours)
+        AUTH_RESET_TTL_MINUTES        = tostring(var.auth_reset_ttl_minutes)
+        AUTH_SESSION_TTL_HOURS        = tostring(var.auth_session_ttl_hours)
       },
       var.auth_email_from == "" ? {} : { AUTH_EMAIL_FROM = var.auth_email_from },
       var.auth_bootstrap_secret == "" ? {} : { AUTH_BOOTSTRAP_SECRET = var.auth_bootstrap_secret },

@@ -917,7 +917,11 @@ export function emptyAccountState(): AccountReviewState {
     auditEvents: [],
     analysisResults: {},
     chatMessages: {},
-    outreachDrafts: {}
+    outreachDrafts: {},
+    discoveredLeads: [],
+    leadSearchRuns: [],
+    leadWorkflows: {},
+    outreachJobs: []
   };
 }
 
@@ -1037,7 +1041,11 @@ function normalizeAccountState(state: Partial<AccountReviewState> | undefined): 
       ? state.analysisResults as Record<string, ReviewResult>
       : {},
     chatMessages: normalizeChatMessages(state?.chatMessages),
-    outreachDrafts: isRecord(state?.outreachDrafts) ? state.outreachDrafts : {}
+    outreachDrafts: isRecord(state?.outreachDrafts) ? state.outreachDrafts : {},
+    discoveredLeads: Array.isArray(state?.discoveredLeads) ? state.discoveredLeads : [],
+    leadSearchRuns: Array.isArray(state?.leadSearchRuns) ? state.leadSearchRuns : [],
+    leadWorkflows: isRecord(state?.leadWorkflows) ? state.leadWorkflows : {},
+    outreachJobs: Array.isArray(state?.outreachJobs) ? state.outreachJobs : []
   };
 }
 
@@ -1046,7 +1054,11 @@ function mergeAccountState(existing: AccountReviewState, incoming: AccountReview
     ...incoming,
     auditEvents: mergeById(incoming.auditEvents, existing.auditEvents),
     chatMessages: mergeChatMessages(existing.chatMessages, incoming.chatMessages),
-    outreachDrafts: { ...(existing.outreachDrafts ?? {}), ...(incoming.outreachDrafts ?? {}) }
+    outreachDrafts: { ...(existing.outreachDrafts ?? {}), ...(incoming.outreachDrafts ?? {}) },
+    discoveredLeads: mergeById(incoming.discoveredLeads ?? [], existing.discoveredLeads ?? []),
+    leadSearchRuns: mergeById(incoming.leadSearchRuns ?? [], existing.leadSearchRuns ?? []),
+    leadWorkflows: { ...(existing.leadWorkflows ?? {}), ...(incoming.leadWorkflows ?? {}) },
+    outreachJobs: mergeById(incoming.outreachJobs ?? [], existing.outreachJobs ?? [])
   };
 }
 

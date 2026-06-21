@@ -61,6 +61,18 @@ variable "bedrock_outreach_model" {
   default     = "us.anthropic.claude-opus-4-6-v1"
 }
 
+variable "bedrock_personalization_model" {
+  description = "Bedrock model used for source-grounded outreach personalization."
+  type        = string
+  default     = "global.anthropic.claude-sonnet-4-6"
+}
+
+variable "bedrock_lead_search_model" {
+  description = "Bedrock model used to assess public-web lead-search evidence."
+  type        = string
+  default     = "global.anthropic.claude-sonnet-4-6"
+}
+
 variable "custom_domain" {
   description = "Public custom domain for the app, e.g. app.rulix.cloud. Empty = use the default Function URL only (no CloudFront)."
   type        = string

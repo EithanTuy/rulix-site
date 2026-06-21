@@ -6,11 +6,20 @@ Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a ve
 
 ```bash
 npm install
-npm run dev:server
 npm run dev
 ```
 
-The Vite app runs on `http://127.0.0.1:5173` by default and proxies `/api` to the backend at `http://127.0.0.1:8787`.
+`npm run dev` starts both required processes: the Vite app at
+`http://127.0.0.1:5173` and the API at `http://127.0.0.1:8787`. Vite proxies
+`/api` to the backend. Use `npm run dev:client` or `npm run dev:server` only
+when you intentionally want to run one side by itself.
+
+For a production-style local run, `npm start` builds the client and serves the
+complete app from `http://127.0.0.1:8787`.
+
+GitHub Actions runs tests and the production build for pull requests and main.
+Pushes to `main` deploy through the repository-scoped AWS OIDC role provisioned
+in `infra/terraform/github_actions.tf`; no long-lived AWS secret is stored in GitHub.
 
 Auth is invite-only. In local development the server falls back to a git-ignored JSON store unless `RULIX_AUTH_TABLE` and `RULIX_ACCOUNT_TABLE` point at DynamoDB tables. A first operator can create an invite through the bootstrap endpoint when `AUTH_BOOTSTRAP_SECRET` is set, or through the Users console after signing in as an export-control officer.
 

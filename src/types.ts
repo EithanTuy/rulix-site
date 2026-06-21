@@ -165,12 +165,102 @@ export interface MemoChatMessage {
 export interface OutreachLead {
   leadId: string;
   organization: string;
-  email: string;
-  persona: string;
+  organizationType: string;
   segment: string;
+  website: string;
+  domain: string;
   city: string;
   state: string;
+  source: string;
+  sourceUrl: string;
+  fitScore: number;
+  priority: string;
+  email: string;
+  status: string;
   outreachAngle: string;
+  owner: string;
+  notes: string;
+  persona: string;
+  discoveredAt?: string;
+}
+
+export interface LeadSearchActivity {
+  at: string;
+  message: string;
+}
+
+export interface LeadSearchRun {
+  id: string;
+  startedAt: string;
+  completedAt: string;
+  durationSeconds: number;
+  model: string;
+  status: "completed" | "failed";
+  addedLeadIds: string[];
+  activity: LeadSearchActivity[];
+  error?: string;
+}
+
+export type LeadReviewStatus =
+  | "new"
+  | "pending-review"
+  | "approved"
+  | "rejected"
+  | "needs-research"
+  | "ready-to-send";
+
+export type OutreachLifecycleStatus =
+  | "not-contacted"
+  | "drafted"
+  | "personalized"
+  | "approved"
+  | "sent"
+  | "replied"
+  | "follow-up-due"
+  | "closed"
+  | "opted-out";
+
+export interface LeadWorkflow {
+  leadId: string;
+  reviewStatus: LeadReviewStatus;
+  lifecycleStatus: OutreachLifecycleStatus;
+  assignedOwner?: string;
+  notes?: string;
+  lastContactedAt?: string;
+  followUpAt?: string;
+  replyStatus?: string;
+  updatedAt: string;
+}
+
+export type OutreachJobType = "draft-missing" | "personalize-all" | "lead-search";
+export type OutreachJobStatus = "queued" | "running" | "paused" | "completed" | "failed";
+
+export interface OutreachJobLog {
+  at: string;
+  message: string;
+  level: "info" | "success" | "warning" | "error";
+}
+
+export interface OutreachJob {
+  id: string;
+  type: OutreachJobType;
+  status: OutreachJobStatus;
+  itemIds: string[];
+  cursor: number;
+  completedCount: number;
+  failedCount: number;
+  retryCount: number;
+  maxRetries: number;
+  maxCostUsd: number;
+  estimatedCostUsd: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  direction?: string;
+  searchDurationSeconds?: number;
+  error?: string;
+  logs: OutreachJobLog[];
 }
 
 export interface OutreachDraft {
@@ -183,6 +273,13 @@ export interface OutreachDraft {
   updatedAt: string;
   generatedAt?: string;
   sentAt?: string;
+  personalizationStatus?: "generic" | "personalized" | "needs-research";
+  personalizationDetail?: string;
+  personalizationRelevance?: string;
+  personalizationSourceTitle?: string;
+  personalizationSourceUrl?: string;
+  personalizationVerifiedAt?: string;
+  personalizationConfidence?: number;
 }
 
 export interface AccountReviewState {
@@ -193,6 +290,10 @@ export interface AccountReviewState {
   analysisResults: Record<string, ReviewResult>;
   chatMessages: Record<string, MemoChatMessage[]>;
   outreachDrafts?: Record<string, OutreachDraft>;
+  discoveredLeads?: OutreachLead[];
+  leadSearchRuns?: LeadSearchRun[];
+  leadWorkflows?: Record<string, LeadWorkflow>;
+  outreachJobs?: OutreachJob[];
 }
 
 export interface NewReviewInput {
@@ -206,7 +307,13 @@ export interface NewReviewInput {
   attachments: string[];
 }
 
-export type UsageCallType = "council" | "memo-chat" | "public-draft" | "outreach-writer";
+export type UsageCallType =
+  | "council"
+  | "memo-chat"
+  | "public-draft"
+  | "outreach-writer"
+  | "outreach-personalization"
+  | "lead-search";
 
 // A single billed Bedrock model invocation. Token counts are stored raw; the
 // dollar cost is derived at aggregation time so price-table changes apply
@@ -241,7 +348,24 @@ export interface MetricBucket {
   costUsd: number;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   calls: number;
+}
+
+export interface ModelPricingSummary {
+  key: string;
+  label: string;
+  inputPer1M: number;
+  outputPer1M: number;
+  cacheReadPer1M: number;
+  cacheWritePer1M: number;
+}
+
+export interface CostTimelinePoint {
+  period: string;
+  label: string;
+  segments: Array<{ key: string; label: string; costUsd: number }>;
 }
 
 export interface UserUsageSummary {
@@ -261,6 +385,9 @@ export interface AdminMetrics {
   byModel: MetricBucket[];
   byCallType: MetricBucket[];
   daily: MetricBucket[];
+  monthlyByModel: CostTimelinePoint[];
+  monthlyByCallType: CostTimelinePoint[];
+  pricing: ModelPricingSummary[];
   topUsers: UserUsageSummary[];
   users: { total: number; online: number };
 }

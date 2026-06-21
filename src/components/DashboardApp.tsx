@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BarChart3,
   CheckCircle2,
+  ClipboardCheck,
   CircleDollarSign,
   Clock3,
   Cpu,
@@ -15,6 +16,8 @@ import {
   Send,
   Server,
   ShieldCheck,
+  Target,
+  Workflow,
   UserPlus,
   Users,
   Wifi
@@ -31,9 +34,78 @@ import {
 } from "../lib/apiClient";
 import type { AdminMetrics, MetricBucket, UserAdminSummary, UserProfile } from "../types";
 import { OutreachWriterPanel } from "./OutreachWriterPanel";
+import { LeadsPanel } from "./LeadsPanel";
+import { LeadReviewQueue } from "./LeadReviewQueue";
+import { OutreachJobsPanel } from "./OutreachJobsPanel";
 
 const ADMIN_ROLE: UserProfile["role"] = "export-control-officer";
 const RANGE_OPTIONS = [7, 30, 90] as const;
+type DashboardTab = "overview" | "usage" | "accounts" | "invites" | "leads" | "review" | "jobs" | "writer";
+
+const DASHBOARD_TABS: Array<{
+  id: DashboardTab;
+  label: string;
+  heading: string;
+  description: string;
+  icon: typeof LayoutDashboard;
+}> = [
+  {
+    id: "overview",
+    label: "Overview",
+    heading: "Operations overview",
+    description: "A concise view of service health, Bedrock activity, and account access.",
+    icon: LayoutDashboard
+  },
+  {
+    id: "usage",
+    label: "Usage",
+    heading: "AI usage and spend",
+    description: "Bedrock costs, model activity, workflow volume, tokens, and latency.",
+    icon: BarChart3
+  },
+  {
+    id: "accounts",
+    label: "Accounts",
+    heading: "Account activity",
+    description: "Operator access, online status, and cumulative AI usage by account.",
+    icon: Users
+  },
+  {
+    id: "invites",
+    label: "Invitations",
+    heading: "Secure invitations",
+    description: "Provision role-based access and review recent invitation status.",
+    icon: UserPlus
+  },
+  {
+    id: "leads",
+    label: "Leads",
+    heading: "Lead pipeline",
+    description: "The imported outreach sheet plus timed, source-aware Bedrock lead discovery.",
+    icon: Target
+  },
+  {
+    id: "review",
+    label: "Review Queue",
+    heading: "Lead review queue",
+    description: "Human approval, ownership, lifecycle status, and follow-up planning.",
+    icon: ClipboardCheck
+  },
+  {
+    id: "jobs",
+    label: "Background Jobs",
+    heading: "Background outreach jobs",
+    description: "Durable bulk work with progress, retries, pause/resume, and cost controls.",
+    icon: Workflow
+  },
+  {
+    id: "writer",
+    label: "Bedrock Writer",
+    heading: "Bedrock Writer",
+    description: "Generate, edit, and save project-first outreach drafts.",
+    icon: Mail
+  }
+];
 
 export function DashboardApp() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -168,6 +240,10 @@ function DashboardDenied({ user, onSignOut }: { user: UserProfile; onSignOut: ()
 function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () => Promise<void> }) {
   const [metrics, setMetrics] = useState<AdminMetrics | undefined>();
   const [users, setUsers] = useState<UserAdminSummary[]>([]);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
+    const hash = window.location.hash.replace("#", "");
+    return DASHBOARD_TABS.some((tab) => tab.id === hash) ? hash as DashboardTab : "overview";
+  });
   const [rangeDays, setRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(30);
   const [error, setError] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -190,6 +266,14 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
     void load();
   }, [load]);
 
+  const selectTab = (tab: DashboardTab) => {
+    setActiveTab(tab);
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${tab}`);
+    document.querySelector(".dash-main")?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const activeTabInfo = DASHBOARD_TABS.find((tab) => tab.id === activeTab) ?? DASHBOARD_TABS[0];
+  const showsMetricsRange = activeTab === "overview" || activeTab === "usage";
+
   return (
     <div className="dash-app-shell">
       <aside className="dash-rail">
@@ -201,18 +285,20 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
           </div>
         </div>
         <nav aria-label="Operations dashboard">
-          <a className="active" href="#overview">
-            <LayoutDashboard size={18} /> <span>Overview</span>
-          </a>
-          <a href="#usage">
-            <BarChart3 size={18} /> <span>Usage</span>
-          </a>
-          <a href="#access">
-            <Users size={18} /> <span>Access</span>
-          </a>
-          <a href="#writer">
-            <Mail size={18} /> <span>Bedrock Writer</span>
-          </a>
+          {DASHBOARD_TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                type="button"
+                className={activeTab === tab.id ? "active" : ""}
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                onClick={() => selectTab(tab.id)}
+                key={tab.id}
+              >
+                <Icon size={18} /> <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </nav>
         <div className="dash-rail-status">
           <span className="dash-status-dot" />
@@ -227,11 +313,11 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
       </aside>
 
       <main className="dash-main">
-        <header className="dash-header" id="overview">
+        <header className="dash-header">
           <div>
             <span className="dash-eyebrow">Admin control room</span>
-            <h1>Operations overview</h1>
-            <p>Bedrock usage, account access, and service activity across Rulix.</p>
+            <h1>{activeTabInfo.heading}</h1>
+            <p>{activeTabInfo.description}</p>
           </div>
           <div className="dash-account">
             <div className="dash-avatar">{initials(user.name)}</div>
@@ -246,19 +332,21 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
         </header>
 
         <div className="dash-toolbar">
-          <div className="dash-range" aria-label="Metrics date range">
-            {RANGE_OPTIONS.map((days) => (
-              <button
-                type="button"
-                className={rangeDays === days ? "active" : ""}
-                aria-pressed={rangeDays === days}
-                onClick={() => setRangeDays(days)}
-                key={days}
-              >
-                {days} days
-              </button>
-            ))}
-          </div>
+          {showsMetricsRange ? (
+            <div className="dash-range" aria-label="Metrics date range">
+              {RANGE_OPTIONS.map((days) => (
+                <button
+                  type="button"
+                  className={rangeDays === days ? "active" : ""}
+                  aria-pressed={rangeDays === days}
+                  onClick={() => setRangeDays(days)}
+                  key={days}
+                >
+                  {days} days
+                </button>
+              ))}
+            </div>
+          ) : <span />}
           <div className="dash-toolbar-meta">
             {metrics && <span>Updated {relativeTime(metrics.generatedAt)}</span>}
             <button type="button" className="dash-secondary" onClick={() => void load()} disabled={loading}>
@@ -269,60 +357,129 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
 
         {error && <div className="dash-error dash-banner">{error}</div>}
 
-        <section className="dash-health-strip" aria-label="System status">
-          <div>
-            <CheckCircle2 size={18} />
-            <span><strong>Service healthy</strong> API and account storage are responding</span>
-          </div>
-          <div>
-            <Server size={18} />
-            <span><strong>Amazon Bedrock</strong> Usage telemetry connected</span>
-          </div>
-          <div>
-            <ShieldCheck size={18} />
-            <span><strong>Access protected</strong> Officer role required</span>
-          </div>
-        </section>
+        <div className="dash-tab-content" key={activeTab}>
+          {activeTab === "overview" && (
+            <>
+              <SystemHealth />
+              {metrics ? (
+                <>
+                  <MetricCards metrics={metrics} rangeDays={rangeDays} />
+                  <section className="dash-overview-grid">
+                    <ChartCard title="Daily spend snapshot" detail={`Last ${rangeDays} days`}>
+                      <BarChart buckets={metrics.daily} metric="cost" empty="No billed Bedrock activity in this range." />
+                    </ChartCard>
+                    <OverviewPanel
+                      icon={<Users size={19} />}
+                      title="Account access"
+                      detail={`${num(metrics.users.online)} online of ${num(metrics.users.total)} total accounts`}
+                      action="Open accounts"
+                      onOpen={() => selectTab("accounts")}
+                    />
+                    <OverviewPanel
+                      icon={<Mail size={19} />}
+                      title="Operations tools"
+                      detail="Invitations and the Bedrock outreach writer are ready in dedicated tabs."
+                      action="Open writer"
+                      onOpen={() => selectTab("writer")}
+                    />
+                  </section>
+                </>
+              ) : <DashboardSkeleton />}
+            </>
+          )}
 
-        {metrics ? (
-          <>
-            <section className="dash-cards" aria-label="Key metrics">
-              <MetricCard icon={<CircleDollarSign size={20} />} label={`Spend (${rangeDays}d)`} value={usd(metrics.totals.costUsd)} accent />
-              <MetricCard icon={<Activity size={20} />} label="AI calls" value={num(metrics.totals.calls)} />
-              <MetricCard icon={<Cpu size={20} />} label="Tokens processed" value={compact(metrics.totals.inputTokens + metrics.totals.outputTokens)} />
-              <MetricCard icon={<Clock3 size={20} />} label="Average latency" value={`${num(metrics.totals.avgLatencyMs)} ms`} />
-              <MetricCard icon={<Users size={20} />} label="Accounts" value={num(metrics.users.total)} />
-              <MetricCard icon={<Wifi size={20} />} label="Online now" value={num(metrics.users.online)} tone={metrics.users.online ? "green" : "default"} />
-            </section>
+          {activeTab === "usage" && (
+            <>
+              {metrics ? (
+                <>
+                  <MetricCards metrics={metrics} rangeDays={rangeDays} />
+                  <section className="dash-charts">
+                    <ChartCard title="Daily spend" detail={`Last ${rangeDays} days`}>
+                      <BarChart buckets={metrics.daily} metric="cost" empty="No billed Bedrock activity in this range." />
+                    </ChartCard>
+                    <ChartCard title="Spend by model" detail="USD estimate">
+                      <BarChart buckets={metrics.byModel} metric="cost" empty="Model spend will appear after the first live AI call." />
+                    </ChartCard>
+                    <ChartCard title="Calls by workflow" detail="Request count">
+                      <BarChart buckets={metrics.byCallType} metric="calls" empty="Workflow activity will appear after the first live AI call." />
+                    </ChartCard>
+                  </section>
+                  <CostBreakdown metrics={metrics} />
+                </>
+              ) : <DashboardSkeleton />}
+            </>
+          )}
 
-            <section className="dash-charts" id="usage">
-              <ChartCard title="Daily spend" detail={`Last ${rangeDays} days`}>
-                <BarChart buckets={metrics.daily} metric="cost" empty="No billed Bedrock activity in this range." />
-              </ChartCard>
-              <ChartCard title="Spend by model" detail="USD estimate">
-                <BarChart buckets={metrics.byModel} metric="cost" empty="Model spend will appear after the first live AI call." />
-              </ChartCard>
-              <ChartCard title="Calls by workflow" detail="Request count">
-                <BarChart buckets={metrics.byCallType} metric="calls" empty="Workflow activity will appear after the first live AI call." />
-              </ChartCard>
-            </section>
-          </>
-        ) : (
-          <DashboardSkeleton />
-        )}
-
-        <OutreachWriterPanel />
-
-        <section className="dash-grid" id="access">
-          <UsersTable users={users} />
-          <InvitePanel onChanged={load} />
-        </section>
+          {activeTab === "accounts" && <UsersTable users={users} />}
+          {activeTab === "invites" && <InvitePanel onChanged={load} />}
+          {activeTab === "leads" && <LeadsPanel />}
+          {activeTab === "review" && <LeadReviewQueue />}
+          {activeTab === "jobs" && <OutreachJobsPanel />}
+          {activeTab === "writer" && <OutreachWriterPanel />}
+        </div>
 
         <footer className="dash-footer">
           <span>Rulix Operations</span>
           <span>Human review remains the final authority for every classification.</span>
         </footer>
       </main>
+    </div>
+  );
+}
+
+function SystemHealth() {
+  return (
+    <section className="dash-health-strip" aria-label="System status">
+      <div>
+        <CheckCircle2 size={18} />
+        <span><strong>Service healthy</strong> API and account storage are responding</span>
+      </div>
+      <div>
+        <Server size={18} />
+        <span><strong>Amazon Bedrock</strong> Usage telemetry connected</span>
+      </div>
+      <div>
+        <ShieldCheck size={18} />
+        <span><strong>Access protected</strong> Officer role required</span>
+      </div>
+    </section>
+  );
+}
+
+function MetricCards({ metrics, rangeDays }: { metrics: AdminMetrics; rangeDays: number }) {
+  return (
+    <section className="dash-cards" aria-label="Key metrics">
+      <MetricCard icon={<CircleDollarSign size={20} />} label={`Spend (${rangeDays}d)`} value={usd(metrics.totals.costUsd)} accent />
+      <MetricCard icon={<Activity size={20} />} label="AI calls" value={num(metrics.totals.calls)} />
+      <MetricCard icon={<Cpu size={20} />} label="Tokens processed" value={compact(metrics.totals.inputTokens + metrics.totals.outputTokens)} />
+      <MetricCard icon={<Clock3 size={20} />} label="Average latency" value={`${num(metrics.totals.avgLatencyMs)} ms`} />
+      <MetricCard icon={<Users size={20} />} label="Accounts" value={num(metrics.users.total)} />
+      <MetricCard icon={<Wifi size={20} />} label="Online now" value={num(metrics.users.online)} tone={metrics.users.online ? "green" : "default"} />
+    </section>
+  );
+}
+
+function OverviewPanel({
+  icon,
+  title,
+  detail,
+  action,
+  onOpen
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  action: string;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="dash-overview-panel">
+      <span className="dash-panel-icon">{icon}</span>
+      <div>
+        <h2>{title}</h2>
+        <p>{detail}</p>
+      </div>
+      <button type="button" className="dash-secondary" onClick={onOpen}>{action}</button>
     </div>
   );
 }
@@ -393,6 +550,147 @@ function BarChart({ buckets, metric, empty }: { buckets: MetricBucket[]; metric:
           <span className="dash-bar-value">{metric === "cost" ? usd(row.value) : num(row.value)}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function CostBreakdown({ metrics }: { metrics: AdminMetrics }) {
+  const [groupBy, setGroupBy] = useState<"model" | "workflow">("model");
+  const timeline = groupBy === "model" ? metrics.monthlyByModel : metrics.monthlyByCallType;
+  return (
+    <section className="dash-cost-breakdown">
+      <div className="dash-cost-heading">
+        <div>
+          <h2><span className="dash-cost-grip">⠿</span> Cost breakdown <small>Info</small></h2>
+        </div>
+        <strong>{usd(metrics.totals.costUsd)} total</strong>
+      </div>
+
+      <label className="dash-cost-group">
+        <span>Group costs by</span>
+        <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as "model" | "workflow")}>
+          <option value="model">Model</option>
+          <option value="workflow">Workflow</option>
+        </select>
+      </label>
+
+      <CostExplorerChart timeline={timeline} />
+
+      <div className="dash-cost-token-grid">
+        <CostToken label="Input tokens" value={metrics.totals.inputTokens} />
+        <CostToken label="Output tokens" value={metrics.totals.outputTokens} />
+        <CostToken label="Cache reads" value={metrics.totals.cacheReadTokens} />
+        <CostToken label="Cache writes" value={metrics.totals.cacheWriteTokens} />
+      </div>
+
+      <div className="dash-cost-tables">
+        <CostTable title="By model" buckets={metrics.byModel} />
+        <CostTable title="By workflow" buckets={metrics.byCallType} />
+      </div>
+
+      <div className="dash-pricing-table">
+        <div className="dash-cost-row dash-cost-header">
+          <span>Pricing family</span><span>Input / 1M</span><span>Output / 1M</span>
+          <span>Cache read / 1M</span><span>Cache write / 1M</span>
+        </div>
+        {metrics.pricing.map((price) => (
+          <div className="dash-cost-row" key={price.key}>
+            <strong>{price.label}</strong>
+            <span>{usd(price.inputPer1M)}</span>
+            <span>{usd(price.outputPer1M)}</span>
+            <span>{usd(price.cacheReadPer1M)}</span>
+            <span>{usd(price.cacheWritePer1M)}</span>
+          </div>
+        ))}
+        {!metrics.pricing.length && <div className="dash-empty compact">Pricing appears after recorded model usage.</div>}
+      </div>
+    </section>
+  );
+}
+
+function CostExplorerChart({ timeline }: { timeline: AdminMetrics["monthlyByModel"] }) {
+  const palette = ["#4b70e2", "#e381a4", "#0c9b84", "#a77ae8", "#e67817", "#8da5f1", "#f2c84b"];
+  const segmentKeys = [...new Set(timeline.flatMap((point) => point.segments.map((segment) => segment.key)))];
+  const labels = new Map(timeline.flatMap((point) => point.segments.map((segment) => [segment.key, segment.label])));
+  const max = Math.max(0.01, ...timeline.map((point) => point.segments.reduce((sum, segment) => sum + segment.costUsd, 0)));
+  const axisMax = niceAxisMax(max);
+
+  return (
+    <div className="dash-cost-explorer">
+      <strong className="dash-cost-axis-title">Costs (USD)</strong>
+      <div className="dash-cost-chart">
+        <div className="dash-cost-y-axis">
+          {[axisMax, axisMax * .66, axisMax * .33, 0].map((value) => <span key={value}>{usd(value)}</span>)}
+        </div>
+        <div className="dash-cost-plot">
+          {[100, 66, 33, 0].map((position) => <i style={{ bottom: `${position}%` }} key={position} />)}
+          <div className="dash-cost-columns">
+            {timeline.map((point) => (
+              <div className="dash-cost-column" key={point.period}>
+                <div className="dash-cost-stack">
+                  {point.segments.map((segment) => {
+                    const colorIndex = segmentKeys.indexOf(segment.key);
+                    return (
+                      <span
+                        title={`${segment.label}: ${usd(segment.costUsd)}`}
+                        style={{
+                          height: `${Math.max(3, (segment.costUsd / axisMax) * 100)}%`,
+                          background: palette[colorIndex % palette.length]
+                        }}
+                        key={segment.key}
+                      />
+                    );
+                  })}
+                </div>
+                <small>{point.label}</small>
+              </div>
+            ))}
+            {!timeline.length && <div className="dash-cost-no-data">No cost activity in this range.</div>}
+          </div>
+        </div>
+      </div>
+      <div className="dash-cost-legend">
+        {segmentKeys.map((key, index) => (
+          <span key={key}><i style={{ background: palette[index % palette.length] }} />{labels.get(key)}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function niceAxisMax(value: number) {
+  if (value <= 0.05) return 0.05;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  return Math.ceil(value / magnitude) * magnitude;
+}
+
+function CostToken({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{num(value)}</strong>
+    </div>
+  );
+}
+
+function CostTable({ title, buckets }: { title: string; buckets: MetricBucket[] }) {
+  return (
+    <div className="dash-cost-table">
+      <h3>{title}</h3>
+      <div className="dash-cost-row dash-cost-header">
+        <span>Name</span><span>Calls</span><span>Input</span><span>Output</span><span>Cache R/W</span><span>Cost</span>
+      </div>
+      {buckets.map((bucket) => (
+        <div className="dash-cost-row six" key={bucket.key}>
+          <strong>{bucket.label}</strong>
+          <span>{num(bucket.calls)}</span>
+          <span>{compact(bucket.inputTokens)}</span>
+          <span>{compact(bucket.outputTokens)}</span>
+          <span>{compact(bucket.cacheReadTokens)} / {compact(bucket.cacheWriteTokens)}</span>
+          <span>{usd(bucket.costUsd)}</span>
+        </div>
+      ))}
+      {!buckets.length && <div className="dash-empty compact">No recorded usage in this range.</div>}
     </div>
   );
 }

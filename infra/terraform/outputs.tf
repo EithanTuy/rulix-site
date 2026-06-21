@@ -55,3 +55,8 @@ output "app_custom_domain_cname_target" {
   value       = var.custom_domain == "" ? "" : aws_cloudfront_distribution.app[0].domain_name
 }
 
+output "github_actions_deploy_role_arn" {
+  description = "OIDC role used by the production GitHub Actions deployment workflow."
+  value       = aws_iam_role.github_actions_deploy.arn
+}
+

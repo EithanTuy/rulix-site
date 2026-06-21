@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { officialCorpus } from "../src/data/corpus";
-import { outreachLeads } from "../src/outreachLeads";
 import { analyzeMemo } from "../src/lib/eccnReview";
 import { createAuditEvent, deriveReviewStatus } from "../src/lib/reviewLifecycle";
 import type {
@@ -14,6 +13,9 @@ import type {
   MemoRecord,
   NewReviewInput,
   OutreachDraft,
+  LeadSearchRun,
+  LeadWorkflow,
+  OutreachJob,
   ReviewerDecision,
   UsageEvent,
   UserProfile
@@ -36,7 +38,20 @@ import {
 } from "./store";
 import { buildAdminMetrics, summarizeUsers } from "./metrics";
 import { sendInviteEmail, sendPasswordResetEmail } from "./email";
-import { generateOutreachDraft, outreachModel, outreachReady } from "./outreachWriter";
+import {
+  generateOutreachDraft,
+  outreachModel,
+  outreachReady,
+  personalizeOutreachDraft,
+  personalizationModel
+} from "./outreachWriter";
+import { discoverLeads, leadSearchModel } from "./leadSearch";
+import {
+  createOutreachJob,
+  estimateJobCost,
+  mergeOutreachLeads,
+  scheduleOutreachJob
+} from "./outreachJobs";
 
 const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
 const SESSION_COOKIE = "rulix_session";
@@ -144,19 +159,27 @@ export function createApp(options: CreateAppOptions = {}) {
 
   app.get("/api/admin/outreach", requireAuth(store), requireAdmin, async (_req, res) => {
     const state = await store.getAccountState(res.locals.user.id);
+    const leads = mergeOutreachLeads(state.discoveredLeads ?? []);
     res.json({
-      leads: outreachLeads,
+      leads,
       drafts: state.outreachDrafts ?? {},
+      leadSearchRuns: state.leadSearchRuns ?? [],
+      leadWorkflows: state.leadWorkflows ?? {},
+      outreachJobs: state.outreachJobs ?? [],
       bedrock: {
         ready: outreachReady(),
         model: outreachModel(),
+        personalizationModel: personalizationModel(),
+        leadSearchModel: leadSearchModel(),
         region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1"
       }
     });
   });
 
   app.post("/api/admin/outreach/generate", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
-    const lead = outreachLeads.find((item) => item.leadId === normalizeText(req.body?.leadId, ""));
+    const state = await store.getAccountState(res.locals.user.id);
+    const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
+      .find((item) => item.leadId === normalizeText(req.body?.leadId, ""));
     if (!lead) {
       res.status(404).json({ error: "Outreach lead not found." });
       return;
@@ -167,8 +190,11 @@ export function createApp(options: CreateAppOptions = {}) {
         normalizeText(req.body?.direction, ""),
         (sample) => recordUsageSafe(store, res.locals.user, sample)
       );
-      const state = await store.getAccountState(res.locals.user.id);
       (state.outreachDrafts ??= {})[lead.leadId] = draft;
+      setLeadWorkflow(state, lead.leadId, {
+        reviewStatus: "pending-review",
+        lifecycleStatus: "drafted"
+      });
       await store.replaceAccountState(res.locals.user.id, state);
       res.json({ lead, draft });
     } catch (error) {
@@ -177,7 +203,9 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.put("/api/admin/outreach/drafts/:leadId", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
-    const lead = outreachLeads.find((item) => item.leadId === req.params.leadId);
+    const state = await store.getAccountState(res.locals.user.id);
+    const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
+      .find((item) => item.leadId === req.params.leadId);
     if (!lead) {
       res.status(404).json({ error: "Outreach lead not found." });
       return;
@@ -188,7 +216,6 @@ export function createApp(options: CreateAppOptions = {}) {
       res.status(400).json({ error: "Subject and body are required." });
       return;
     }
-    const state = await store.getAccountState(res.locals.user.id);
     const previous = state.outreachDrafts?.[lead.leadId];
     const draft: OutreachDraft = {
       leadId: lead.leadId,
@@ -199,6 +226,13 @@ export function createApp(options: CreateAppOptions = {}) {
       model: previous?.model ?? outreachModel(),
       generatedAt: previous?.generatedAt,
       sentAt: previous?.sentAt,
+      personalizationStatus: previous?.personalizationStatus,
+      personalizationDetail: previous?.personalizationDetail,
+      personalizationRelevance: previous?.personalizationRelevance,
+      personalizationSourceTitle: previous?.personalizationSourceTitle,
+      personalizationSourceUrl: previous?.personalizationSourceUrl,
+      personalizationVerifiedAt: previous?.personalizationVerifiedAt,
+      personalizationConfidence: previous?.personalizationConfidence,
       updatedAt: new Date().toISOString()
     };
     (state.outreachDrafts ??= {})[lead.leadId] = draft;
@@ -215,8 +249,207 @@ export function createApp(options: CreateAppOptions = {}) {
     }
     draft.sentAt = new Date().toISOString();
     draft.updatedAt = draft.sentAt;
+    setLeadWorkflow(state, req.params.leadId, {
+      reviewStatus: "approved",
+      lifecycleStatus: "sent",
+      lastContactedAt: draft.sentAt
+    });
     await store.replaceAccountState(res.locals.user.id, state);
     res.json({ draft });
+  });
+
+  app.post("/api/admin/outreach/drafts/:leadId/personalize", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const state = await store.getAccountState(res.locals.user.id);
+    const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
+      .find((item) => item.leadId === req.params.leadId);
+    const draft = state.outreachDrafts?.[req.params.leadId];
+    if (!lead) {
+      res.status(404).json({ error: "Outreach lead not found." });
+      return;
+    }
+    if (!draft) {
+      res.status(404).json({ error: "Create a draft before personalizing it." });
+      return;
+    }
+    try {
+      const personalized = await personalizeOutreachDraft(
+        lead,
+        draft,
+        (sample) => recordUsageSafe(store, res.locals.user, sample)
+      );
+      (state.outreachDrafts ??= {})[lead.leadId] = personalized;
+      setLeadWorkflow(state, lead.leadId, {
+        reviewStatus: personalized.personalizationStatus === "personalized" ? "pending-review" : "needs-research",
+        lifecycleStatus: personalized.personalizationStatus === "personalized" ? "personalized" : "drafted"
+      });
+      await store.replaceAccountState(res.locals.user.id, state);
+      res.json({ lead, draft: personalized });
+    } catch (error) {
+      res.status(502).json({
+        error: error instanceof Error ? error.message : "Personalization failed."
+      });
+    }
+  });
+
+  app.put("/api/admin/leads/:leadId/workflow", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const state = await store.getAccountState(res.locals.user.id);
+    const lead = mergeOutreachLeads(state.discoveredLeads ?? [])
+      .find((item) => item.leadId === req.params.leadId);
+    if (!lead) {
+      res.status(404).json({ error: "Lead not found." });
+      return;
+    }
+    const reviewStatus = coerceReviewStatus(req.body?.reviewStatus);
+    const lifecycleStatus = coerceLifecycleStatus(req.body?.lifecycleStatus);
+    if (!reviewStatus || !lifecycleStatus) {
+      res.status(400).json({ error: "Valid review and lifecycle statuses are required." });
+      return;
+    }
+    const workflow = setLeadWorkflow(state, lead.leadId, {
+      reviewStatus,
+      lifecycleStatus,
+      assignedOwner: normalizeOptional(req.body?.assignedOwner),
+      notes: normalizeOptional(req.body?.notes),
+      lastContactedAt: normalizeIsoDate(req.body?.lastContactedAt),
+      followUpAt: normalizeIsoDate(req.body?.followUpAt),
+      replyStatus: normalizeOptional(req.body?.replyStatus)
+    });
+    await store.replaceAccountState(res.locals.user.id, state);
+    res.json({ lead, workflow });
+  });
+
+  app.post("/api/admin/outreach/jobs", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const state = await store.getAccountState(res.locals.user.id);
+    const type = coerceOutreachJobType(req.body?.type);
+    if (!type) {
+      res.status(400).json({ error: "Unknown outreach job type." });
+      return;
+    }
+    const leads = mergeOutreachLeads(state.discoveredLeads ?? []);
+    const itemIds = type === "draft-missing"
+      ? leads.filter((lead) => !state.outreachDrafts?.[lead.leadId]).map((lead) => lead.leadId)
+      : type === "personalize-all"
+        ? leads.filter((lead) => {
+            const draft = state.outreachDrafts?.[lead.leadId];
+            return Boolean(draft && !draft.sentAt && draft.personalizationStatus !== "personalized");
+          }).map((lead) => lead.leadId)
+        : [];
+    const job = createOutreachJob({
+      type,
+      itemIds,
+      maxCostUsd: clampNumber(Number(req.body?.maxCostUsd) || 5, 0.05, 100),
+      maxRetries: clampNumber(Number(req.body?.maxRetries) || 2, 0, 5),
+      direction: normalizeOptional(req.body?.direction),
+      searchDurationSeconds: clampNumber(Number(req.body?.searchDurationSeconds) || 30, 15, 45)
+    });
+    job.estimatedCostUsd = estimateJobCost(job);
+    if (type !== "lead-search" && itemIds.length === 0) {
+      job.status = "completed";
+      job.completedAt = new Date().toISOString();
+      job.logs.unshift({
+        at: job.completedAt,
+        message: "No eligible items were found.",
+        level: "success"
+      });
+    }
+    state.outreachJobs = [job, ...(state.outreachJobs ?? [])].slice(0, 40);
+    await store.replaceAccountState(res.locals.user.id, state);
+    if (job.status === "queued") {
+      await scheduleOutreachJob({
+        source: "rulix.outreach-worker",
+        userId: res.locals.user.id,
+        userEmail: res.locals.user.email,
+        jobId: job.id
+      });
+    }
+    res.status(202).json({ job });
+  });
+
+  app.post("/api/admin/outreach/jobs/:jobId/:action", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const action = req.params.action;
+    if (!["pause", "resume", "retry"].includes(action)) {
+      res.status(400).json({ error: "Unknown job action." });
+      return;
+    }
+    const state = await store.getAccountState(res.locals.user.id);
+    const job = state.outreachJobs?.find((candidate) => candidate.id === req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: "Outreach job not found." });
+      return;
+    }
+    if (action === "pause") {
+      job.status = "paused";
+      job.logs.unshift({ at: new Date().toISOString(), message: "Paused by operator.", level: "warning" });
+    } else {
+      job.status = "queued";
+      job.error = undefined;
+      if (action === "retry") job.retryCount = 0;
+      job.logs.unshift({
+        at: new Date().toISOString(),
+        message: `${action === "retry" ? "Retry" : "Resume"} requested by operator.`,
+        level: "info"
+      });
+    }
+    job.updatedAt = new Date().toISOString();
+    await store.replaceAccountState(res.locals.user.id, state);
+    if (job.status === "queued") {
+      await scheduleOutreachJob({
+        source: "rulix.outreach-worker",
+        userId: res.locals.user.id,
+        userEmail: res.locals.user.email,
+        jobId: job.id
+      });
+    }
+    res.json({ job });
+  });
+
+  app.post("/api/admin/leads/search", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
+    const durationSeconds = clampNumber(Number(req.body?.durationSeconds) || 30, 15, 45);
+    const startedAt = new Date().toISOString();
+    const state = await store.getAccountState(res.locals.user.id);
+    const existingLeads = mergeOutreachLeads(state.discoveredLeads ?? []);
+    try {
+      const result = await discoverLeads({
+        existingLeads,
+        durationSeconds,
+        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+      });
+      state.discoveredLeads = mergeOutreachLeads([
+        ...(state.discoveredLeads ?? []),
+        ...result.leads
+      ]).filter((lead) => lead.leadId.startsWith("AI-"));
+      const run: LeadSearchRun = {
+        id: `lead-search-${Date.now()}`,
+        startedAt,
+        completedAt: new Date().toISOString(),
+        durationSeconds,
+        model: result.model,
+        status: "completed",
+        addedLeadIds: result.leads.map((lead) => lead.leadId),
+        activity: result.activity
+      };
+      state.leadSearchRuns = [run, ...(state.leadSearchRuns ?? [])].slice(0, 20);
+      await store.replaceAccountState(res.locals.user.id, state);
+      res.json({ leads: mergeOutreachLeads(state.discoveredLeads), run });
+    } catch (error) {
+      const run: LeadSearchRun = {
+        id: `lead-search-${Date.now()}`,
+        startedAt,
+        completedAt: new Date().toISOString(),
+        durationSeconds,
+        model: leadSearchModel(),
+        status: "failed",
+        addedLeadIds: [],
+        activity: [
+          { at: startedAt, message: `Started a ${durationSeconds}-second lead research budget.` },
+          { at: new Date().toISOString(), message: "Lead search stopped before candidates were saved." }
+        ],
+        error: error instanceof Error ? error.message : "Lead search failed."
+      };
+      state.leadSearchRuns = [run, ...(state.leadSearchRuns ?? [])].slice(0, 20);
+      await store.replaceAccountState(res.locals.user.id, state);
+      res.status(502).json({ error: run.error, run });
+    }
   });
 
   app.get("/api/auth/invites/:token", async (req, res) => {
@@ -870,6 +1103,59 @@ function normalizeText(value: unknown, fallback: string) {
 
 function normalizeOptional(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function setLeadWorkflow(
+  state: AccountReviewState,
+  leadId: string,
+  patch: Partial<LeadWorkflow>
+) {
+  const previous = state.leadWorkflows?.[leadId];
+  const workflow: LeadWorkflow = {
+    leadId,
+    reviewStatus: previous?.reviewStatus ?? "new",
+    lifecycleStatus: previous?.lifecycleStatus ?? "not-contacted",
+    ...previous,
+    ...patch,
+    updatedAt: new Date().toISOString()
+  };
+  (state.leadWorkflows ??= {})[leadId] = workflow;
+  return workflow;
+}
+
+function coerceReviewStatus(value: unknown): LeadWorkflow["reviewStatus"] | undefined {
+  const allowed = new Set<LeadWorkflow["reviewStatus"]>([
+    "new", "pending-review", "approved", "rejected", "needs-research", "ready-to-send"
+  ]);
+  return typeof value === "string" && allowed.has(value as LeadWorkflow["reviewStatus"])
+    ? value as LeadWorkflow["reviewStatus"]
+    : undefined;
+}
+
+function coerceLifecycleStatus(value: unknown): LeadWorkflow["lifecycleStatus"] | undefined {
+  const allowed = new Set<LeadWorkflow["lifecycleStatus"]>([
+    "not-contacted", "drafted", "personalized", "approved", "sent", "replied",
+    "follow-up-due", "closed", "opted-out"
+  ]);
+  return typeof value === "string" && allowed.has(value as LeadWorkflow["lifecycleStatus"])
+    ? value as LeadWorkflow["lifecycleStatus"]
+    : undefined;
+}
+
+function coerceOutreachJobType(value: unknown): OutreachJob["type"] | undefined {
+  return value === "draft-missing" || value === "personalize-all" || value === "lead-search"
+    ? value
+    : undefined;
+}
+
+function normalizeIsoDate(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 function isString(value: unknown): value is string {

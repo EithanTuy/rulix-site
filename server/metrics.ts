@@ -6,7 +6,7 @@ import type {
   UserProfile,
   UserUsageSummary
 } from "../src/types";
-import { priceFamily, usageCostUsd } from "./bedrockPricing";
+import { modelPrice, priceFamily, usageCostUsd } from "./bedrockPricing";
 
 export interface SessionSummary {
   userId: string;
@@ -46,6 +46,8 @@ export function buildAdminMetrics(input: {
   const byModel = new Map<string, MetricBucket>();
   const byCallType = new Map<string, MetricBucket>();
   const daily = new Map<string, MetricBucket>();
+  const monthlyByModel = new Map<string, Map<string, { label: string; costUsd: number }>>();
+  const monthlyByCallType = new Map<string, Map<string, { label: string; costUsd: number }>>();
   const perUser = new Map<string, UserUsageSummary>();
   const profiles = new Map(input.users.map((user) => [user.id, user]));
 
@@ -65,6 +67,8 @@ export function buildAdminMetrics(input: {
     addBucket(byModel, priceFamily(event.model), modelLabel(event.model), event, cost);
     addBucket(byCallType, event.callType, callTypeLabel(event.callType), event, cost);
     addBucket(daily, event.at.slice(0, 10), event.at.slice(0, 10), event, cost);
+    addTimelineCost(monthlyByModel, event.at.slice(0, 7), priceFamily(event.model), modelLabel(event.model), cost);
+    addTimelineCost(monthlyByCallType, event.at.slice(0, 7), event.callType, callTypeLabel(event.callType), cost);
 
     const profile = profiles.get(event.userId);
     const summary = perUser.get(event.userId) ?? {
@@ -92,9 +96,47 @@ export function buildAdminMetrics(input: {
     byModel: sortByCost(byModel),
     byCallType: sortByCost(byCallType),
     daily: Array.from(daily.values()).sort((a, b) => a.key.localeCompare(b.key)),
+    monthlyByModel: timelinePoints(monthlyByModel),
+    monthlyByCallType: timelinePoints(monthlyByCallType),
+    pricing: [...new Set(events.map((event) => priceFamily(event.model)))].map((family) => {
+      const price = modelPrice(family);
+      return {
+        key: family,
+        label: modelLabel(family),
+        inputPer1M: price.inputPer1M,
+        outputPer1M: price.outputPer1M,
+        cacheReadPer1M: price.cacheReadPer1M,
+        cacheWritePer1M: price.cacheWritePer1M
+      };
+    }),
     topUsers: Array.from(perUser.values()).sort((a, b) => b.costUsd - a.costUsd).slice(0, 10),
     users: { total: input.users.length, online: countOnline(input.sessions) }
   };
+}
+
+function addTimelineCost(
+  timeline: Map<string, Map<string, { label: string; costUsd: number }>>,
+  period: string,
+  key: string,
+  label: string,
+  costUsd: number
+) {
+  const segments = timeline.get(period) ?? new Map();
+  const segment = segments.get(key) ?? { label, costUsd: 0 };
+  segment.costUsd += costUsd;
+  segments.set(key, segment);
+  timeline.set(period, segments);
+}
+
+function timelinePoints(timeline: Map<string, Map<string, { label: string; costUsd: number }>>) {
+  return Array.from(timeline.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, segments]) => ({
+      period,
+      label: new Intl.DateTimeFormat("en", { month: "short", year: "numeric" })
+        .format(new Date(`${period}-01T00:00:00Z`)),
+      segments: Array.from(segments.entries()).map(([key, value]) => ({ key, ...value }))
+    }));
 }
 
 export function summarizeUsers(input: {
@@ -157,10 +199,21 @@ function addBucket(
   event: UsageEvent,
   cost: number
 ) {
-  const bucket = map.get(key) ?? { key, label, costUsd: 0, inputTokens: 0, outputTokens: 0, calls: 0 };
+  const bucket = map.get(key) ?? {
+    key,
+    label,
+    costUsd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    calls: 0
+  };
   bucket.costUsd += cost;
   bucket.inputTokens += event.inputTokens;
   bucket.outputTokens += event.outputTokens;
+  bucket.cacheReadTokens += event.cacheReadTokens;
+  bucket.cacheWriteTokens += event.cacheWriteTokens;
   bucket.calls += 1;
   map.set(key, bucket);
 }
@@ -181,5 +234,7 @@ function callTypeLabel(type: UsageEvent["callType"]) {
   if (type === "council") return "Council review";
   if (type === "memo-chat") return "Memo chat";
   if (type === "outreach-writer") return "Outreach writer";
+  if (type === "outreach-personalization") return "Outreach personalization";
+  if (type === "lead-search") return "Lead search";
   return "Public draft";
 }

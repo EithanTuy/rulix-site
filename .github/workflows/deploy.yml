@@ -1,0 +1,53 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: rulix-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run
+      - run: npm run build:lambda
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.6
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::431445330783:role/rulix-github-actions-deploy
+          aws-region: us-east-1
+      - name: Build deployment archive
+        working-directory: infra/terraform
+        env:
+          TF_VAR_tenant_slug: prod
+          TF_VAR_aws_region: us-east-1
+        run: |
+          terraform init -input=false
+          terraform plan -refresh=false -input=false >/dev/null
+      - name: Deploy Lambda bundle
+        run: |
+          aws lambda update-function-code \
+            --function-name rulix-prod-app \
+            --zip-file fileb://infra/terraform/function.zip >/dev/null
+          aws lambda wait function-updated --function-name rulix-prod-app
+      - name: Smoke test
+        run: |
+          curl --fail --retry 6 --retry-delay 5 https://app.rulix.cloud/api/health
+          curl --fail --retry 6 --retry-delay 5 https://dashboard.rulix.cloud/

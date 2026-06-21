@@ -7,6 +7,9 @@ import type {
   MemoRecord,
   OutreachDraft,
   OutreachLead,
+  LeadSearchRun,
+  LeadWorkflow,
+  OutreachJob,
   ReviewResult,
   UserAdminSummary,
   UserProfile
@@ -279,7 +282,16 @@ export async function draftPublicMemo(item: string, signal?: AbortSignal) {
 export interface OutreachWorkspace {
   leads: OutreachLead[];
   drafts: Record<string, OutreachDraft>;
-  bedrock: { ready: boolean; model: string; region: string };
+  leadSearchRuns: LeadSearchRun[];
+  leadWorkflows: Record<string, LeadWorkflow>;
+  outreachJobs: OutreachJob[];
+  bedrock: {
+    ready: boolean;
+    model: string;
+    personalizationModel: string;
+    leadSearchModel: string;
+    region: string;
+  };
 }
 
 export async function getOutreachWorkspace(signal?: AbortSignal) {
@@ -309,6 +321,57 @@ export async function markOutreachSent(leadId: string) {
   return fetchJson<{ draft: OutreachDraft }>(
     `/api/admin/outreach/drafts/${encodeURIComponent(leadId)}/mark-sent`,
     { method: "POST" }
+  );
+}
+
+export async function personalizeOutreachEmail(leadId: string) {
+  return fetchJson<{ lead: OutreachLead; draft: OutreachDraft }>(
+    `/api/admin/outreach/drafts/${encodeURIComponent(leadId)}/personalize`,
+    { method: "POST" }
+  );
+}
+
+export async function searchForLeads(durationSeconds: number, signal?: AbortSignal) {
+  return fetchJson<{ leads: OutreachLead[]; run: LeadSearchRun }>("/api/admin/leads/search", {
+    method: "POST",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ durationSeconds })
+  });
+}
+
+export async function createOutreachJob(input: {
+  type: OutreachJob["type"];
+  maxCostUsd: number;
+  maxRetries?: number;
+  direction?: string;
+  searchDurationSeconds?: number;
+}) {
+  return fetchJson<{ job: OutreachJob }>("/api/admin/outreach/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+}
+
+export async function updateOutreachJob(jobId: string, action: "pause" | "resume" | "retry") {
+  return fetchJson<{ job: OutreachJob }>(
+    `/api/admin/outreach/jobs/${encodeURIComponent(jobId)}/${action}`,
+    { method: "POST" }
+  );
+}
+
+export async function updateLeadWorkflow(
+  leadId: string,
+  workflow: Omit<LeadWorkflow, "leadId" | "updatedAt">
+) {
+  return fetchJson<{ lead: OutreachLead; workflow: LeadWorkflow }>(
+    `/api/admin/leads/${encodeURIComponent(leadId)}/workflow`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workflow)
+    }
   );
 }
 

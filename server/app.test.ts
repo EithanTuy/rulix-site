@@ -326,6 +326,102 @@ describe("Rulix ECCN API", () => {
     expect(me.usage.calls).toBe(1);
     expect(me.online).toBe(true);
   });
+
+  it("serves the imported lead sheet and records disabled lead searches", async () => {
+    const admin = await signedInAgent("lead-admin@example.com", "export-control-officer");
+
+    const workspace = (await admin.agent.get("/api/admin/outreach").expect(200)).body;
+    expect(workspace.leads).toHaveLength(154);
+    expect(workspace.leads[0]).toMatchObject({
+      leadId: "RULIX-00001",
+      email: "exportcontrol@brown.edu",
+      priority: "A"
+    });
+    expect(workspace.bedrock.leadSearchModel).toContain("sonnet-4-6");
+    expect(workspace.bedrock.personalizationModel).toContain("sonnet-4-6");
+
+    const search = await admin.agent
+      .post("/api/admin/leads/search")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({ durationSeconds: 15 })
+      .expect(502);
+    expect(search.body.run.status).toBe("failed");
+
+    const refreshed = (await admin.agent.get("/api/admin/outreach").expect(200)).body;
+    expect(refreshed.leadSearchRuns[0].status).toBe("failed");
+  });
+
+  it("requires a saved draft and enabled Bedrock before personalization", async () => {
+    const admin = await signedInAgent("personalize-admin@example.com", "export-control-officer");
+
+    await admin.agent
+      .post("/api/admin/outreach/drafts/RULIX-00001/personalize")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(404);
+
+    await admin.agent
+      .put("/api/admin/outreach/drafts/RULIX-00001")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({
+        subject: "A small Rulix pilot",
+        body: "I am exploring a small Rulix pilot with export-control teams. If this is not relevant, I will not follow up."
+      })
+      .expect(200);
+
+    const response = await admin.agent
+      .post("/api/admin/outreach/drafts/RULIX-00001/personalize")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(502);
+    expect(response.body.error).toContain("Bedrock is not enabled");
+  });
+
+  it("creates controllable background jobs and persists lead workflow decisions", async () => {
+    const admin = await signedInAgent("workflow-admin@example.com", "export-control-officer");
+
+    const created = await admin.agent
+      .post("/api/admin/outreach/jobs")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({ type: "lead-search", maxCostUsd: 1, maxRetries: 2, searchDurationSeconds: 15 })
+      .expect(202);
+    expect(created.body.job).toMatchObject({
+      type: "lead-search",
+      status: "queued",
+      maxCostUsd: 1
+    });
+
+    const paused = await admin.agent
+      .post(`/api/admin/outreach/jobs/${created.body.job.id}/pause`)
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(200);
+    expect(paused.body.job.status).toBe("paused");
+
+    const resumed = await admin.agent
+      .post(`/api/admin/outreach/jobs/${created.body.job.id}/resume`)
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(200);
+    expect(resumed.body.job.status).toBe("queued");
+
+    const workflow = await admin.agent
+      .put("/api/admin/leads/RULIX-00001/workflow")
+      .set("x-rulix-csrf", admin.csrfToken)
+      .send({
+        reviewStatus: "approved",
+        lifecycleStatus: "approved",
+        assignedOwner: "Eithan",
+        followUpAt: "2026-07-01T14:00:00.000Z",
+        replyStatus: "Awaiting outreach"
+      })
+      .expect(200);
+    expect(workflow.body.workflow).toMatchObject({
+      leadId: "RULIX-00001",
+      reviewStatus: "approved",
+      assignedOwner: "Eithan"
+    });
+
+    const workspace = (await admin.agent.get("/api/admin/outreach").expect(200)).body;
+    expect(workspace.outreachJobs[0].id).toBe(created.body.job.id);
+    expect(workspace.leadWorkflows["RULIX-00001"].reviewStatus).toBe("approved");
+  });
 });
 
 function testApp() {
