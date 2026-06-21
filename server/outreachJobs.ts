@@ -66,7 +66,8 @@ export function createOutreachJob(input: {
   };
 }
 
-export async function scheduleOutreachJob(event: OutreachWorkerEvent) {
+export async function scheduleOutreachJob(event: OutreachWorkerEvent, delayMs = 0) {
+  if (delayMs > 0) await sleep(delayMs);
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (!functionName) {
     if (process.env.NODE_ENV !== "test") {
@@ -106,6 +107,8 @@ export async function processOutreachJob(
   job.logs.unshift(jobLog(`Processing ${job.type} step ${job.cursor + 1}.`));
   await store.replaceAccountState(event.userId, state);
 
+  let retryDelayMs = 0;
+
   try {
     if (job.type === "lead-search") {
       await processLeadSearchJob(store, state, job, event);
@@ -129,11 +132,17 @@ export async function processOutreachJob(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Background job step failed.";
+    const rateLimit = isRateLimitError(error);
     job.retryCount += 1;
     job.logs.unshift(jobLog(message, "error"));
     if (job.retryCount <= job.maxRetries) {
       job.status = "queued";
-      job.logs.unshift(jobLog(`Retry ${job.retryCount} of ${job.maxRetries} queued.`, "warning"));
+      if (rateLimit) {
+        retryDelayMs = Math.min(120_000, 15_000 * Math.pow(2, job.retryCount - 1));
+        job.logs.unshift(jobLog(`Retry ${job.retryCount} of ${job.maxRetries} queued after ${retryDelayMs / 1000}s backoff.`, "warning"));
+      } else {
+        job.logs.unshift(jobLog(`Retry ${job.retryCount} of ${job.maxRetries} queued.`, "warning"));
+      }
     } else {
       job.failedCount += 1;
       job.cursor += 1;
@@ -152,7 +161,7 @@ export async function processOutreachJob(
   job.updatedAt = new Date().toISOString();
   await store.replaceAccountState(event.userId, state);
   if (job.status === "queued") {
-    await scheduleOutreachJob(event);
+    await scheduleOutreachJob(event, retryDelayMs);
   }
 }
 
@@ -279,6 +288,15 @@ export function jobModel(job: OutreachJob) {
   if (job.type === "draft-missing") return outreachModel();
   if (job.type === "personalize-all") return personalizationModel();
   return leadSearchModel();
+}
+
+function isRateLimitError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return /429|too many requests|throttl|rate.?limit/i.test(error.message);
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 export function estimateJobCost(job: OutreachJob) {
