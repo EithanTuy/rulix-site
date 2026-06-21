@@ -1,8 +1,8 @@
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { LeadSearchActivity, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
+import { createAIClient, outreachProviderReady, resolveModel } from "./aiClient";
 
 export const DEFAULT_LEAD_SEARCH_MODEL = "global.anthropic.claude-sonnet-4-6";
 
@@ -99,12 +99,13 @@ export async function discoverLeads({
   durationSeconds: number;
   onUsage?: (sample: UsageSample) => void;
 }): Promise<{ leads: OutreachLead[]; activity: LeadSearchActivity[]; model: string }> {
-  if (process.env.BEDROCK_ENABLED !== "true") {
+  if (!outreachProviderReady()) {
     throw new Error("Amazon Bedrock is not enabled for this deployment.");
   }
 
   const startedAt = Date.now();
   const model = leadSearchModel();
+  const apiModel = resolveModel(model);
   const targetCount = durationSeconds <= 15 ? 3 : durationSeconds <= 30 ? 6 : 10;
   const activity = [
     log(`Loaded ${existingLeads.length} existing leads and built duplicate guards.`),
@@ -116,10 +117,10 @@ export async function discoverLeads({
     activity
   );
   activity.push(log(`Collected ${webEvidence.length} public search results for model review.`));
-  const client = new AnthropicBedrock();
+  const client = createAIClient();
   const response = await client.messages.create(
     {
-      model,
+      model: apiModel,
       max_tokens: 3000,
       temperature: 0.2,
       system: SYSTEM_PROMPT,

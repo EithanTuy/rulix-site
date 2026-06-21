@@ -1,8 +1,8 @@
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import type { OutreachDraft, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
+import { createAIClient, outreachProviderReady, resolveModel } from "./aiClient";
 
 export const DEFAULT_OUTREACH_MODEL = "us.anthropic.claude-opus-4-6-v1";
 export const DEFAULT_PERSONALIZATION_MODEL = "global.anthropic.claude-sonnet-4-6";
@@ -84,7 +84,7 @@ export function outreachModel() {
 }
 
 export function outreachReady() {
-  return process.env.BEDROCK_ENABLED === "true";
+  return outreachProviderReady();
 }
 
 export function personalizationModel() {
@@ -98,11 +98,12 @@ export async function generateOutreachDraft(
 ): Promise<OutreachDraft> {
   if (!outreachReady()) throw new Error("Amazon Bedrock is not enabled for this deployment.");
   const model = outreachModel();
+  const apiModel = resolveModel(model);
   const startedAt = Date.now();
-  const client = new AnthropicBedrock();
+  const client = createAIClient();
   const response = await client.messages.create(
     {
-      model,
+      model: apiModel,
       max_tokens: 700,
       temperature: 0.35,
       system: SYSTEM_PROMPT,
@@ -187,11 +188,12 @@ export async function personalizeOutreachDraft(
   }
 
   const model = personalizationModel();
+  const apiModel = resolveModel(model);
   const startedAt = Date.now();
-  const client = new AnthropicBedrock();
+  const client = createAIClient();
   const response = await client.messages.create(
     {
-      model,
+      model: apiModel,
       max_tokens: 1100,
       temperature: 0.2,
       system: PERSONALIZATION_PROMPT,
