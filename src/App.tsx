@@ -1135,6 +1135,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function readableApiError(message: string) {
+  if (message.trimStart().startsWith("<")) return "Request failed.";
   try {
     const parsed = JSON.parse(message) as { error?: string };
     return parsed.error ?? message;
