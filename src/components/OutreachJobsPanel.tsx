@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pause, Play, RefreshCw, RotateCcw } from "lucide-react";
+import { Pause, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 import {
   createOutreachJob,
   getOutreachWorkspace,
@@ -46,8 +46,12 @@ export function OutreachJobsPanel() {
     }
   };
 
-  const act = async (job: OutreachJob, action: "pause" | "resume" | "retry") => {
+  const act = async (job: OutreachJob, action: "pause" | "resume" | "retry" | "terminate") => {
+    if (action === "terminate" && !window.confirm(`Terminate ${jobTitle(job.type)}? Any result currently being generated will be discarded.`)) {
+      return;
+    }
     setBusy(true);
+    setError("");
     try {
       const result = await updateOutreachJob(job.id, action);
       setJobs((current) => current.map((item) => item.id === job.id ? result.job : item));
@@ -100,6 +104,9 @@ export function OutreachJobsPanel() {
                   )}
                   {job.status === "failed" && (
                     <button type="button" title="Retry" onClick={() => void act(job, "retry")}><RotateCcw size={15} /></button>
+                  )}
+                  {(job.status === "queued" || job.status === "running" || job.status === "paused") && (
+                    <button className="job-terminate" type="button" title="Terminate" onClick={() => void act(job, "terminate")}><Square size={15} /></button>
                   )}
                   <button type="button" title="Refresh" onClick={() => void load()}><RefreshCw size={15} /></button>
                 </div>

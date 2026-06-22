@@ -149,8 +149,8 @@ export function OutreachWriterPanel() {
       setBody(result.draft.body);
       setNotice(
         result.draft.personalizationStatus === "personalized"
-          ? "Personalized from a verified public source."
-          : "The available public sources were not strong enough. The generic draft was preserved."
+          ? "The reviewer approved a subtle, source-backed edit."
+          : "The reviewer rejected the proposed edit. The default email was preserved."
       );
     } catch (personalizationError) {
       setError(message(personalizationError, "Personalization failed."));
@@ -162,7 +162,7 @@ export function OutreachWriterPanel() {
   const personalizeAll = async () => {
     const candidates = leads.filter((item) => {
       const draft = drafts[item.leadId];
-      return hasDraft(draft) && !draft?.sentAt && draft?.personalizationStatus !== "personalized";
+      return hasDraft(draft) && !draft?.sentAt;
     });
     if (!candidates.length) {
       setNotice("Every eligible draft is already personalized.");
@@ -198,7 +198,7 @@ export function OutreachWriterPanel() {
   const missingDraftCount = leads.filter((item) => !hasDraft(drafts[item.leadId])).length;
   const personalizationCount = leads.filter((item) => {
     const draft = drafts[item.leadId];
-    return hasDraft(draft) && !draft?.sentAt && draft?.personalizationStatus !== "personalized";
+    return hasDraft(draft) && !draft?.sentAt;
   }).length;
 
   return (
@@ -274,7 +274,7 @@ export function OutreachWriterPanel() {
             <button type="button" onClick={() => void copy(fullDraft, "Draft")}><Copy size={14} /> Copy all</button>
             <button type="button" onClick={() => void save()} disabled={busy}><Save size={14} /> Save</button>
             <button type="button" onClick={() => void personalize()} disabled={busy || !currentDraft}>
-              <Sparkles size={14} /> Personalize this draft
+              <Sparkles size={14} /> Add subtle context
             </button>
             <button type="button" onClick={() => void markSent()} disabled={busy || !subject || !body}><Send size={14} /> Mark sent</button>
           </div>
@@ -303,7 +303,7 @@ export function OutreachWriterPanel() {
               disabled={busy || !ready || personalizationCount === 0}
             >
               <Sparkles size={16} />
-              {personalizationCount ? `Personalize all drafts (${personalizationCount})` : "All eligible drafts personalized"}
+              {personalizationCount ? `Refresh subtle context (${personalizationCount})` : "No eligible drafts"}
             </button>
             <button
               type="button"
@@ -379,7 +379,7 @@ function PersonalizationEvidence({ draft }: { draft: OutreachDraft }) {
           {draft.personalizationSourceTitle || "Open personalization source"} <ExternalLink size={13} />
         </a>
       )}
-      {status === "generic" && <p>Run personalization to research one organization-level public detail.</p>}
+      {status === "generic" && <p>Add restrained sourced context while preserving the original structure and most wording.</p>}
     </div>
   );
 }

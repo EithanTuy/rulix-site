@@ -457,6 +457,19 @@ describe("Rulix ECCN API", () => {
       .expect(200);
     expect(resumed.body.job.status).toBe("queued");
 
+    const terminated = await admin.agent
+      .post(`/api/admin/outreach/jobs/${created.body.job.id}/terminate`)
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(200);
+    expect(terminated.body.job.status).toBe("terminated");
+    expect(terminated.body.job.completedAt).toBeTruthy();
+    expect(terminated.body.job.logs[0].message).toContain("Terminated by operator");
+
+    await admin.agent
+      .post(`/api/admin/outreach/jobs/${created.body.job.id}/resume`)
+      .set("x-rulix-csrf", admin.csrfToken)
+      .expect(409);
+
     const workflow = await admin.agent
       .put("/api/admin/leads/RULIX-00001/workflow")
       .set("x-rulix-csrf", admin.csrfToken)

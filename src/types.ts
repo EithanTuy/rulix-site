@@ -235,7 +235,7 @@ export interface LeadWorkflow {
 }
 
 export type OutreachJobType = "draft-missing" | "personalize-all" | "lead-search";
-export type OutreachJobStatus = "queued" | "running" | "paused" | "completed" | "failed";
+export type OutreachJobStatus = "queued" | "running" | "paused" | "completed" | "failed" | "terminated";
 
 export interface OutreachJobLog {
   at: string;

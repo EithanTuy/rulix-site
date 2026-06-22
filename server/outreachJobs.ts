@@ -90,7 +90,7 @@ export async function processOutreachJob(
 ) {
   const state = await store.getAccountState(event.userId);
   const job = state.outreachJobs?.find((candidate) => candidate.id === event.jobId);
-  if (!job || job.status === "paused" || job.status === "completed") return;
+  if (!job || job.status === "paused" || job.status === "completed" || job.status === "terminated") return;
 
   const projectedCost = projectedJobCost(job);
   if (projectedCost > job.maxCostUsd) {
@@ -161,6 +161,10 @@ export async function processOutreachJob(
     }
   }
 
+  const latestState = await store.getAccountState(event.userId);
+  const latestJob = latestState.outreachJobs?.find((candidate) => candidate.id === event.jobId);
+  if (!latestJob || latestJob.status === "terminated") return;
+
   job.updatedAt = new Date().toISOString();
   await store.replaceAccountState(event.userId, state);
   if (job.status === "queued") {
@@ -191,7 +195,7 @@ async function processLeadItem(
 
   const draft = state.outreachDrafts?.[leadId];
   if (!draft) throw new Error(`Lead ${leadId} has no draft to personalize.`);
-  if (draft.sentAt || draft.personalizationStatus === "personalized") return;
+  if (draft.sentAt) return;
   const personalized = await personalizeOutreachDraft(lead, draft, onUsage, config);
   state.outreachDrafts![leadId] = personalized;
   updateWorkflow(state, leadId, {

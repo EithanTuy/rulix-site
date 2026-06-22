@@ -397,7 +397,7 @@ export function createApp(options: CreateAppOptions = {}) {
       : type === "personalize-all"
         ? leads.filter((lead) => {
             const draft = state.outreachDrafts?.[lead.leadId];
-            return Boolean(draft && !draft.sentAt && draft.personalizationStatus !== "personalized");
+            return Boolean(draft && !draft.sentAt);
           }).map((lead) => lead.leadId)
         : [];
     const job = createOutreachJob({
@@ -433,7 +433,7 @@ export function createApp(options: CreateAppOptions = {}) {
 
   app.post("/api/admin/outreach/jobs/:jobId/:action", requireAuth(store), requireCsrf, requireAdmin, async (req, res) => {
     const action = req.params.action;
-    if (!["pause", "resume", "retry"].includes(action)) {
+    if (!["pause", "resume", "retry", "terminate"].includes(action)) {
       res.status(400).json({ error: "Unknown job action." });
       return;
     }
@@ -443,7 +443,22 @@ export function createApp(options: CreateAppOptions = {}) {
       res.status(404).json({ error: "Outreach job not found." });
       return;
     }
-    if (action === "pause") {
+    if (action === "terminate") {
+      if (job.status !== "completed" && job.status !== "terminated") {
+        const now = new Date().toISOString();
+        job.status = "terminated";
+        job.completedAt = now;
+        job.error = undefined;
+        job.logs.unshift({
+          at: now,
+          message: "Terminated by operator. Any in-flight result will be discarded.",
+          level: "warning"
+        });
+      }
+    } else if (job.status === "terminated" || job.status === "completed") {
+      res.status(409).json({ error: `A ${job.status} job cannot be ${action}d.` });
+      return;
+    } else if (action === "pause") {
       job.status = "paused";
       job.logs.unshift({ at: new Date().toISOString(), message: "Paused by operator.", level: "warning" });
     } else {

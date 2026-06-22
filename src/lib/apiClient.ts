@@ -375,7 +375,7 @@ export async function createOutreachJob(input: {
   });
 }
 
-export async function updateOutreachJob(jobId: string, action: "pause" | "resume" | "retry") {
+export async function updateOutreachJob(jobId: string, action: "pause" | "resume" | "retry" | "terminate") {
   return fetchJson<{ job: OutreachJob }>(
     `/api/admin/outreach/jobs/${encodeURIComponent(jobId)}/${action}`,
     { method: "POST" }
