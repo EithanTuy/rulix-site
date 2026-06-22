@@ -19,7 +19,7 @@
   --red-soft: #ffd9dd;
   --violet: #7657d8;
   --violet-soft: #e8ddff;
-  --shadow: 0 8px 24px rgba(14, 33, 58, 0.07);
+  --shadow: 0 16px 48px rgba(14, 33, 58, 0.12);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -66,22 +66,23 @@ button {
   place-items: center;
   padding: 28px;
   background:
-    radial-gradient(circle, rgba(8, 33, 58, 0.055) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(7, 139, 142, 0.1), transparent 32%),
-    linear-gradient(315deg, rgba(217, 138, 0, 0.12), transparent 28%),
-    #f7f9fb;
-  background-size: 22px 22px, 100% 100%, 100% 100%, 100% 100%;
+    radial-gradient(circle, rgba(8, 33, 58, 0.07) 1px, transparent 1px),
+    radial-gradient(ellipse at 15% 50%, rgba(7, 139, 142, 0.22), transparent 48%),
+    radial-gradient(ellipse at 85% 15%, rgba(11, 45, 77, 0.18), transparent 42%),
+    radial-gradient(ellipse at 70% 85%, rgba(217, 138, 0, 0.1), transparent 38%),
+    #edf1f7;
+  background-size: 22px 22px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
 }
 
 .auth-card {
-  width: min(440px, 100%);
+  width: min(480px, 100%);
   display: grid;
-  gap: 16px;
-  padding: 28px;
+  gap: 18px;
+  padding: 38px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 16px;
   background: #ffffff;
-  box-shadow: var(--shadow);
+  box-shadow: 0 24px 72px rgba(14, 33, 58, 0.16);
 }
 
 .auth-card.compact {
@@ -91,9 +92,9 @@ button {
 .auth-card h1 {
   margin: 0;
   color: var(--navy-950);
-  font-size: 28px;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .auth-card p {
@@ -221,14 +222,14 @@ button {
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 60px;
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 28px;
   padding: 0 18px;
   color: #ffffff;
-  background: linear-gradient(90deg, #061d35 0%, #082745 54%, #0a2f52 100%);
-  box-shadow: 0 2px 10px rgba(5, 22, 40, 0.28);
+  background: linear-gradient(90deg, #040e1c 0%, #061527 50%, #071e38 100%);
+  box-shadow: 0 1px 0 rgba(7, 139, 142, 0.45), 0 4px 20px rgba(4, 14, 28, 0.42);
 }
 
 .brand-block {
@@ -245,9 +246,9 @@ button {
   height: 37px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #0b2d4d, #078b8e);
 }
 
 .brand-mark svg {
@@ -324,7 +325,8 @@ button {
   color: #ffffff;
   background: var(--teal);
   border-color: var(--teal);
-  box-shadow: 0 8px 18px rgba(7, 139, 142, 0.24);
+  min-height: 40px;
+  box-shadow: 0 6px 24px rgba(7, 139, 142, 0.38);
 }
 
 .button.primary:hover {
@@ -445,7 +447,7 @@ button {
     minmax(440px, 1fr)
     6px
     var(--analysis-panel-width, 456px);
-  height: calc(100vh - 60px);
+  height: calc(100vh - 56px);
   min-height: 0;
 }
 
@@ -459,8 +461,8 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 18px 0;
-  background: linear-gradient(180deg, #06223c 0%, #082946 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #040e1c 0%, #061527 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .rail-items {
@@ -481,8 +483,9 @@ button {
 
 .rail-button.active {
   color: #ffffff;
-  background: rgba(3, 153, 165, 0.22);
-  border-left: 3px solid #0db5c0;
+  background: rgba(7, 139, 142, 0.32);
+  border-left: 3px solid var(--teal);
+  box-shadow: inset 0 0 12px rgba(7, 139, 142, 0.15);
 }
 
 .rail-button:hover {
@@ -569,7 +572,7 @@ button {
 }
 
 .queue-header {
-  min-height: 55px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   padding: 0 18px;
@@ -954,12 +957,12 @@ button {
 
 .memo-header {
   position: relative;
-  min-height: 80px;
+  min-height: 90px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 15px 23px;
+  padding: 18px 24px;
   background: #ffffff;
   border-bottom: 1px solid var(--line);
 }
@@ -2226,7 +2229,7 @@ button {
 }
 
 .analysis-title {
-  min-height: 55px;
+  min-height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3120,7 +3123,7 @@ button {
 
   .topbar {
     height: auto;
-    min-height: 60px;
+    min-height: 56px;
     flex-wrap: wrap;
     gap: 12px;
     padding: 10px 12px;
@@ -3147,7 +3150,7 @@ button {
   .workspace-grid {
     grid-template-columns: 1fr;
     height: auto;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 56px);
   }
 
   .workspace-grid.console-mode {
@@ -3713,7 +3716,7 @@ button {
   border: 1px solid var(--dash-panel-line);
   border-radius: 9px;
   background: #ffffff;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 
 .dash-overview-panel h2 {
@@ -3747,7 +3750,7 @@ button {
   border: 1px solid var(--dash-panel-line);
   border-radius: 9px;
   background: #ffffff;
-  box-shadow: 0 6px 20px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 
 .dash-card.accent {
@@ -3815,7 +3818,7 @@ button {
   border: 1px solid var(--dash-panel-line);
   border-radius: 9px;
   background: #ffffff;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 
 .dash-chart-card {
@@ -3830,7 +3833,7 @@ button {
   border-radius: 9px;
   color: #dbe5f0;
   background: #151d28;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 .dash-cost-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
 .dash-cost-heading h2 { margin: 3px 0 5px; color: #f7f9fc; font-size: 18px; }
@@ -4533,7 +4536,7 @@ button {
   border: 1px solid var(--dash-panel-line);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 .outreach-head, .outreach-status, .outreach-actions, .outreach-meta {
   display: flex;
@@ -4624,7 +4627,7 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
   border: 1px solid var(--dash-panel-line);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 .lead-search-card > div:first-child h2,
 .leads-table-toolbar h2 { margin: 3px 0 5px; color: var(--navy-950); font-size: 18px; }
@@ -4674,7 +4677,7 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .jobs-workspace, .review-queue { display: grid; gap: 16px; }
 .jobs-launcher, .job-card, .review-queue, .review-card {
   border: 1px solid var(--dash-panel-line); border-radius: 10px; background: #fff;
-  box-shadow: 0 7px 22px rgba(11, 45, 77, 0.045);
+  box-shadow: 0 8px 28px rgba(11, 45, 77, 0.09);
 }
 .jobs-launcher { padding: 20px; display: grid; grid-template-columns: minmax(260px,1fr) 180px auto; gap: 16px; align-items: end; }
 .jobs-launcher h2, .review-queue-head h2 { margin: 3px 0 5px; color: var(--navy-950); font-size: 18px; }
