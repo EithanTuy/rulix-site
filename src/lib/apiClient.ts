@@ -44,8 +44,8 @@ export interface BackendHealth {
   time: string;
   provider: {
     configured: boolean;
-    model: string;
-    deepModel: string;
+    model?: string;
+    deepModel?: string;
   };
 }
 

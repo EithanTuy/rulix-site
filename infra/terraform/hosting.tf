@@ -135,6 +135,7 @@ resource "aws_lambda_function" "app" {
         RULIX_AUTH_TABLE              = aws_dynamodb_table.auth.name
         RULIX_ACCOUNT_TABLE           = aws_dynamodb_table.account_state.name
         RULIX_TENANT_ID               = var.tenant_slug
+        RULIX_ALLOWED_ORIGINS         = join(",", compact([var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"]))
         APP_BASE_URL                  = var.app_base_url
         AUTH_INVITE_TTL_HOURS         = tostring(var.auth_invite_ttl_hours)
         AUTH_RESET_TTL_MINUTES        = tostring(var.auth_reset_ttl_minutes)
@@ -154,6 +155,220 @@ resource "aws_lambda_function" "app" {
 resource "aws_lambda_function_url" "app" {
   function_name      = aws_lambda_function.app.function_name
   authorization_type = "NONE"
+}
+
+# ---- Edge security policy ----
+resource "aws_cloudfront_response_headers_policy" "app_security" {
+  count = var.custom_domain == "" ? 0 : 1
+  name  = "${local.fn_name}-security-headers"
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = "default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self' data:; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: https:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests"
+      override                = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    strict_transport_security {
+      access_control_max_age_sec = 63072000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+
+    xss_protection {
+      mode_block = true
+      protection = true
+      override   = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = "camera=(), microphone=(), geolocation=(), payment=()"
+      override = true
+    }
+
+    items {
+      header   = "X-Robots-Tag"
+      value    = "noindex, nofollow"
+      override = false
+    }
+  }
+}
+
+resource "aws_wafv2_web_acl" "app" {
+  count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
+  name  = "${local.fn_name}-edge"
+  scope = "CLOUDFRONT"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 0
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "AWSManagedRulesKnownBadInputsRuleSet"
+    priority = 1
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-bad-inputs"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "RateLimitAuthRoutes"
+    priority = 10
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        aggregate_key_type = "IP"
+        limit              = var.waf_auth_rate_limit
+
+        scope_down_statement {
+          byte_match_statement {
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/api/auth/"
+
+            field_to_match {
+              uri_path {}
+            }
+
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-auth-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "RateLimitAdminRoutes"
+    priority = 11
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        aggregate_key_type = "IP"
+        limit              = var.waf_admin_rate_limit
+
+        scope_down_statement {
+          byte_match_statement {
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/api/admin/"
+
+            field_to_match {
+              uri_path {}
+            }
+
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-admin-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "RateLimitAllRoutes"
+    priority = 20
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        aggregate_key_type = "IP"
+        limit              = var.waf_global_rate_limit
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-global-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${local.fn_name}-edge"
+    sampled_requests_enabled   = true
+  }
+
+  tags = local.common_tags
 }
 
 # ---- Custom domain: CloudFront + ACM (us-east-1, required for CloudFront) ----
@@ -179,6 +394,7 @@ resource "aws_cloudfront_distribution" "app" {
   is_ipv6_enabled = true
   comment         = "Rulix ECCN ${var.tenant_slug}"
   aliases         = compact([var.custom_domain, var.dashboard_domain])
+  web_acl_id      = var.enable_waf ? aws_wafv2_web_acl.app[0].arn : null
 
   origin {
     domain_name = local.fn_url_host
@@ -205,8 +421,9 @@ resource "aws_cloudfront_distribution" "app" {
     cached_methods         = ["GET", "HEAD"]
 
     # AWS managed policies: CachingDisabled + AllViewerExceptHostHeader.
-    cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
-    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+    cache_policy_id            = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+    origin_request_policy_id   = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.app_security[0].id
   }
 
   restrictions {

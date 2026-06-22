@@ -121,3 +121,27 @@ variable "auth_session_ttl_hours" {
   type        = number
   default     = 8
 }
+
+variable "enable_waf" {
+  description = "Attach an AWS WAF Web ACL to CloudFront for managed protections and route-specific rate limits."
+  type        = bool
+  default     = true
+}
+
+variable "waf_global_rate_limit" {
+  description = "Maximum requests per 5-minute window per IP across the CloudFront distribution."
+  type        = number
+  default     = 2000
+}
+
+variable "waf_auth_rate_limit" {
+  description = "Maximum requests per 5-minute window per IP for /api/auth/* routes."
+  type        = number
+  default     = 300
+}
+
+variable "waf_admin_rate_limit" {
+  description = "Maximum requests per 5-minute window per IP for /api/admin/* operations routes."
+  type        = number
+  default     = 200
+}

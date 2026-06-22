@@ -55,6 +55,10 @@ import {
 
 const ALLOWED_REVIEW_DEPTHS = new Set<CouncilDepth>(["standard", "deep"]);
 const SESSION_COOKIE = "rulix_session";
+const DEFAULT_ALLOWED_ORIGINS = new Set([
+  "https://app.rulix.cloud",
+  "https://dashboard.rulix.cloud"
+]);
 
 interface CreateAppOptions {
   store?: AccountStore;
@@ -65,6 +69,10 @@ export function createApp(options: CreateAppOptions = {}) {
   const store = options.store ?? createAccountStore();
   const edgeSharedSecret = options.edgeSharedSecret ?? process.env.RULIX_EDGE_SHARED_SECRET;
   const app = express();
+  const allowedOrigins = allowedCorsOrigins();
+
+  app.disable("x-powered-by");
+  app.use(appSecurityHeaders);
 
   if (edgeSharedSecret) {
     app.use((req, res, next) => {
@@ -76,7 +84,12 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   }
 
-  app.use(cors({ origin: true, credentials: true }));
+  app.use(cors({
+    origin: (origin, callback) => {
+      callback(null, isCorsOriginAllowed(origin, allowedOrigins));
+    },
+    credentials: true
+  }));
   app.use(express.json({ limit: "5mb" }));
 
   app.get("/api/health", (_req, res) => {
@@ -86,12 +99,29 @@ export function createApp(options: CreateAppOptions = {}) {
       service: "rulix-eccn-api",
       phase: "phase-2-mvp",
       time: new Date().toISOString(),
-      provider
+      provider: {
+        configured: provider.configured
+      }
     });
   });
 
   app.get("/api/corpus", (_req, res) => {
     res.json(officialCorpus);
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    if (shouldNoindexApp(req)) {
+      res.type("text/plain").send("User-agent: *\nDisallow: /\n");
+      return;
+    }
+    res.status(404).type("text/plain").send("Not found");
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    if (shouldNoindexApp(req)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+    res.status(404).type("text/plain").send("Not found");
   });
 
   app.post("/api/auth/register", (_req, res) => {
@@ -799,11 +829,72 @@ export function createApp(options: CreateAppOptions = {}) {
         next();
         return;
       }
+    if (shouldNoindexApp(req)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
       res.sendFile(path.join(distDir, "index.html"));
     });
   }
 
   return app;
+}
+
+function appSecurityHeaders(req: Request, res: Response, next: NextFunction) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "connect-src 'self'",
+    "font-src 'self' data:",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data: https:",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "upgrade-insecure-requests"
+  ].join("; "));
+  if (req.secure || req.get("x-forwarded-proto") === "https") {
+    res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  if (shouldNoindexApp(req)) {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  }
+  next();
+}
+
+function allowedCorsOrigins() {
+  const configured = (process.env.RULIX_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+}
+
+function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: Set<string>) {
+  if (!origin) return true;
+  if (process.env.NODE_ENV !== "production" && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+    return true;
+  }
+  return allowedOrigins.has(origin);
+}
+
+function isPrivateAppHost(req: Request) {
+  const host = (
+    req.get("x-forwarded-host") ??
+    req.get("x-original-host") ??
+    req.hostname ??
+    req.get("host") ??
+    ""
+  ).split(",")[0].split(":")[0].toLowerCase();
+  return host === "app.rulix.cloud" || host === "dashboard.rulix.cloud";
+}
+
+function shouldNoindexApp(req: Request) {
+  return process.env.NODE_ENV === "production" || isPrivateAppHost(req);
 }
 
 async function memoAuditEvents(store: AccountStore, userId: string, memoId: string) {

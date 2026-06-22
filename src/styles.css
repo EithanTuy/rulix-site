@@ -604,6 +604,35 @@ button {
   gap: 8px;
 }
 
+.intake-acknowledgement {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px;
+  align-items: start;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  border: 1px solid #f0d48b;
+  border-radius: 6px;
+  background: #fff9ea;
+  color: #684707;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.intake-acknowledgement input {
+  margin-top: 2px;
+}
+
+.intake-acknowledgement span {
+  display: flex;
+  gap: 7px;
+}
+
+.intake-acknowledgement svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .paste-box {
   display: grid;
   gap: 8px;
@@ -1035,6 +1064,14 @@ button {
 .tool.active {
   color: var(--teal);
   background: #edfafa;
+}
+
+.tool.danger {
+  color: #8a2a2a;
+}
+
+.tool.danger:hover:not(:disabled) {
+  background: #fff1f1;
 }
 
 .tool:disabled {
@@ -2921,6 +2958,10 @@ button {
   min-height: 220px;
   padding: 12px;
   line-height: 1.5;
+}
+
+.modal-acknowledgement {
+  margin: 14px 20px 0;
 }
 
 .modal-footer {

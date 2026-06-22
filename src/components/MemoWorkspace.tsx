@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Archive,
   Edit3,
   FileText,
   Highlighter,
@@ -15,6 +16,7 @@ interface MemoWorkspaceProps {
   selectedFindingId?: string;
   analysisLocked: boolean;
   onMemoTextChange: (memoId: string, memoText: string) => void;
+  onArchiveMemo: (memoId: string) => void;
 }
 
 export function MemoWorkspace({
@@ -22,7 +24,8 @@ export function MemoWorkspace({
   result,
   selectedFindingId,
   analysisLocked,
-  onMemoTextChange
+  onMemoTextChange,
+  onArchiveMemo
 }: MemoWorkspaceProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(memo.memoText);
@@ -106,6 +109,14 @@ export function MemoWorkspace({
           }}
         >
           <Edit3 size={17} /> {editing ? "Cancel Edit" : "Edit Text"}
+        </button>
+        <button
+          type="button"
+          className="tool danger"
+          disabled={analysisLocked}
+          onClick={() => onArchiveMemo(memo.id)}
+        >
+          <Archive size={17} /> Archive
         </button>
       </div>
 

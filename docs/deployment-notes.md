@@ -14,7 +14,7 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 | Compute | Lambda `rulix-prod-app` (Node 20, Express UI + `/api`) |
 | Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` and `dashboard.rulix.cloud` |
 | DNS | GoDaddy `rulix.cloud`: ACM validation CNAMEs + `app` and `dashboard` to CloudFront |
-| AI mode | **local-rules** (deterministic) - `BEDROCK_ENABLED` not deployed |
+| AI mode | Bedrock-enabled in production, with deterministic fallback behavior |
 | Auth mode | Invite-only custom auth with DynamoDB tables and SESv2 email when `AUTH_EMAIL_FROM` is configured |
 
 Verified end-to-end: UI loads, `/api/health` 200, `/api/ai/review` returns
@@ -47,19 +47,19 @@ decrypt, re-encrypt, data-key, and describe permissions for the log-group ARN.
 with account-root administration and scoped CloudWatch Logs usage for the
 application log group ARN.
 
-### 2. Deployed in Local-Rules Mode, Not Live Bedrock (BY DESIGN)
+### 2. Initial Local-Rules Mode, Then Bedrock Enabled (RESOLVED)
 
-`BEDROCK_ENABLED` was not deployed, so the app uses the deterministic council.
-This is intentional until the Lambda role has approved Bedrock model access and
-the operator explicitly enables live AI.
+The first deployment used the deterministic council only. Production has since
+been redeployed with Bedrock enabled and deterministic fallback behavior still
+available when model calls fail or time out.
 
-To enable live AI, redeploy with Bedrock enabled:
+To explicitly redeploy with Bedrock enabled:
 
 ```bash
 terraform apply -var tenant_slug=prod -var aws_region=us-east-1 -var bedrock_enabled=true
 ```
 
-The Lambda uses its execution role for AWS credentials. Ensure the account has
+The Lambda uses its execution role for AWS credentials. Ensure the account keeps
 Bedrock model access for the configured Anthropic model/profile in `us-east-1`.
 
 ### 3. AWS App Runner Was Unavailable (RESOLVED)
@@ -103,6 +103,25 @@ users, verify an SES sender for `AUTH_EMAIL_FROM` and configure a temporary
 `AUTH_BOOTSTRAP_SECRET` to create the first `export-control-officer` invite.
 After the first admin signs in, future invites should be created from the Users
 console and the bootstrap secret should be removed or rotated.
+
+### 8. June 2026 Edge and App Hardening
+
+The app/dashboard production edge should be deployed with the hardened
+configuration from this repo:
+
+- CloudFront security response headers and HSTS.
+- AWS WAF managed rule groups plus rate limits for auth, admin, and global
+  traffic.
+- `X-Robots-Tag: noindex, nofollow` and app/dashboard `robots.txt` handling.
+- `/api/health` exposing provider configured status without model IDs.
+- Production CORS restricted to `app.rulix.cloud` and `dashboard.rulix.cloud`
+  by default.
+- Real Lambda log group `/aws/lambda/rulix-prod-app` imported into Terraform,
+  encrypted with the tenant KMS key, and retained for `log_retention_days`.
+
+The public marketing site at `rulix.cloud` remains a separate Netlify surface.
+See `docs/website-leads-and-hardening.md` for lead-generation and SEO changes
+that need to be deployed from that site project.
 
 ---
 

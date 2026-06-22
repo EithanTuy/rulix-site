@@ -87,9 +87,10 @@ export function App() {
   const memosRef = useRef<MemoRecord[]>([]);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
+  const activeMemos = useMemo(() => memos.filter((memo) => !memo.archivedAt), [memos]);
   const selectedMemo = selectedMemoId
-    ? memos.find((memo) => memo.id === selectedMemoId)
-    : memos[0];
+    ? activeMemos.find((memo) => memo.id === selectedMemoId)
+    : activeMemos[0];
   const reviewResult = selectedMemo ? analysisResults[selectedMemo.id] : undefined;
   const analysisState = selectedMemo
     ? analysisStates[selectedMemo.id] ?? {
@@ -173,16 +174,20 @@ export function App() {
   }, [auth.status, stateReady, memos, selectedMemoId, decisions, auditEvents, analysisResults, chatMessages]);
 
   useEffect(() => {
-    if (memos.length > 0 && selectedMemoId && !memos.some((memo) => memo.id === selectedMemoId)) {
-      setSelectedMemoId(memos[0].id);
+    if (activeMemos.length === 0 && selectedMemoId) {
+      setSelectedMemoId(undefined);
+      return;
     }
-    if (memos.length > 0 && !selectedMemoId) {
-      setSelectedMemoId(memos[0].id);
+    if (activeMemos.length > 0 && selectedMemoId && !activeMemos.some((memo) => memo.id === selectedMemoId)) {
+      setSelectedMemoId(activeMemos[0].id);
     }
-  }, [memos, selectedMemoId]);
+    if (activeMemos.length > 0 && !selectedMemoId) {
+      setSelectedMemoId(activeMemos[0].id);
+    }
+  }, [activeMemos, selectedMemoId]);
   useEffect(() => setSelectedFindingId(undefined), [selectedMemo?.id]);
 
-  const filteredMemos = memos.filter((memo) =>
+  const filteredMemos = activeMemos.filter((memo) =>
     `${memo.title} ${memo.documentCode} ${memo.itemFamily}`
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -448,6 +453,36 @@ export function App() {
     addAuditEvent(memoId, "Memo edited", detail, "review");
   };
 
+  const archiveMemo = (memoId: string) => {
+    if (analysisStates[memoId]?.status === "running") {
+      setSyncNotice("Wait for the running analysis before archiving this memo.");
+      return;
+    }
+    const archivedAt = new Date().toISOString();
+    setMemos((current) =>
+      current.map((memo) =>
+        memo.id === memoId
+          ? {
+              ...memo,
+              archivedAt,
+              archivedBy: currentUser?.name ?? "Reviewer",
+              updatedAt: archivedAt.slice(0, 10)
+            }
+          : memo
+      )
+    );
+    setSelectedMemoId((current) => {
+      if (current !== memoId) return current;
+      return activeMemos.find((memo) => memo.id !== memoId)?.id;
+    });
+    addAuditEvent(
+      memoId,
+      "Memo archived",
+      "Memo was removed from the active review queue but retained in account history.",
+      "review"
+    );
+  };
+
   const handleDecision = (action: ReviewerDecision["action"], notes: string) => {
     if (!selectedMemo || !reviewResult) return;
     const nextDecision = {
@@ -711,6 +746,7 @@ export function App() {
                   selectedFindingId={selectedFindingId}
                   analysisLocked={analysisState.status === "running"}
                   onMemoTextChange={updateMemoText}
+                  onArchiveMemo={archiveMemo}
                 />
                 <PanelResizeHandle
                   label="Resize analysis panel"

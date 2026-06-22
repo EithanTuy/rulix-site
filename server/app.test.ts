@@ -36,12 +36,68 @@ describe("Rulix ECCN API", () => {
     }
   });
 
-  it("reports health and whether the Bedrock backend is configured", async () => {
+  it("reports minimal public health without exposing model identifiers", async () => {
     const response = await request(testApp()).get("/api/health").expect(200);
 
     expect(response.body.ok).toBe(true);
     expect(response.body.service).toBe("rulix-eccn-api");
     expect(response.body.provider.configured).toBe(false);
+    expect(response.body.provider.model).toBeUndefined();
+    expect(response.body.provider.deepModel).toBeUndefined();
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+  });
+
+  it("limits production CORS to trusted app origins", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const allowed = await request(testApp())
+        .get("/api/health")
+        .set("Origin", "https://app.rulix.cloud")
+        .expect(200);
+      expect(allowed.headers["access-control-allow-origin"]).toBe("https://app.rulix.cloud");
+
+      const rejected = await request(testApp())
+        .get("/api/health")
+        .set("Origin", "https://evil.example")
+        .expect(200);
+      expect(rejected.headers["access-control-allow-origin"]).toBeUndefined();
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    }
+  });
+
+  it("keeps app and dashboard hosts out of public indexes", async () => {
+    const robots = await request(testApp())
+      .get("/robots.txt")
+      .set("Host", "dashboard.rulix.cloud")
+      .expect(200);
+    expect(robots.text).toContain("Disallow: /");
+    expect(robots.headers["x-robots-tag"]).toContain("noindex");
+
+    const sitemap = await request(testApp())
+      .get("/sitemap.xml")
+      .set("Host", "app.rulix.cloud")
+      .expect(404);
+    expect(sitemap.headers["x-robots-tag"]).toContain("noindex");
+
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const productionRobots = await request(testApp()).get("/robots.txt").expect(200);
+      expect(productionRobots.text).toContain("Disallow: /");
+      expect(productionRobots.headers["x-robots-tag"]).toContain("noindex");
+    } finally {
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    }
   });
 
   it("serves the official corpus snapshot", async () => {

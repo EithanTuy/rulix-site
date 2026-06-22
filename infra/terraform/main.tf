@@ -21,9 +21,11 @@ data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix    = "rulix-${var.tenant_slug}"
-  log_group_name = "/aws/rulix/${var.tenant_slug}/application"
-  log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
+  name_prefix           = "rulix-${var.tenant_slug}"
+  log_group_name        = "/aws/rulix/${var.tenant_slug}/application"
+  lambda_log_group_name = "/aws/lambda/${local.name_prefix}-app"
+  log_group_arn         = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
+  lambda_log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.lambda_log_group_name}"
   common_tags = {
     Application = "Rulix ECCN"
     Tenant      = var.tenant_slug
@@ -61,7 +63,12 @@ data "aws_iam_policy_document" "tenant_kms" {
     condition {
       test     = "ArnLike"
       variable = "kms:EncryptionContext:aws:logs:arn"
-      values   = [local.log_group_arn, "${local.log_group_arn}:*"]
+      values = [
+        local.log_group_arn,
+        "${local.log_group_arn}:*",
+        local.lambda_log_group_arn,
+        "${local.lambda_log_group_arn}:*"
+      ]
     }
   }
 }
@@ -227,6 +234,13 @@ resource "aws_dynamodb_table" "account_state" {
 
 resource "aws_cloudwatch_log_group" "application" {
   name              = local.log_group_name
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.tenant.arn
+  tags              = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "lambda" {
+  name              = local.lambda_log_group_name
   retention_in_days = var.log_retention_days
   kms_key_id        = aws_kms_key.tenant.arn
   tags              = local.common_tags

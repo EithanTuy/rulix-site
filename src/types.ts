@@ -61,6 +61,8 @@ export interface MemoRecord {
   manufacturer?: string;
   sourcePath?: "manufacturer" | "self-classification" | "ccats" | "cj" | "unknown";
   intendedUse?: string;
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 export interface ClassificationCandidate {

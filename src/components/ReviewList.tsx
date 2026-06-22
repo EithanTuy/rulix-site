@@ -3,6 +3,7 @@ import {
   FileText,
   Filter,
   Search,
+  ShieldCheck,
   UploadCloud
 } from "lucide-react";
 import type { MemoRecord } from "../types";
@@ -37,6 +38,7 @@ export function ReviewList({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteTitle, setPasteTitle] = useState("");
   const [pasteText, setPasteText] = useState("");
+  const [intakeAcknowledged, setIntakeAcknowledged] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
@@ -49,12 +51,16 @@ export function ReviewList({
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
+    if (!intakeAcknowledged) {
+      event.currentTarget.value = "";
+      return;
+    }
     await onFile(file);
     event.currentTarget.value = "";
   };
 
   const submitPaste = () => {
-    if (!pasteText.trim()) return;
+    if (!pasteText.trim() || !intakeAcknowledged) return;
     onPasteMemo(pasteTitle, pasteText);
     setPasteTitle("");
     setPasteText("");
@@ -72,14 +78,32 @@ export function ReviewList({
 
       <section className="intake-section" aria-label="Intake and new review">
         <div className="section-title">Add a Memo</div>
+        <label className="intake-acknowledgement">
+          <input
+            type="checkbox"
+            checked={intakeAcknowledged}
+            onChange={(event) => setIntakeAcknowledged(event.target.checked)}
+          />
+          <span>
+            <ShieldCheck size={16} />
+            Use sanitized, public, or approved memo text only. Do not upload CUI, ITAR technical data,
+            controlled attachments, or customer secrets.
+          </span>
+        </label>
         <div className="intake-card">
-          <button className="button small" type="button" onClick={() => inputRef.current?.click()}>
+          <button
+            className="button small"
+            type="button"
+            disabled={!intakeAcknowledged}
+            onClick={() => inputRef.current?.click()}
+          >
             <UploadCloud size={16} />
             Upload File
           </button>
           <button
             className="button small"
             type="button"
+            disabled={!intakeAcknowledged}
             onClick={() => setPasteOpen((value) => !value)}
           >
             <FileText size={16} />
@@ -106,7 +130,12 @@ export function ReviewList({
               placeholder="Paste memo text"
               rows={6}
             />
-            <button className="button primary small full" type="button" onClick={submitPaste}>
+            <button
+              className="button primary small full"
+              type="button"
+              disabled={!pasteText.trim() || !intakeAcknowledged}
+              onClick={submitPaste}
+            >
               Add Memo
             </button>
           </div>

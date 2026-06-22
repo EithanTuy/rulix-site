@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { ShieldCheck, X } from "lucide-react";
 import type { DataClass, NewReviewInput } from "../types";
 
 interface NewReviewModalProps {
@@ -28,8 +28,14 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
   const [dataClass, setDataClass] = useState<DataClass>("proprietary");
   const [sourcePath, setSourcePath] = useState<NewReviewInput["sourcePath"]>("self-classification");
   const [memoText, setMemoText] = useState(defaultMemo);
+  const [dataAcknowledged, setDataAcknowledged] = useState(false);
 
   if (!open) return null;
+
+  const close = () => {
+    setDataAcknowledged(false);
+    onClose();
+  };
 
   const submit = () => {
     onCreate({
@@ -42,7 +48,7 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
       memoText,
       attachments: []
     });
-    onClose();
+    close();
   };
 
   return (
@@ -53,7 +59,7 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
             <h2 id="new-review-title">New Review</h2>
             <p>Add the memo text and the minimum metadata needed for review tracking.</p>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close new review">
+          <button className="icon-button" type="button" onClick={close} aria-label="Close new review">
             <X size={18} />
           </button>
         </div>
@@ -96,12 +102,30 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
           Memo text
           <textarea value={memoText} onChange={(event) => setMemoText(event.target.value)} rows={12} />
         </label>
+        <label className="intake-acknowledgement modal-acknowledgement">
+          <input
+            type="checkbox"
+            checked={dataAcknowledged}
+            onChange={(event) => setDataAcknowledged(event.target.checked)}
+          />
+          <span>
+            <ShieldCheck size={16} />
+            This review uses sanitized, public, or approved text for this hosted workspace. CUI, ITAR
+            technical data, controlled attachments, and customer secrets stay out of the app unless a
+            separate approved environment is in place.
+          </span>
+        </label>
 
         <div className="modal-footer">
-          <button className="button" type="button" onClick={onClose}>
+          <button className="button" type="button" onClick={close}>
             Cancel
           </button>
-          <button className="button primary" type="button" onClick={submit} disabled={!memoText.trim()}>
+          <button
+            className="button primary"
+            type="button"
+            onClick={submit}
+            disabled={!memoText.trim() || !dataAcknowledged}
+          >
             Create Review
           </button>
         </div>
