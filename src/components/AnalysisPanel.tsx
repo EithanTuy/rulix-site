@@ -16,9 +16,8 @@ import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
 import type { AuditEvent, MemoChatMessage, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
 import { MemoChatPanel } from "./MemoChatPanel";
-import { PublicDraftPanel } from "./PublicDraftPanel";
 
-type SupportTab = "chat" | "draft" | "analysis" | "decision" | "audit";
+type SupportTab = "chat" | "analysis" | "decision" | "audit";
 
 interface AnalysisPanelProps {
   memo: MemoRecord;
@@ -38,7 +37,7 @@ interface AnalysisPanelProps {
   onDecision: (action: ReviewerDecision["action"], notes: string) => void;
   onSendChat: (memoId: string, message: string) => Promise<void>;
   onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
-  onCreatePublicDraft: (title: string, memoText: string) => void;
+
   selectedFindingId?: string;
   onFindingSelect: (findingId: string | undefined) => void;
 }
@@ -58,7 +57,7 @@ export function AnalysisPanel({
   onDecision,
   onSendChat,
   onApplyChatSuggestion,
-  onCreatePublicDraft,
+
   selectedFindingId,
   onFindingSelect
 }: AnalysisPanelProps) {
@@ -111,9 +110,7 @@ export function AnalysisPanel({
         </div>
         {tabs}
 
-        {activeTab === "chat" ? chatPanel : activeTab === "draft" ? (
-          <PublicDraftPanel onCreateMemo={onCreatePublicDraft} />
-        ) : (
+        {activeTab === "chat" ? chatPanel : (
           <>
             <section className={`analysis-status-card ${analysisState.status}`}>
               <strong>{analysisState.status === "running" ? "AI analysis is running" : "This memo is unanalyzed"}</strong>
@@ -161,7 +158,6 @@ export function AnalysisPanel({
       {tabs}
 
       {activeTab === "chat" && chatPanel}
-      {activeTab === "draft" && <PublicDraftPanel onCreateMemo={onCreatePublicDraft} />}
 
       {activeTab === "analysis" && (
         <>
@@ -417,7 +413,6 @@ function SupportTabs({
 }) {
   const tabs: Array<{ id: SupportTab; label: string }> = [
     { id: "chat", label: "Chat" },
-    { id: "draft", label: "Draft" },
     { id: "analysis", label: "Analysis" },
     { id: "decision", label: "Decision" },
     { id: "audit", label: "Audit" }

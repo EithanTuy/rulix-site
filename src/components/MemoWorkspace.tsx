@@ -3,11 +3,13 @@ import {
   Archive,
   Edit3,
   FileText,
+  FileEdit,
   Highlighter,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
 import { createHighlightSegments } from "../lib/highlights";
+import { PublicDraftPanel } from "./PublicDraftPanel";
 import type { MemoRecord, ReviewResult } from "../types";
 
 interface MemoWorkspaceProps {
@@ -17,6 +19,7 @@ interface MemoWorkspaceProps {
   analysisLocked: boolean;
   onMemoTextChange: (memoId: string, memoText: string) => void;
   onArchiveMemo: (memoId: string) => void;
+  onCreatePublicDraft: (title: string, memoText: string) => void;
 }
 
 export function MemoWorkspace({
@@ -25,19 +28,20 @@ export function MemoWorkspace({
   selectedFindingId,
   analysisLocked,
   onMemoTextChange,
-  onArchiveMemo
+  onArchiveMemo,
+  onCreatePublicDraft
 }: MemoWorkspaceProps) {
-  const [editing, setEditing] = useState(false);
+  const [mode, setMode] = useState<"highlight" | "edit" | "draft">("highlight");
+  const editing = mode === "edit";
   const [draft, setDraft] = useState(memo.memoText);
   const [zoom, setZoom] = useState(100);
-  const [highlightsVisible, setHighlightsVisible] = useState(true);
   const selectedFindingRef = useRef<HTMLElement | null>(null);
   const findings = result?.findings ?? [];
   const segments = createHighlightSegments(memo.memoText, findings);
 
   useEffect(() => {
     setDraft(memo.memoText);
-    setEditing(false);
+    setMode("highlight");
   }, [memo.id, memo.memoText]);
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function MemoWorkspace({
   const saveDraft = () => {
     if (analysisLocked) return;
     onMemoTextChange(memo.id, draft);
-    setEditing(false);
+    setMode("highlight");
   };
 
   return (
@@ -70,45 +74,39 @@ export function MemoWorkspace({
       </div>
 
       <div className="memo-toolbar">
-        <div className="toolbar-group">
-          <button type="button" className="tool" onClick={() => setZoom(100)}>{zoom}%</button>
-          <button
-            type="button"
-            className="tool"
-            aria-label="Zoom out"
-            title="Zoom out"
-            onClick={() => setZoom((value) => Math.max(75, value - 10))}
-          >
-            <ZoomOut size={17} />
-          </button>
-          <button
-            type="button"
-            className="tool"
-            aria-label="Zoom in"
-            title="Zoom in"
-            onClick={() => setZoom((value) => Math.min(150, value + 10))}
-          >
-            <ZoomIn size={17} />
-          </button>
-        </div>
+        {mode !== "draft" && (
+          <div className="toolbar-group">
+            <button type="button" className="tool" onClick={() => setZoom(100)}>{zoom}%</button>
+            <button type="button" className="tool" aria-label="Zoom out" title="Zoom out" onClick={() => setZoom((value) => Math.max(75, value - 10))}>
+              <ZoomOut size={17} />
+            </button>
+            <button type="button" className="tool" aria-label="Zoom in" title="Zoom in" onClick={() => setZoom((value) => Math.min(150, value + 10))}>
+              <ZoomIn size={17} />
+            </button>
+          </div>
+        )}
         <div className="toolbar-spacer" />
         <button
           type="button"
-          className={highlightsVisible ? "tool active" : "tool"}
-          onClick={() => setHighlightsVisible((value) => !value)}
+          className={mode === "highlight" ? "tool active" : "tool"}
+          onClick={() => { setMode("highlight"); setDraft(memo.memoText); }}
         >
           <Highlighter size={17} /> Highlight
         </button>
         <button
           type="button"
-          className="tool"
+          className={mode === "edit" ? "tool active" : "tool"}
           disabled={analysisLocked}
-          onClick={() => {
-            setDraft(memo.memoText);
-            setEditing((value) => !value);
-          }}
+          onClick={() => { setDraft(memo.memoText); setMode(mode === "edit" ? "highlight" : "edit"); }}
         >
-          <Edit3 size={17} /> {editing ? "Cancel Edit" : "Edit Text"}
+          <Edit3 size={17} /> Edit Text
+        </button>
+        <button
+          type="button"
+          className={mode === "draft" ? "tool active" : "tool"}
+          onClick={() => setMode(mode === "draft" ? "highlight" : "draft")}
+        >
+          <FileEdit size={17} /> Draft Memo
         </button>
         <button
           type="button"
@@ -121,7 +119,9 @@ export function MemoWorkspace({
       </div>
 
       <div className="document-frame">
-        {editing ? (
+        {mode === "draft" ? (
+          <PublicDraftPanel onCreateMemo={onCreatePublicDraft} />
+        ) : editing ? (
           <div className="editor-frame">
             <textarea value={draft} onChange={(event) => setDraft(event.target.value)} />
             <div className="editor-actions">
@@ -136,7 +136,7 @@ export function MemoWorkspace({
             style={{ fontSize: `${16 * (zoom / 100)}px` }}
           >
             {segments.map((segment, index) =>
-              segment.finding && highlightsVisible ? (
+              segment.finding && mode === "highlight" ? (
                 <mark
                   className={
                     segment.finding.id === selectedFindingId

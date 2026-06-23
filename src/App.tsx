@@ -747,6 +747,7 @@ export function App() {
                   analysisLocked={analysisState.status === "running"}
                   onMemoTextChange={updateMemoText}
                   onArchiveMemo={archiveMemo}
+                  onCreatePublicDraft={handleCreatePublicDraftMemo}
                 />
                 <PanelResizeHandle
                   label="Resize analysis panel"
@@ -767,7 +768,6 @@ export function App() {
                   onDecision={handleDecision}
                   onSendChat={handleSendMemoChat}
                   onApplyChatSuggestion={handleApplyChatSuggestion}
-                  onCreatePublicDraft={handleCreatePublicDraftMemo}
                   selectedFindingId={selectedFindingId}
                   onFindingSelect={setSelectedFindingId}
                 />

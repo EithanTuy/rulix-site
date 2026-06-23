@@ -1577,7 +1577,7 @@ button {
   top: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 8px;
   border-bottom: 1px solid var(--line);
@@ -1779,6 +1779,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  padding: 12px 16px 16px;
 }
 
 .console-kpi {
@@ -2129,12 +2130,13 @@ button {
 .readiness-row,
 .evidence-table-row,
 .audit-row {
-  min-height: 54px;
+  min-height: 42px;
   display: grid;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid #eef2f5;
   color: var(--text);
+  font-size: 13px;
 }
 
 .chunk-row {
@@ -2163,7 +2165,7 @@ button {
 }
 
 .readiness-row {
-  grid-template-columns: minmax(220px, 1fr) 120px 170px 170px;
+  grid-template-columns: minmax(180px, 1fr) 80px 130px 110px;
 }
 
 .evidence-table-row small,
@@ -2193,7 +2195,7 @@ button {
 }
 
 .audit-row {
-  grid-template-columns: 12px 180px 130px 150px minmax(0, 1fr);
+  grid-template-columns: 12px 150px 110px 120px minmax(0, 1fr);
 }
 
 .audit-row p {
