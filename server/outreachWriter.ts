@@ -222,6 +222,13 @@ export async function personalizeOutreachDraft(
   onUsage?: (sample: UsageSample) => void,
   config: StoredOutreachConfig = { provider: "bedrock" }
 ): Promise<OutreachDraft> {
+  if (!outreachProviderReady(config)) {
+    throw new Error(
+      config.provider === "anthropic"
+        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
+        : "Amazon Bedrock is not enabled for this deployment."
+    );
+  }
   const sources = await collectPublicSources(lead);
   if (!sources.length) {
     return {
