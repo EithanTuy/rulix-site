@@ -399,7 +399,23 @@ export async function updateLeadWorkflow(
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const method = init?.method?.toUpperCase() ?? "GET";
-  if (csrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)) {
+  const needsCsrf = !["GET", "HEAD", "OPTIONS"].includes(method);
+
+  // First mutating request may arrive before getCurrentUser() resolves and sets
+  // the CSRF token — fetch it transparently so the request doesn't fire blind.
+  if (needsCsrf && !csrfToken) {
+    try {
+      const me = await fetch("/api/auth/me", { credentials: "include" });
+      if (me.ok) {
+        const data = await me.json() as { csrfToken?: string };
+        if (data.csrfToken) csrfToken = data.csrfToken;
+      }
+    } catch {
+      // proceed without token; server will 403 and app will surface the error
+    }
+  }
+
+  if (csrfToken && needsCsrf) {
     headers.set("x-rulix-csrf", csrfToken);
   }
 

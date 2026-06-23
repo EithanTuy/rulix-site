@@ -205,8 +205,8 @@ export function OutreachWriterPanel() {
     <section className="outreach-panel" id="writer">
       <div className="outreach-head">
         <div>
-          <span className="dash-eyebrow">AWS Bedrock</span>
-          <h2>Bedrock Writer</h2>
+          <span className="dash-eyebrow">Outreach Writer</span>
+          <h2>Outreach Writer</h2>
           <p>Project-first outreach drafts. Rulix never sends email automatically.</p>
         </div>
         <div className="outreach-status">
