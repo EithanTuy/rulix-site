@@ -231,24 +231,39 @@ resource "aws_wafv2_web_acl" "app" {
           byte_match_statement {
             positional_constraint = "EXACTLY"
             search_string         = "/api/documents/extract"
-            field_to_match { uri_path {} }
-            text_transformation { priority = 0; type = "NONE" }
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
           }
         }
         statement {
           byte_match_statement {
             positional_constraint = "STARTS_WITH"
             search_string         = "/api/ai/"
-            field_to_match { uri_path {} }
-            text_transformation { priority = 0; type = "NONE" }
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
           }
         }
         statement {
           byte_match_statement {
             positional_constraint = "STARTS_WITH"
             search_string         = "/api/account/"
-            field_to_match { uri_path {} }
-            text_transformation { priority = 0; type = "NONE" }
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
           }
         }
       }
