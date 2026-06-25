@@ -9,7 +9,7 @@ export type ReviewStatus =
 
 export type DataClass = "public" | "proprietary" | "export-controlled" | "itar-risk" | "cui";
 
-export type AppView = "reviews" | "controls" | "evidence" | "corpus" | "users" | "settings";
+export type AppView = "reviews" | "controls" | "evidence" | "corpus" | "users" | "settings" | "memo-builder";
 
 export type AgentRole =
   | "memo-parser"
@@ -315,7 +315,8 @@ export type UsageCallType =
   | "public-draft"
   | "outreach-writer"
   | "outreach-personalization"
-  | "lead-search";
+  | "lead-search"
+  | "memo-builder";
 
 // A single billed Bedrock model invocation. Token counts are stored raw; the
 // dollar cost is derived at aggregation time so price-table changes apply

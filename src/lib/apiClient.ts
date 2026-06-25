@@ -263,6 +263,29 @@ export async function sendMemoChat(memoId: string, message: string, signal?: Abo
   return response;
 }
 
+export interface MemoBuildMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface MemoBuildDraft {
+  title: string;
+  itemFamily: string;
+  manufacturer?: string;
+  intendedUse?: string;
+  dataClass: import("../types").DataClass;
+  memoText: string;
+}
+
+export async function sendMemoBuildChat(messages: MemoBuildMessage[], signal?: AbortSignal) {
+  return fetchJson<{ reply: string; draft?: MemoBuildDraft }>("/api/ai/memo-builder-chat", {
+    method: "POST",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages })
+  });
+}
+
 export async function draftPublicMemo(item: string, signal?: AbortSignal) {
   return fetchJson<{
     title: string;

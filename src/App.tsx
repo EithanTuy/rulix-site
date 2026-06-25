@@ -5,6 +5,7 @@ import {
   ANALYSIS_MODE_CONFIG,
   type AnalysisMode,
   type BackendHealth,
+  type MemoBuildDraft,
   acceptInvite,
   analyzeMemoWithBackend,
   completePasswordReset,
@@ -37,6 +38,7 @@ import type {
 } from "./types";
 import { AdminConsole } from "./components/AdminConsole";
 import { AnalysisPanel } from "./components/AnalysisPanel";
+import { MemoDraftChatPanel } from "./components/MemoDraftChatPanel";
 import { MemoWorkspace } from "./components/MemoWorkspace";
 import { NewReviewModal } from "./components/NewReviewModal";
 import { ReviewList } from "./components/ReviewList";
@@ -379,6 +381,116 @@ export function App() {
       }
     }));
     setActiveView("reviews");
+  };
+
+  const handleCreateBuilderMemo = (draft: MemoBuildDraft) => {
+    const now = new Date().toISOString().slice(0, 10);
+    const memo: MemoRecord = {
+      id: `ai-draft-${Date.now()}`,
+      title: draft.title || "AI-drafted ECCN Memo",
+      itemFamily: draft.itemFamily || "AI-drafted item",
+      owner: currentUser?.name ?? "You",
+      updatedAt: now,
+      documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
+      status: "draft",
+      memoText: draft.memoText,
+      attachments: [],
+      dataClass: draft.dataClass ?? "proprietary",
+      sourcePath: "self-classification",
+      manufacturer: draft.manufacturer,
+      intendedUse: draft.intendedUse
+    };
+    addMemo(memo);
+    addAuditEvent(
+      memo.id,
+      "AI-assisted memo created",
+      "Memo drafted via Memo Builder with Sonnet. Analysis has not been run.",
+      "info"
+    );
+    setAnalysisStates((current) => ({
+      ...current,
+      [memo.id]: {
+        status: "unanalyzed",
+        message: "AI-drafted memo is waiting for reviewer-initiated AI analysis."
+      }
+    }));
+    setActiveView("reviews");
+    setIntakeWarning(undefined);
+  };
+
+  const handleCreateAndAnalyzeBuilderMemo = (draft: MemoBuildDraft) => {
+    const now = new Date().toISOString().slice(0, 10);
+    const memo: MemoRecord = {
+      id: `ai-draft-${Date.now()}`,
+      title: draft.title || "AI-drafted ECCN Memo",
+      itemFamily: draft.itemFamily || "AI-drafted item",
+      owner: currentUser?.name ?? "You",
+      updatedAt: now,
+      documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
+      status: "draft",
+      memoText: draft.memoText,
+      attachments: [],
+      dataClass: draft.dataClass ?? "proprietary",
+      sourcePath: "self-classification",
+      manufacturer: draft.manufacturer,
+      intendedUse: draft.intendedUse
+    };
+
+    // Build the state with the new memo so saveAccountState has it before analysis runs.
+    const stateWithMemo: AccountReviewState = {
+      ...buildCurrentAccountState(),
+      memos: [memo, ...memos],
+      selectedMemoId: memo.id
+    };
+
+    addMemo(memo);
+    addAuditEvent(
+      memo.id,
+      "AI-assisted memo created",
+      "Memo drafted via Memo Builder with Sonnet. Auto-analysis queued.",
+      "info"
+    );
+    setAnalysisStates((current) => ({
+      ...current,
+      [memo.id]: {
+        status: "running",
+        message: backendHealth?.provider.configured
+          ? "AI Council is analyzing this Memo Builder draft…"
+          : "Live AI is unavailable. Running deterministic analysis."
+      }
+    }));
+    setActiveView("reviews");
+    setIntakeWarning(undefined);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 180000);
+
+    void saveAccountState(stateWithMemo)
+      .then(() => analyzeMemoWithBackend(memo, analysisMode, controller.signal))
+      .then(({ review, result, auditEvents: serverAuditEvents }) => {
+        window.clearTimeout(timeoutId);
+        setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
+        if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
+        setAnalysisStates((current) => ({
+          ...current,
+          [memo.id]: result.provider.live
+            ? { status: "live", message: "Live AI analysis completed. Reviewer signoff is still required." }
+            : { status: "deterministic", message: result.provider.message }
+        }));
+        setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
+      })
+      .catch((error) => {
+        window.clearTimeout(timeoutId);
+        const message = readableApiError(error instanceof Error ? error.message : "AI analysis failed.");
+        setAnalysisStates((current) => ({
+          ...current,
+          [memo.id]: {
+            status: "failed",
+            message: `${message} Retry when the backend is available.`
+          }
+        }));
+        addAuditEvent(memo.id, "AI analysis failed", "Analysis failed after Memo Builder creation.", "review");
+      });
   };
 
   const handleCreateReview = (input: NewReviewInput) => {
@@ -795,6 +907,11 @@ export function App() {
               </>
             )}
           </>
+        ) : activeView === "memo-builder" ? (
+          <MemoDraftChatPanel
+            onCreateMemo={handleCreateBuilderMemo}
+            onCreateAndAnalyze={handleCreateAndAnalyzeBuilderMemo}
+          />
         ) : (
           <AdminConsole
             view={activeView}

@@ -3,7 +3,8 @@ import {
   BookOpen,
   FileText,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  Wand2
 } from "lucide-react";
 import type { AppView } from "../types";
 
@@ -15,6 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: FileText, label: "Reviews", view: "reviews" },
+  { icon: Wand2, label: "Memo Builder", view: "memo-builder" },
   { icon: BarChart3, label: "Evidence", view: "evidence" },
   { icon: BookOpen, label: "Sources", view: "corpus" },
   { icon: ShieldCheck, label: "Controls", view: "controls" },

@@ -1,8 +1,10 @@
+import Anthropic from "@anthropic-ai/sdk";
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { officialCorpus } from "../src/data/corpus";
 import { analyzeMemo } from "../src/lib/eccnReview";
 import type {
   AgentRole,
+  DataClass,
   AnalysisProviderStatus,
   ClassificationCandidate,
   CouncilAgentRun,
@@ -950,4 +952,127 @@ function emitUsage(
 
 function usageNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+// ── Memo Builder ──────────────────────────────────────────────────────────────
+
+const MEMO_BUILDER_SYSTEM_PROMPT = `You are Rulix Memo Builder, an expert that helps create ECCN export-control classification memos through guided conversation.
+
+Your goal is to gather facts and draft a complete self-classification memo. Ask focused, concise follow-up questions — one or two at a time. Collect:
+1. Item name, model/part number
+2. Manufacturer and country of origin
+3. Key technical specifications that drive ECCN classification (frequencies, power levels, materials, encryption, etc.)
+4. Intended use and end-user type (research lab, commercial, defense, etc.)
+5. Whether the information is publicly available or proprietary
+
+Do NOT rush to finish_draft — gather the minimum facts for a meaningful memo first. Ask for missing critical details before finishing.
+
+When you have enough information, call the finish_draft tool. The memoText must be proper markdown with sections: item description, proposed classification/review path, key technical specifications, intended use, information still needed, and a verification checklist.
+
+Never claim a final legal determination. Always present the memo as a draft requiring reviewer signoff and independent verification.`;
+
+const MEMO_BUILDER_DRAFT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "itemFamily", "dataClass", "memoText"],
+  properties: {
+    title: { type: "string" },
+    itemFamily: { type: "string" },
+    manufacturer: { type: "string" },
+    intendedUse: { type: "string" },
+    dataClass: { type: "string", enum: ["public", "proprietary", "export-controlled", "itar-risk", "cui"] },
+    memoText: { type: "string" }
+  }
+} as const;
+
+export interface MemoBuildChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface MemoBuildDraft {
+  title: string;
+  itemFamily: string;
+  manufacturer?: string;
+  intendedUse?: string;
+  dataClass: DataClass;
+  memoText: string;
+}
+
+export interface MemoBuildChatResult {
+  reply: string;
+  draft?: MemoBuildDraft;
+}
+
+export async function runMemoBuildChat(
+  messages: MemoBuildChatMessage[],
+  options: { onUsage?: (sample: UsageSample) => void } = {}
+): Promise<MemoBuildChatResult> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const runtime = getBedrockRuntime();
+
+  let client: Anthropic;
+  let model: string;
+
+  if (anthropicKey) {
+    client = new Anthropic({ apiKey: anthropicKey });
+    model = "claude-sonnet-4-6";
+  } else if (runtime.configured) {
+    client = new AnthropicBedrock() as unknown as Anthropic;
+    model = runtime.deepModel;
+  } else {
+    throw new Error("No AI provider configured. Set ANTHROPIC_API_KEY or enable Bedrock.");
+  }
+
+  const startedAt = Date.now();
+  const response = await client.messages.create({
+    model,
+    max_tokens: 2400,
+    system: MEMO_BUILDER_SYSTEM_PROMPT,
+    tools: [
+      {
+        name: "finish_draft",
+        description: "Call when you have gathered enough information to produce a complete memo draft.",
+        input_schema: MEMO_BUILDER_DRAFT_SCHEMA as Parameters<Anthropic["messages"]["create"]>[0]["tools"][number]["input_schema"]
+      }
+    ],
+    messages: messages.map((m) => ({ role: m.role, content: m.content }))
+  });
+
+  emitUsage(options.onUsage, model, "memo-builder", response.usage, Date.now() - startedAt);
+
+  const toolBlock = response.content.find(
+    (block) => block.type === "tool_use" && block.name === "finish_draft"
+  );
+  const textBlock = response.content.find((block) => block.type === "text");
+  const replyText = textBlock?.type === "text" ? textBlock.text.trim() : "";
+
+  if (toolBlock?.type === "tool_use") {
+    const input = toolBlock.input as Record<string, unknown>;
+    return {
+      reply: replyText || "Your memo draft is ready. Review it below, then choose how to add it to your queue.",
+      draft: {
+        title: asString(input.title, "AI-drafted ECCN Memo"),
+        itemFamily: asString(input.itemFamily, "AI-drafted item"),
+        manufacturer: typeof input.manufacturer === "string" && input.manufacturer.trim() ? input.manufacturer.trim() : undefined,
+        intendedUse: typeof input.intendedUse === "string" && input.intendedUse.trim() ? input.intendedUse.trim() : undefined,
+        dataClass: isValidDataClass(input.dataClass) ? input.dataClass : "proprietary",
+        memoText: asString(input.memoText, "")
+      }
+    };
+  }
+
+  return {
+    reply: replyText || "Could you tell me more about the item you need to classify?"
+  };
+}
+
+function isValidDataClass(value: unknown): value is DataClass {
+  return (
+    value === "public" ||
+    value === "proprietary" ||
+    value === "export-controlled" ||
+    value === "itar-risk" ||
+    value === "cui"
+  );
 }

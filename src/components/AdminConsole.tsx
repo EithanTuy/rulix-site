@@ -503,7 +503,8 @@ function viewTitle(view: AppView) {
     evidence: ["Evidence", "Cross-memo finding queue and evidence quality map."],
     corpus: ["Corpus", "Official source snapshots and retrieved source chunks."],
     users: ["Users", "Role model for research-facility review workflows."],
-    settings: ["Settings", "Tenant deployment, persistence, and model policy settings."]
+    settings: ["Settings", "Tenant deployment, persistence, and model policy settings."],
+    "memo-builder": ["Memo Builder", "Chat with Sonnet to draft a new ECCN classification memo."]
   } satisfies Record<AppView, [string, string]>;
 
   return {

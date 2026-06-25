@@ -24,8 +24,10 @@ import {
   draftMemoFromPublicWeb,
   getBedrockRuntime,
   runCouncilAnalysis,
+  runMemoBuildChat,
   runMemoChatWithHaiku,
   type CouncilDepth,
+  type MemoBuildChatMessage,
   type UsageSample
 } from "./bedrockCouncil";
 import {
@@ -762,6 +764,29 @@ export function createApp(options: CreateAppOptions = {}) {
       onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
     });
     res.json(draft);
+  });
+
+  app.post("/api/ai/memo-builder-chat", requireAuth(store), requireCsrf, async (req, res) => {
+    const raw = req.body?.messages;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      res.status(400).json({ error: "messages array is required." });
+      return;
+    }
+    const messages: MemoBuildChatMessage[] = raw
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
+    if (messages.length === 0 || messages[0].role !== "user") {
+      res.status(400).json({ error: "First message must be from the user." });
+      return;
+    }
+    try {
+      const result = await runMemoBuildChat(messages, {
+        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "Memo Builder AI failed." });
+    }
   });
 
   app.post("/api/reviews/:id/chat", requireAuth(store), requireCsrf, async (req, res) => {
