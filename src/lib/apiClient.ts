@@ -275,14 +275,22 @@ export interface MemoBuildDraft {
   intendedUse?: string;
   dataClass: import("../types").DataClass;
   memoText: string;
+  attachments?: string[];
 }
 
 export async function sendMemoBuildChat(messages: MemoBuildMessage[], signal?: AbortSignal) {
+  // Keep the last 20 messages and truncate any single message that exceeds
+  // 60 KB so the JSON body stays well within Lambda's 6 MB payload limit.
+  const trimmed = messages.slice(-20).map((m) =>
+    m.content.length > 60_000
+      ? { ...m, content: m.content.slice(0, 60_000) + "\n\n[truncated]" }
+      : m
+  );
   return fetchJson<{ reply: string; draft?: MemoBuildDraft }>("/api/ai/memo-builder-chat", {
     method: "POST",
     signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages })
+    body: JSON.stringify({ messages: trimmed })
   });
 }
 
@@ -300,6 +308,30 @@ export async function draftPublicMemo(item: string, signal?: AbortSignal) {
     },
     body: JSON.stringify({ item })
   });
+}
+
+export interface DocumentExtraction {
+  fileName: string;
+  mediaType: string;
+  text: string;
+  method: "text" | "bedrock-document" | "bedrock-image" | "pdf-image-fallback" | "unavailable";
+  warning?: string;
+}
+
+export async function extractDocument(input: {
+  fileName: string;
+  mediaType: string;
+  dataBase64: string;
+}, signal?: AbortSignal) {
+  const response = await fetchJson<{ extraction: DocumentExtraction }>("/api/documents/extract", {
+    method: "POST",
+    signal,
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+  return response.extraction;
 }
 
 export interface OutreachProviderConfig {

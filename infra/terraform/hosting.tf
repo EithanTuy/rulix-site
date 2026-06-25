@@ -77,14 +77,6 @@ data "aws_iam_policy_document" "lambda_auth" {
   }
 
   statement {
-    sid     = "InvokeOutreachWorker"
-    actions = ["lambda:InvokeFunction"]
-    resources = [
-      "arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.fn_name}"
-    ]
-  }
-
-  statement {
     sid = "AuthEmailDelivery"
     actions = [
       "ses:SendEmail"
@@ -119,7 +111,7 @@ resource "aws_lambda_function" "app" {
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
   memory_size      = 1024
-  timeout          = 60
+  timeout          = 180
 
   environment {
     variables = merge(
@@ -220,9 +212,58 @@ resource "aws_wafv2_web_acl" "app" {
     allow {}
   }
 
+  # Allow large POST bodies on authenticated API paths that routinely exceed
+  # WAF's 8 KB body-inspection limit: document extraction, the AI endpoints
+  # (memo-builder-chat, ai/review), and account-state saves (all memos).
+  # These paths all require session auth, so bypassing body-size inspection
+  # here is safe — the managed rules still apply to every other path.
+  rule {
+    name     = "AllowLargeApiRequests"
+    priority = 0
+
+    action {
+      allow {}
+    }
+
+    statement {
+      or_statement {
+        statement {
+          byte_match_statement {
+            positional_constraint = "EXACTLY"
+            search_string         = "/api/documents/extract"
+            field_to_match { uri_path {} }
+            text_transformation { priority = 0; type = "NONE" }
+          }
+        }
+        statement {
+          byte_match_statement {
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/api/ai/"
+            field_to_match { uri_path {} }
+            text_transformation { priority = 0; type = "NONE" }
+          }
+        }
+        statement {
+          byte_match_statement {
+            positional_constraint = "STARTS_WITH"
+            search_string         = "/api/account/"
+            field_to_match { uri_path {} }
+            text_transformation { priority = 0; type = "NONE" }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-large-api-allow"
+      sampled_requests_enabled   = true
+    }
+  }
+
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
-    priority = 0
+    priority = 1
 
     override_action {
       none {}
@@ -244,7 +285,7 @@ resource "aws_wafv2_web_acl" "app" {
 
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
-    priority = 1
+    priority = 2
 
     override_action {
       none {}
@@ -410,7 +451,7 @@ resource "aws_cloudfront_distribution" "app" {
       https_port             = 443
       origin_protocol_policy = "https-only"
       origin_ssl_protocols   = ["TLSv1.2"]
-      origin_read_timeout    = 60
+      origin_read_timeout    = 120
     }
   }
 
