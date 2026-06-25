@@ -30,7 +30,7 @@ variable "bedrock_resource_arns" {
 variable "bedrock_enabled" {
   description = "Enables live Bedrock AI calls when true. False keeps the app in deterministic local-rules mode."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "bedrock_model" {

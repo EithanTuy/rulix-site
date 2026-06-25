@@ -291,11 +291,44 @@ export interface AccountReviewState {
   auditEvents: AuditEvent[];
   analysisResults: Record<string, ReviewResult>;
   chatMessages: Record<string, MemoChatMessage[]>;
+  memoBuilder?: {
+    activeSessionId?: string;
+    sessions?: MemoBuilderSession[];
+    /**
+     * Legacy single-thread builder state. Kept so older saved accounts migrate cleanly.
+     */
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    draft?: {
+      title: string;
+      itemFamily: string;
+      manufacturer?: string;
+      intendedUse?: string;
+      dataClass: DataClass;
+      memoText: string;
+      attachments?: string[];
+    };
+  };
   outreachDrafts?: Record<string, OutreachDraft>;
   discoveredLeads?: OutreachLead[];
   leadSearchRuns?: LeadSearchRun[];
   leadWorkflows?: Record<string, LeadWorkflow>;
   outreachJobs?: OutreachJob[];
+}
+
+export interface MemoBuilderSession {
+  id: string;
+  title: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  updatedAt: string;
+  draft?: {
+    title: string;
+    itemFamily: string;
+    manufacturer?: string;
+    intendedUse?: string;
+    dataClass: DataClass;
+    memoText: string;
+    attachments?: string[];
+  };
 }
 
 export interface NewReviewInput {
@@ -316,7 +349,8 @@ export type UsageCallType =
   | "outreach-writer"
   | "outreach-personalization"
   | "lead-search"
-  | "memo-builder";
+  | "memo-builder"
+  | "document-extraction";
 
 // A single billed Bedrock model invocation. Token counts are stored raw; the
 // dollar cost is derived at aggregation time so price-table changes apply

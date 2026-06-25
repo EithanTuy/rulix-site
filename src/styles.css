@@ -2975,6 +2975,99 @@ button {
   line-height: 1.5;
 }
 
+.modal-attachments {
+  margin: 14px 20px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfe;
+}
+
+.modal-attachments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-attachments-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.modal-attachments-header strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.modal-attachments-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachment-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid #d8e3ee;
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--text);
+}
+
+.attachment-row.warning {
+  border-color: #f2c46d;
+  background: #fff9ec;
+}
+
+.attachment-row.failed {
+  border-color: #f0a1a1;
+  background: #fff4f4;
+}
+
+.attachment-row.reading {
+  color: var(--muted);
+}
+
+.attachment-row span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.attachment-row strong,
+.attachment-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-row small {
+  color: var(--muted);
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
 .modal-acknowledgement {
   margin: 14px 20px 0;
 }
@@ -4757,6 +4850,115 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 
 /* ── Memo Builder ────────────────────────────────────────────────────────── */
 
+.memo-builder-shell {
+  grid-column: 2;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  background: var(--soft);
+}
+
+.memo-builder-sessions {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border-right: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.memo-builder-sessions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.memo-builder-sessions-head div {
+  display: grid;
+  gap: 2px;
+}
+
+.memo-builder-sessions-head strong {
+  color: var(--navy-950);
+  font-size: 14px;
+}
+
+.memo-builder-sessions-head span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.button.compact {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.memo-builder-session-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.memo-builder-session {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.memo-builder-session:hover {
+  background: var(--soft);
+}
+
+.memo-builder-session.active {
+  border-color: #bfe0dc;
+  background: var(--teal-soft);
+}
+
+.memo-builder-session svg {
+  margin-top: 2px;
+  color: var(--teal);
+}
+
+.memo-builder-session span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.memo-builder-session strong,
+.memo-builder-session small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memo-builder-session strong {
+  font-size: 12px;
+  color: var(--navy-950);
+}
+
+.memo-builder-session small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .memo-builder-panel {
   grid-column: 2;
   display: grid;
@@ -4900,10 +5102,10 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 }
 
 .mb-draft-preview {
-  max-height: 280px;
-  overflow-y: auto;
-  margin: 0;
-  padding: 12px 14px;
+    max-height: 280px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 12px 14px;
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
   line-height: 1.6;
@@ -4912,13 +5114,21 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: #fafcfd;
-  color: var(--text);
-}
+    color: var(--text);
+  }
 
+.mb-draft-queue-note {
+  margin: 0;
+  padding: 10px 14px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+  
 .mb-draft-actions {
-  display: flex;
-  gap: 10px;
-  padding: 10px 14px;
+    display: flex;
+    gap: 10px;
+    padding: 10px 14px;
 }
 
 .memo-builder-compose {
@@ -4968,7 +5178,133 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
   flex-shrink: 0;
 }
 
+.memo-builder-compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.memo-builder-compose-actions span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.button.ghost.memo-builder-attach-wide {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  color: var(--teal-dark) !important;
+  background: #ffffff;
+  border-color: var(--line);
+}
+
+.button.ghost.memo-builder-attach-wide svg {
+  color: currentColor;
+}
+
+.button.ghost.memo-builder-attach-wide:hover {
+  color: var(--navy-950) !important;
+  background: var(--teal-soft);
+  border-color: #bfe0dc;
+}
+
+.memo-builder-attachments {
+  display: grid;
+  gap: 7px;
+}
+
+.memo-builder-attachment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d8e3ee;
+  border-radius: 8px;
+  background: #f8fbfe;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.memo-builder-attachment.warning {
+  border-color: #f2c46d;
+  background: #fff9ec;
+}
+
+.memo-builder-attachment.failed {
+  border-color: #f0a1a1;
+  background: #fff4f4;
+}
+
+.memo-builder-attachment.reading {
+  color: var(--muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.memo-builder-attachment.reading::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  animation: attachment-reading 1.2s ease-in-out infinite;
+}
+
+.memo-builder-attachment span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.memo-builder-attachment strong,
+.memo-builder-attachment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memo-builder-attachment small {
+  color: var(--muted);
+}
+
+.memo-builder-attachment button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.memo-builder-attachment button:hover {
+  background: rgba(11, 45, 77, 0.07);
+  color: var(--text);
+}
+
+@keyframes attachment-reading {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
 @media (max-width: 980px) {
+  .memo-builder-shell {
+    grid-column: 1;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .memo-builder-sessions {
+    max-height: 190px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
   .memo-builder-panel {
     grid-column: 1;
   }

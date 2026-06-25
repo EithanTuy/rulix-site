@@ -967,9 +967,23 @@ Your goal is to gather facts and draft a complete self-classification memo. Ask 
 
 Do NOT rush to finish_draft — gather the minimum facts for a meaningful memo first. Ask for missing critical details before finishing.
 
+If the user provides sections labeled "Attached source documents", treat them as reviewer-supplied source material such as datasheets, quotes, manuals, or screenshots. Use those extracted facts as the primary basis for the draft. Preserve model numbers, manufacturer names, technical limits, units, caveats, and source document names. Do not invent specifications that are not in the attachments or conversation. If the attachments provide enough facts to draft, call finish_draft instead of asking the user to retype the datasheet. Put uncertain or missing facts in the "information still needed" and "verification checklist" sections.
+
 When you have enough information, call the finish_draft tool. The memoText must be proper markdown with sections: item description, proposed classification/review path, key technical specifications, intended use, information still needed, and a verification checklist.
 
 Never claim a final legal determination. Always present the memo as a draft requiring reviewer signoff and independent verification.`;
+
+const MEMO_BUILDER_QUALITY_APPENDIX = `
+
+Memo Builder quality requirements:
+- When you draft, produce a complete, copy-ready memo that can be sent to the Reviews tab for analysis.
+- The memoText should usually be 500-1100 words when source material is available.
+- Use markdown sections: Executive summary; Item and source documents reviewed; Item description; Technical specifications relevant to ECCN screening; Intended use and end-user assumptions; Proposed classification/review path; Rationale and CCL screening notes; Information still needed; Verification checklist.
+- Do not return a one-paragraph memo, filler language, or fake certainty.
+- If a specification is missing, name the missing field instead of guessing.
+- Never claim final legal determination; present it as a draft requiring reviewer signoff.`;
+
+const MEMO_BUILDER_PROVIDER_TIMEOUT_MS = 115000;
 
 const MEMO_BUILDER_DRAFT_SCHEMA = {
   type: "object",
@@ -1025,19 +1039,34 @@ export async function runMemoBuildChat(
   }
 
   const startedAt = Date.now();
-  const response = await client.messages.create({
-    model,
-    max_tokens: 2400,
-    system: MEMO_BUILDER_SYSTEM_PROMPT,
-    tools: [
+  let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
+  try {
+    response = await client.messages.create(
       {
-        name: "finish_draft",
-        description: "Call when you have gathered enough information to produce a complete memo draft.",
-        input_schema: MEMO_BUILDER_DRAFT_SCHEMA as Parameters<Anthropic["messages"]["create"]>[0]["tools"][number]["input_schema"]
+        model,
+        max_tokens: 3200,
+        system: `${MEMO_BUILDER_SYSTEM_PROMPT}${MEMO_BUILDER_QUALITY_APPENDIX}`,
+        tools: [
+          {
+            name: "finish_draft",
+            description: "Call when you have gathered enough information to produce a complete memo draft.",
+            input_schema: MEMO_BUILDER_DRAFT_SCHEMA as Parameters<Anthropic["messages"]["create"]>[0]["tools"][number]["input_schema"]
+          }
+        ],
+        messages: messages.map((m) => ({ role: m.role, content: m.content }))
+      },
+      {
+        timeout: MEMO_BUILDER_PROVIDER_TIMEOUT_MS,
+        maxRetries: 0
       }
-    ],
-    messages: messages.map((m) => ({ role: m.role, content: m.content }))
-  });
+    );
+  } catch (error) {
+    const message = safeError(error);
+    if (/timeout|timed? out|abort/i.test(message)) {
+      throw new Error("Memo Builder took too long. Try again with a shorter prompt or fewer/lighter attachments.");
+    }
+    throw error;
+  }
 
   emitUsage(options.onUsage, model, "memo-builder", response.usage, Date.now() - startedAt);
 
@@ -1057,7 +1086,7 @@ export async function runMemoBuildChat(
         manufacturer: typeof input.manufacturer === "string" && input.manufacturer.trim() ? input.manufacturer.trim() : undefined,
         intendedUse: typeof input.intendedUse === "string" && input.intendedUse.trim() ? input.intendedUse.trim() : undefined,
         dataClass: isValidDataClass(input.dataClass) ? input.dataClass : "proprietary",
-        memoText: asString(input.memoText, "")
+        memoText: asLongString(input.memoText, "", 16000)
       }
     };
   }

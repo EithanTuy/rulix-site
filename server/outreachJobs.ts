@@ -1,4 +1,3 @@
-import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { outreachLeads } from "../src/outreachLeads";
 import type {
   LeadSearchRun,
@@ -69,19 +68,8 @@ export function createOutreachJob(input: {
 
 export async function scheduleOutreachJob(event: OutreachWorkerEvent, delayMs = 0) {
   if (delayMs > 0) await sleep(delayMs);
-  const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
-  if (!functionName) {
-    if (process.env.NODE_ENV !== "test") {
-      setTimeout(() => void processOutreachJob(event), 0);
-    }
-    return;
-  }
-  const client = new LambdaClient({});
-  await client.send(new InvokeCommand({
-    FunctionName: functionName,
-    InvocationType: "Event",
-    Payload: Buffer.from(JSON.stringify(event))
-  }));
+  if (process.env.NODE_ENV === "test") return;
+  setTimeout(() => void processOutreachJob(event), 0);
 }
 
 export async function processOutreachJob(
@@ -167,7 +155,7 @@ export async function processOutreachJob(
 
   job.updatedAt = new Date().toISOString();
   await store.replaceAccountState(event.userId, state);
-  if (job.status === "queued") {
+  if (job.status === "queued" && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
     await scheduleOutreachJob(event, retryDelayMs);
   }
 }

@@ -943,6 +943,7 @@ export function emptyAccountState(): AccountReviewState {
     auditEvents: [],
     analysisResults: {},
     chatMessages: {},
+    memoBuilder: { messages: [] },
     outreachDrafts: {},
     discoveredLeads: [],
     leadSearchRuns: [],

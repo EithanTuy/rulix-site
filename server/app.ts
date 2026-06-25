@@ -30,6 +30,7 @@ import {
   type MemoBuildChatMessage,
   type UsageSample
 } from "./bedrockCouncil";
+import { extractDocumentText } from "./documentExtraction";
 import {
   StoreError,
   createAccountStore,
@@ -92,7 +93,7 @@ export function createApp(options: CreateAppOptions = {}) {
     },
     credentials: true
   }));
-  app.use(express.json({ limit: "5mb" }));
+  app.use(express.json({ limit: "12mb" }));
 
   app.get("/api/health", (_req, res) => {
     const provider = getBedrockRuntime();
@@ -764,6 +765,28 @@ export function createApp(options: CreateAppOptions = {}) {
       onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
     });
     res.json(draft);
+  });
+
+  app.post("/api/documents/extract", requireAuth(store), requireCsrf, async (req, res) => {
+    const fileName = normalizeText(req.body?.fileName, "attached-document");
+    const mediaType = normalizeText(req.body?.mediaType, "application/octet-stream");
+    const dataBase64 = normalizeText(req.body?.dataBase64, "");
+    if (!dataBase64) {
+      res.status(400).json({ error: "Document data is required." });
+      return;
+    }
+
+    try {
+      const extraction = await extractDocumentText(
+        { fileName, mediaType, dataBase64 },
+        { onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample) }
+      );
+      res.json({ extraction });
+    } catch (error) {
+      res.status(502).json({
+        error: error instanceof Error ? error.message : "Document extraction failed."
+      });
+    }
   });
 
   app.post("/api/ai/memo-builder-chat", requireAuth(store), requireCsrf, async (req, res) => {

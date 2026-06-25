@@ -256,6 +256,27 @@ describe("Rulix ECCN API", () => {
       .expect(403);
   });
 
+  it("extracts uploaded text documents through the authenticated document endpoint", async () => {
+    const { agent, csrfToken } = await signedInAgent("documents@example.com");
+    const text = "1.0 Item\nCryogenic controller model RLX-200 with RF timing specs and manufacturer notes.";
+    const response = await agent
+      .post("/api/documents/extract")
+      .set("x-rulix-csrf", csrfToken)
+      .send({
+        fileName: "controller-notes.txt",
+        mediaType: "text/plain",
+        dataBase64: Buffer.from(text, "utf8").toString("base64")
+      })
+      .expect(200);
+
+    expect(response.body.extraction).toMatchObject({
+      fileName: "controller-notes.txt",
+      mediaType: "text/plain",
+      method: "text",
+      text
+    });
+  });
+
   it("analyzes an ad hoc memo through the authenticated fallback backend path", async () => {
     const { agent, csrfToken } = await signedInAgent("analysis@example.com");
     const response = await agent

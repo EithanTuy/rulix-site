@@ -236,5 +236,7 @@ function callTypeLabel(type: UsageEvent["callType"]) {
   if (type === "outreach-writer") return "Outreach writer";
   if (type === "outreach-personalization") return "Outreach personalization";
   if (type === "lead-search") return "Lead search";
+  if (type === "memo-builder") return "Memo Builder";
+  if (type === "document-extraction") return "Document extraction";
   return "Public draft";
 }

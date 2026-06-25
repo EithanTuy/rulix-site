@@ -29,6 +29,7 @@ import type {
   AccountReviewState,
   AppView,
   AuditEvent,
+  MemoBuilderSession,
   MemoChatMessage,
   MemoRecord,
   NewReviewInput,
@@ -62,7 +63,8 @@ const emptyAccountState = (): AccountReviewState => ({
   decisions: {},
   auditEvents: [],
   analysisResults: {},
-  chatMessages: {}
+  chatMessages: {},
+  memoBuilder: { messages: [], sessions: [] }
 });
 
 export function App() {
@@ -77,6 +79,8 @@ export function App() {
   const [analysisResults, setAnalysisResults] = useState<Record<string, ReviewResult>>({});
   const [analysisStates, setAnalysisStates] = useState<Record<string, AnalysisRunState>>({});
   const [chatMessages, setChatMessages] = useState<Record<string, MemoChatMessage[]>>({});
+  const [memoBuilderSessions, setMemoBuilderSessions] = useState<MemoBuilderSession[]>([]);
+  const [activeMemoBuilderSessionId, setActiveMemoBuilderSessionId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<AppView>("reviews");
   const [newReviewOpen, setNewReviewOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState("");
@@ -173,7 +177,18 @@ export function App() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [auth.status, stateReady, memos, selectedMemoId, decisions, auditEvents, analysisResults, chatMessages]);
+  }, [
+    auth.status,
+    stateReady,
+    memos,
+    selectedMemoId,
+    decisions,
+    auditEvents,
+    analysisResults,
+    chatMessages,
+    memoBuilderSessions,
+    activeMemoBuilderSessionId
+  ]);
 
   useEffect(() => {
     if (activeMemos.length === 0 && selectedMemoId) {
@@ -299,28 +314,33 @@ export function App() {
   };
 
   const handleFile = async (file: File) => {
-    const result = await memoFromFile(file);
-    const reviewedMemo = {
-      ...result.memo,
-      owner: currentUser?.name ?? "You",
-      status: "draft" as const
-    };
-    setIntakeWarning(result.warning);
-    addMemo(reviewedMemo);
-    addAuditEvent(
-      reviewedMemo.id,
-      "Document intake",
-      result.warning ?? `Uploaded ${file.name}. Analysis has not been run yet.`,
-      result.warning ? "review" : "info"
-    );
-    setAnalysisStates((current) => ({
-      ...current,
-      [reviewedMemo.id]: {
-        status: "unanalyzed",
-        message: "Uploaded memo is waiting for reviewer-initiated AI analysis."
-      }
-    }));
-    setActiveView("reviews");
+    try {
+      setIntakeWarning(`Reading ${file.name}...`);
+      const result = await memoFromFile(file);
+      const reviewedMemo = {
+        ...result.memo,
+        owner: currentUser?.name ?? "You",
+        status: "draft" as const
+      };
+      setIntakeWarning(result.warning);
+      addMemo(reviewedMemo);
+      addAuditEvent(
+        reviewedMemo.id,
+        "Document intake",
+        result.warning ?? `Uploaded ${file.name}. Analysis has not been run yet.`,
+        result.warning ? "review" : "info"
+      );
+      setAnalysisStates((current) => ({
+        ...current,
+        [reviewedMemo.id]: {
+          status: "unanalyzed",
+          message: "Uploaded memo is waiting for reviewer-initiated AI analysis."
+        }
+      }));
+      setActiveView("reviews");
+    } catch (error) {
+      setIntakeWarning(readableApiError(error instanceof Error ? error.message : "Document extraction failed."));
+    }
   };
 
   const handlePasteMemo = (title: string, text: string) => {
@@ -394,7 +414,7 @@ export function App() {
       documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
       status: "draft",
       memoText: draft.memoText,
-      attachments: [],
+      attachments: draft.attachments ?? [],
       dataClass: draft.dataClass ?? "proprietary",
       sourcePath: "self-classification",
       manufacturer: draft.manufacturer,
@@ -429,7 +449,7 @@ export function App() {
       documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
       status: "draft",
       memoText: draft.memoText,
-      attachments: [],
+      attachments: draft.attachments ?? [],
       dataClass: draft.dataClass ?? "proprietary",
       sourcePath: "self-classification",
       manufacturer: draft.manufacturer,
@@ -743,6 +763,9 @@ export function App() {
     setAnalysisResults(state.analysisResults ?? {});
     setAnalysisStates(deriveAnalysisStates(state.analysisResults ?? {}));
     setChatMessages(state.chatMessages ?? {});
+    const builderSessions = normalizeMemoBuilderSessions(state.memoBuilder);
+    setMemoBuilderSessions(builderSessions);
+    setActiveMemoBuilderSessionId(state.memoBuilder?.activeSessionId ?? builderSessions[0]?.id);
   };
 
   const buildCurrentAccountState = (): AccountReviewState => ({
@@ -751,7 +774,13 @@ export function App() {
     decisions,
     auditEvents,
     analysisResults,
-    chatMessages
+    chatMessages,
+    memoBuilder: {
+      activeSessionId: activeMemoBuilderSessionId,
+      sessions: memoBuilderSessions,
+      messages: memoBuilderSessions.find((session) => session.id === activeMemoBuilderSessionId)?.messages ?? [],
+      draft: memoBuilderSessions.find((session) => session.id === activeMemoBuilderSessionId)?.draft
+    }
   });
 
   const addMemo = (memo: MemoRecord) => {
@@ -909,6 +938,10 @@ export function App() {
           </>
         ) : activeView === "memo-builder" ? (
           <MemoDraftChatPanel
+            sessions={memoBuilderSessions}
+            activeSessionId={activeMemoBuilderSessionId}
+            onSessionsChange={setMemoBuilderSessions}
+            onActiveSessionChange={setActiveMemoBuilderSessionId}
             onCreateMemo={handleCreateBuilderMemo}
             onCreateAndAnalyze={handleCreateAndAnalyzeBuilderMemo}
           />
@@ -934,6 +967,30 @@ export function App() {
       />
     </div>
   );
+}
+
+function normalizeMemoBuilderSessions(builder: AccountReviewState["memoBuilder"]): MemoBuilderSession[] {
+  const sessions = (builder?.sessions ?? [])
+    .filter((session) => session.id && Array.isArray(session.messages))
+    .map((session) => ({
+      ...session,
+      title: session.title?.trim() || session.messages[0]?.content?.replace(/\s+/g, " ").slice(0, 46) || "Memo chat",
+      updatedAt: session.updatedAt || new Date().toISOString()
+    }));
+
+  if (sessions.length) return sessions;
+  if ((builder?.messages?.length ?? 0) || builder?.draft) {
+    return [
+      {
+        id: "builder-migrated",
+        title: builder?.messages?.[0]?.content?.replace(/\s+/g, " ").slice(0, 46) || "Saved memo chat",
+        messages: builder?.messages ?? [],
+        draft: builder?.draft,
+        updatedAt: new Date().toISOString()
+      }
+    ];
+  }
+  return [];
 }
 
 function PanelResizeHandle({
