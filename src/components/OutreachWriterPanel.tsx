@@ -25,7 +25,7 @@ export function OutreachWriterPanel() {
   const [bulkProgress, setBulkProgress] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [signature, setSignature] = useState("Eithan Tuy\nComputational Data Science");
+  const [signature, setSignature] = useState("Eithan Tuyilingire\nComputational Data Science");
 
   const lead = useMemo(
     () => leads.find((item) => item.leadId === selectedId) ?? leads[0],
@@ -137,6 +137,27 @@ export function OutreachWriterPanel() {
       } catch { /* skip failed, continue */ }
     }
     setNotice(`Signed ${count} draft${count === 1 ? "" : "s"}.`);
+    setBusy(false);
+  };
+
+  const removeSignatureFromAll = async () => {
+    const sig = signature.trim();
+    if (!sig) return;
+    const toStrip = leads.filter((l) => drafts[l.leadId]?.body.includes(sig));
+    if (!toStrip.length) { setNotice("Signature not found in any draft."); return; }
+    setBusy(true);
+    setError("");
+    let count = 0;
+    for (const l of toStrip) {
+      const d = drafts[l.leadId];
+      const newBody = d.body.replace(new RegExp(`\\n+${sig.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g"), "").trimEnd();
+      try {
+        const result = await saveOutreachDraft(l.leadId, d.subject, newBody);
+        setDrafts((current) => ({ ...current, [l.leadId]: { ...result.draft, sentAt: d.sentAt } }));
+        count++;
+      } catch { /* skip failed */ }
+    }
+    setNotice(`Removed signature from ${count} draft${count === 1 ? "" : "s"}.`);
     setBusy(false);
   };
 
@@ -307,7 +328,8 @@ export function OutreachWriterPanel() {
             </button>
             <button type="button" onClick={() => void markSent()} disabled={busy || !subject || !body}><Send size={14} /> Mark sent</button>
             <button type="button" onClick={goNext} disabled={!lead || leads.findIndex((item) => item.leadId === lead.leadId) >= leads.length - 1}>Next →</button>
-            <button type="button" className="dash-primary" onClick={() => void signAllUnsent()} disabled={busy || !signature.trim()}>Sign all unsent</button>
+            <button type="button" className="dash-primary" onClick={() => void signAllUnsent()} disabled={busy || !signature.trim()}>Sign all</button>
+            <button type="button" className="dash-secondary" onClick={() => void removeSignatureFromAll()} disabled={busy || !signature.trim()}>Remove from all</button>
           </div>
           <label>
             <span>Body</span>
