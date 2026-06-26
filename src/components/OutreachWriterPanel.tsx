@@ -25,6 +25,7 @@ export function OutreachWriterPanel() {
   const [bulkProgress, setBulkProgress] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [signature, setSignature] = useState("Eithan Tuy\nComputational Data Science");
 
   const lead = useMemo(
     () => leads.find((item) => item.leadId === selectedId) ?? leads[0],
@@ -114,6 +115,29 @@ export function OutreachWriterPanel() {
     const idx = leads.findIndex((item) => item.leadId === lead?.leadId);
     const next = leads[idx + 1];
     if (next) setSelectedId(next.leadId);
+  };
+
+  const signAllUnsent = async () => {
+    const sig = signature.trim();
+    if (!sig) return;
+    const unsent = leads.filter((l) => {
+      const d = drafts[l.leadId];
+      return d && !d.sentAt && !d.body.includes(sig);
+    });
+    if (!unsent.length) { setNotice("All unsent drafts are already signed."); return; }
+    setBusy(true);
+    setError("");
+    let count = 0;
+    for (const l of unsent) {
+      const d = drafts[l.leadId];
+      try {
+        const result = await saveOutreachDraft(l.leadId, d.subject, `${d.body.trimEnd()}\n\n${sig}`);
+        setDrafts((current) => ({ ...current, [l.leadId]: result.draft }));
+        count++;
+      } catch { /* skip failed, continue */ }
+    }
+    setNotice(`Signed ${count} draft${count === 1 ? "" : "s"}.`);
+    setBusy(false);
   };
 
   const draftAllMissing = async () => {
@@ -283,10 +307,15 @@ export function OutreachWriterPanel() {
             </button>
             <button type="button" onClick={() => void markSent()} disabled={busy || !subject || !body}><Send size={14} /> Mark sent</button>
             <button type="button" onClick={goNext} disabled={!lead || leads.findIndex((item) => item.leadId === lead.leadId) >= leads.length - 1}>Next →</button>
+            <button type="button" className="dash-primary" onClick={() => void signAllUnsent()} disabled={busy || !signature.trim()}>Sign all unsent</button>
           </div>
           <label>
             <span>Body</span>
             <textarea rows={16} value={body} onChange={(event) => setBody(event.target.value)} />
+          </label>
+          <label>
+            <span>Signature — appended to unsent drafts</span>
+            <textarea rows={3} value={signature} onChange={(e) => setSignature(e.target.value)} placeholder={"Your Name\nDepartment"} />
           </label>
           {currentDraft && (
             <PersonalizationEvidence draft={currentDraft} />
