@@ -1,4 +1,4 @@
-// Layout.tsx — top nav + footer shell around all routed pages.
+// Layout.tsx - top nav + footer shell around all routed pages.
 
 import { useEffect } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
@@ -17,27 +17,27 @@ export function Brand({ size = 28 }: { size?: number }) {
 }
 
 const NAV = [
-  { to: "/#how", label: "How it works" },
-  { to: "/#features", label: "Features" },
+  { to: "/#sample", label: "Sample audit" },
+  { to: "/#use-cases", label: "Use cases" },
   { to: "/security", label: "Security" },
 ];
 
 export function Layout() {
   const { pathname, hash } = useLocation();
 
-  // Hash links within the home page scroll; route changes reset to top.
   useEffect(() => {
     if (hash) {
-      document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+      window.setTimeout(() => {
+        document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+      }, 0);
     } else {
       window.scrollTo(0, 0);
     }
   }, [pathname, hash]);
 
-  // Scroll-reveal for any element carrying .reveal.
   useEffect(() => {
     const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("vis")),
+      (entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add("vis")),
       { threshold: 0.12 },
     );
     document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
@@ -46,16 +46,19 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b border-line-soft bg-bg/85 backdrop-blur">
-        <div className="wrap flex h-[62px] items-center justify-between">
+      <header className="sticky top-0 z-50 border-b border-line-soft bg-bg/90 backdrop-blur">
+        <div className="wrap flex min-h-[68px] items-center justify-between gap-5 py-3">
           <Link to="/" aria-label="Rulix home"><Brand /></Link>
           <nav className="flex items-center gap-7 text-[13.5px] font-medium text-text-2 max-md:gap-4">
-            {NAV.map((n) => (
-              <Link key={n.to} to={n.to} className="transition-colors hover:text-text-1 max-sm:hidden">
-                {n.label}
+            {NAV.map((item) => (
+              <Link key={item.to} to={item.to} className="transition-colors hover:text-text-1 max-sm:hidden">
+                {item.label}
               </Link>
             ))}
-            <Link to="/contact" className="btn primary !py-2 !text-[13px]">Request a demo</Link>
+            <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-md:hidden">
+              Sign in
+            </a>
+            <Link to="/contact" className="btn primary !py-2 !text-[13px]">Book audit</Link>
           </nav>
         </div>
       </header>
@@ -70,30 +73,31 @@ export function Layout() {
             <Brand size={24} />
             <p className="footnote mt-4 max-w-[44ch]">
               Rulix is decision-support software for export-control review teams. It never issues
-              final ECCN, license, sanctions, or jurisdiction determinations — a qualified human
+              final ECCN, license, sanctions, or jurisdiction determinations. A qualified human
               reviewer always decides.
             </p>
           </div>
           <div className="text-[13.5px]">
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Product</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/#how" className="hover:text-text-1">How it works</Link></li>
-              <li><Link to="/#features" className="hover:text-text-1">Features</Link></li>
-              <li><Link to="/security" className="hover:text-text-1">Security &amp; data handling</Link></li>
+              <li><Link to="/#sample" className="hover:text-text-1">Sample audit output</Link></li>
+              <li><Link to="/#use-cases" className="hover:text-text-1">Use cases</Link></li>
+              <li><Link to="/security" className="hover:text-text-1">Security and data handling</Link></li>
+              <li><a href="https://app.rulix.cloud" className="hover:text-text-1">Hosted app</a></li>
             </ul>
           </div>
           <div className="text-[13.5px]">
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Company</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/legal" className="hover:text-text-1">Legal &amp; disclaimer</Link></li>
+              <li><Link to="/legal" className="hover:text-text-1">Legal and disclaimer</Link></li>
               <li><Link to="/contact" className="hover:text-text-1">Contact</Link></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-line-soft py-5">
           <p className="wrap footnote m-0">
-            © {new Date().getFullYear()} Rulix. Research-grade prototype. Sanitized, public, or
-            approved input only — do not submit CUI, ITAR technical data, or other controlled information.
+            (c) {new Date().getFullYear()} Rulix. Research-grade prototype. Sanitized, public, or
+            approved input only. Do not submit CUI, ITAR technical data, or controlled information.
           </p>
         </div>
       </footer>
