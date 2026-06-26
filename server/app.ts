@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
@@ -62,6 +62,45 @@ const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://app.rulix.cloud",
   "https://dashboard.rulix.cloud"
 ]);
+const PUBLIC_SITE_HOSTS = new Set(["rulix.cloud", "www.rulix.cloud"]);
+const MARKETING_SITE_PAGES = [
+  {
+    path: "/",
+    title: "Rulix - Defensible export-control memo review",
+    description:
+      "Rulix checks classification memos for missing thresholds, weak evidence, and reviewer questions before human export-control reviewers sign off."
+  },
+  {
+    path: "/export-control-memo-review",
+    title: "Export-control memo review software | Rulix",
+    description:
+      "Review export-control classification memos for evidence gaps, missing technical thresholds, reviewer questions, and audit-ready signoff."
+  },
+  {
+    path: "/eccn-classification-assistant",
+    title: "ECCN classification assistant for reviewers | Rulix",
+    description:
+      "Rulix helps export-control reviewers structure ECCN classification review, evidence gaps, and human signoff without replacing expert judgment."
+  },
+  {
+    path: "/ai-export-compliance-review",
+    title: "AI export compliance review with human signoff | Rulix",
+    description:
+      "Use AI decision support to spot export-control memo gaps while keeping final determinations with trained human reviewers."
+  },
+  {
+    path: "/university-export-control-review",
+    title: "University export-control memo review | Rulix",
+    description:
+      "Rulix helps universities and research operations triage public or sanitized export-control memo drafts before empowered officials spend review time."
+  },
+  {
+    path: "/manufacturer-eccn-review",
+    title: "Manufacturer ECCN review support | Rulix",
+    description:
+      "Rulix helps manufacturers and labs reduce back-and-forth on ECCN memo evidence, product specifications, and reviewer-ready questions."
+  }
+];
 
 interface CreateAppOptions {
   store?: AccountStore;
@@ -113,6 +152,12 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.get("/robots.txt", (req, res) => {
+    if (isPublicMarketingHost(req)) {
+      res
+        .type("text/plain")
+        .send("User-agent: *\nAllow: /\n\nSitemap: https://rulix.cloud/sitemap.xml\n");
+      return;
+    }
     if (shouldNoindexApp(req)) {
       res.type("text/plain").send("User-agent: *\nDisallow: /\n");
       return;
@@ -121,6 +166,10 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.get("/sitemap.xml", (req, res) => {
+    if (isPublicMarketingHost(req)) {
+      res.type("application/xml").send(marketingSitemapXml());
+      return;
+    }
     if (shouldNoindexApp(req)) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
     }
@@ -892,10 +941,11 @@ export function createApp(options: CreateAppOptions = {}) {
         next();
         return;
       }
-    if (shouldNoindexApp(req)) {
-      res.setHeader("X-Robots-Tag", "noindex, nofollow");
-    }
-      res.sendFile(path.join(distDir, "index.html"));
+      if (shouldNoindexApp(req)) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      }
+      const indexHtml = readFileSync(path.join(distDir, "index.html"), "utf8");
+      res.type("html").send(renderIndexHtml(indexHtml, req));
     });
   }
 
@@ -946,18 +996,80 @@ function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: Set<str
 }
 
 function isPrivateAppHost(req: Request) {
-  const host = (
+  const host = requestHost(req);
+  return host === "app.rulix.cloud" || host === "dashboard.rulix.cloud";
+}
+
+function isPublicMarketingHost(req: Request) {
+  return PUBLIC_SITE_HOSTS.has(requestHost(req));
+}
+
+function requestHost(req: Request) {
+  return (
     req.get("x-forwarded-host") ??
     req.get("x-original-host") ??
     req.hostname ??
     req.get("host") ??
     ""
   ).split(",")[0].split(":")[0].toLowerCase();
-  return host === "app.rulix.cloud" || host === "dashboard.rulix.cloud";
 }
 
 function shouldNoindexApp(req: Request) {
-  return process.env.NODE_ENV === "production" || isPrivateAppHost(req);
+  return !isPublicMarketingHost(req);
+}
+
+function marketingSitemapXml() {
+  const urls = MARKETING_SITE_PAGES.map((page) => {
+    const priority = page.path === "/" ? "1.0" : "0.8";
+    const changefreq = page.path === "/" ? "weekly" : "monthly";
+    return [
+      "  <url>",
+      `    <loc>https://rulix.cloud${page.path}</loc>`,
+      `    <changefreq>${changefreq}</changefreq>`,
+      `    <priority>${priority}</priority>`,
+      "  </url>"
+    ].join("\n");
+  }).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
+
+function renderIndexHtml(indexHtml: string, req: Request) {
+  if (!isPublicMarketingHost(req)) return indexHtml;
+  const meta = marketingMetaForPath(req.path);
+  const canonical = `https://rulix.cloud${meta.path}`;
+  const cleanHtml = indexHtml
+    .replace(/^\s*<meta name="description"[^>]*>\r?\n?/im, "")
+    .replace(/^\s*<link rel="canonical"[^>]*>\r?\n?/im, "")
+    .replace(/^\s*<meta property="og:[^"]+"[^>]*>\r?\n?/gim, "")
+    .replace(/^\s*<meta name="twitter:card"[^>]*>\r?\n?/im, "");
+  return cleanHtml
+    .replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`)
+    .replace(
+      "</head>",
+      [
+        `    <meta name="description" content="${escapeHtml(meta.description)}" />`,
+        `    <link rel="canonical" href="${canonical}" />`,
+        `    <meta property="og:title" content="${escapeHtml(meta.title)}" />`,
+        `    <meta property="og:description" content="${escapeHtml(meta.description)}" />`,
+        `    <meta property="og:type" content="website" />`,
+        `    <meta property="og:url" content="${canonical}" />`,
+        `    <meta property="og:image" content="https://rulix.cloud/marketing/rulix-audit-product.png" />`,
+        `    <meta name="twitter:card" content="summary_large_image" />`,
+        "  </head>"
+      ].join("\n")
+    );
+}
+
+function marketingMetaForPath(pathname: string) {
+  return MARKETING_SITE_PAGES.find((page) => page.path === pathname) ?? MARKETING_SITE_PAGES[0];
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;");
 }
 
 async function memoAuditEvents(store: AccountStore, userId: string, memoId: string) {

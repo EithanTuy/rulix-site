@@ -100,6 +100,24 @@ describe("Rulix ECCN API", () => {
     }
   });
 
+  it("serves crawl assets for the public marketing host", async () => {
+    const robots = await request(testApp())
+      .get("/robots.txt")
+      .set("Host", "rulix.cloud")
+      .expect(200);
+    expect(robots.text).toContain("Allow: /");
+    expect(robots.text).toContain("https://rulix.cloud/sitemap.xml");
+    expect(robots.headers["x-robots-tag"]).toBeUndefined();
+
+    const sitemap = await request(testApp())
+      .get("/sitemap.xml")
+      .set("Host", "www.rulix.cloud")
+      .expect(200);
+    expect(sitemap.text).toContain("https://rulix.cloud/export-control-memo-review");
+    expect(sitemap.text).toContain("https://rulix.cloud/manufacturer-eccn-review");
+    expect(sitemap.headers["content-type"]).toContain("application/xml");
+  });
+
   it("serves the official corpus snapshot", async () => {
     const response = await request(testApp()).get("/api/corpus").expect(200);
 
