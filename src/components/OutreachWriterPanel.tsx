@@ -120,19 +120,19 @@ export function OutreachWriterPanel() {
   const signAllUnsent = async () => {
     const sig = signature.trim();
     if (!sig) return;
-    const unsent = leads.filter((l) => {
+    const toSign = leads.filter((l) => {
       const d = drafts[l.leadId];
-      return d && !d.sentAt && !d.body.includes(sig);
+      return d && !d.body.includes(sig);
     });
-    if (!unsent.length) { setNotice("All unsent drafts are already signed."); return; }
+    if (!toSign.length) { setNotice("All drafts are already signed."); return; }
     setBusy(true);
     setError("");
     let count = 0;
-    for (const l of unsent) {
+    for (const l of toSign) {
       const d = drafts[l.leadId];
       try {
         const result = await saveOutreachDraft(l.leadId, d.subject, `${d.body.trimEnd()}\n\n${sig}`);
-        setDrafts((current) => ({ ...current, [l.leadId]: result.draft }));
+        setDrafts((current) => ({ ...current, [l.leadId]: { ...result.draft, sentAt: d.sentAt } }));
         count++;
       } catch { /* skip failed, continue */ }
     }
