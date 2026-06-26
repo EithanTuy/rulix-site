@@ -98,7 +98,6 @@ export function OutreachWriterPanel() {
     if (!lead) return;
     const saved = await save(true);
     if (!saved) return;
-    if (!window.confirm(`Mark ${lead.email} as sent manually?`)) return;
     setBusy(true);
     try {
       const result = await markOutreachSent(lead.leadId);
@@ -109,6 +108,12 @@ export function OutreachWriterPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const goNext = () => {
+    const idx = leads.findIndex((item) => item.leadId === lead?.leadId);
+    const next = leads[idx + 1];
+    if (next) setSelectedId(next.leadId);
   };
 
   const draftAllMissing = async () => {
@@ -277,6 +282,7 @@ export function OutreachWriterPanel() {
               <Sparkles size={14} /> Add subtle context
             </button>
             <button type="button" onClick={() => void markSent()} disabled={busy || !subject || !body}><Send size={14} /> Mark sent</button>
+            <button type="button" onClick={goNext} disabled={!lead || leads.findIndex((item) => item.leadId === lead.leadId) >= leads.length - 1}>Next →</button>
           </div>
           <label>
             <span>Body</span>
