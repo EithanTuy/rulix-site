@@ -195,11 +195,7 @@ export function MemoDraftChatPanel({
   };
 
   const handleWrite = (analyze: boolean) => {
-    if (!draft) return;
-    if (!isUsableMemo(draft.memoText)) {
-      setError("The draft is not review-ready yet. Ask Sonnet to produce the full sectioned memo before adding it to Reviews.");
-      return;
-    }
+    if (!draft || !draft.memoText.trim()) return;
     if (analyze) {
       onCreateAndAnalyze(draft);
     } else {
@@ -407,7 +403,7 @@ function normalizeDraft(
   messages: MemoBuildMessage[]
 ) {
   const memoText = result.memoText.trim();
-  if (!isUsableMemo(memoText)) return undefined;
+  if (!memoText) return undefined;
   return {
     ...result,
     memoText,
@@ -415,12 +411,6 @@ function normalizeDraft(
       ? readyAttachments.map((attachment) => attachment.name)
       : currentDraft?.attachments ?? attachmentNamesFromMessages(messages)
   };
-}
-
-function isUsableMemo(memoText: string) {
-  const trimmed = memoText.trim();
-  const sectionCount = (trimmed.match(/^#{1,3}\s+/gm) ?? []).length;
-  return trimmed.length >= 500 && sectionCount >= 4;
 }
 
 function attachmentNamesFromMessages(messages: MemoBuildMessage[]) {
