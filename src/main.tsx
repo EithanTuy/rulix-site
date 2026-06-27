@@ -6,6 +6,9 @@ import { Contact } from "./pages/Contact";
 import { Home, type LandingVariant } from "./pages/Home";
 import { Legal } from "./pages/Legal";
 import { Security } from "./pages/Security";
+import { ThankYou } from "./pages/ThankYou";
+import { initAnalytics } from "./lib/analytics";
+import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
 import "./index.css";
 
 const future = {
@@ -38,10 +41,14 @@ const router = createBrowserRouter([
       { path: "security", element: <Security /> },
       { path: "contact", element: <Contact /> },
       { path: "legal", element: <Legal /> },
+      { path: "thank-you", element: <ThankYou /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ], { future });
+
+initAnalytics();
+applyTheme(getInitialTheme());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
