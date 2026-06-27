@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 
 type BrandProps = {
   variant?: "dark" | "light";
@@ -67,6 +68,7 @@ export function Layout() {
             <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-sm:hidden">
               Sign in
             </a>
+            <ThemeToggle />
             <Link to="/#lead" className="btn primary !py-2.5 !text-[13px]">
               Book consult
             </Link>

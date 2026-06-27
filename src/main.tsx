@@ -8,6 +8,7 @@ import { Legal } from "./pages/Legal";
 import { Security } from "./pages/Security";
 import { ThankYou } from "./pages/ThankYou";
 import { initAnalytics } from "./lib/analytics";
+import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
 import "./index.css";
 
 const future = {
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
 ], { future });
 
 initAnalytics();
+applyTheme(getInitialTheme());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
