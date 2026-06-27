@@ -1,25 +1,32 @@
 // Layout.tsx - top nav + footer shell around all routed pages.
 
 import { useEffect } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
-export function Brand({ size = 28 }: { size?: number }) {
+type BrandProps = {
+  variant?: "dark" | "light";
+  compact?: boolean;
+};
+
+export function Brand({ variant = "dark", compact = false }: BrandProps) {
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
-        <rect width="32" height="32" rx="2" fill="var(--accent)" />
-        <path d="M16 5l9 4v6c0 5.5-3.8 9.7-9 11-5.2-1.3-9-5.5-9-11V9l9-4z" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
-        <path d="M11.5 16.2l3 3 6-6.4" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <strong className="text-[17px] tracking-tight">Rulix</strong>
+    <span className={`brand ${variant === "light" ? "brand-light" : ""}`}>
+      <img src="/brand/rulix-mark.png" alt="" className="brand-mark" />
+      {!compact && (
+        <span className="brand-word">
+          rulix<span />
+        </span>
+      )}
     </span>
   );
 }
 
 const NAV = [
-  { to: "/#sample", label: "Sample audit" },
-  { to: "/#use-cases", label: "Use cases" },
+  { to: "/#product", label: "Product" },
+  { to: "/#sample", label: "Sample packet" },
   { to: "/security", label: "Security" },
+  { to: "/contact", label: "Contact" },
 ];
 
 export function Layout() {
@@ -45,20 +52,24 @@ export function Layout() {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b border-line-soft bg-bg/90 backdrop-blur">
-        <div className="wrap flex min-h-[68px] items-center justify-between gap-5 py-3">
-          <Link to="/" aria-label="Rulix home"><Brand /></Link>
-          <nav className="flex items-center gap-7 text-[13.5px] font-medium text-text-2 max-md:gap-4">
+    <div className="flex min-h-screen flex-col bg-bg text-text-1">
+      <header className="site-header">
+        <div className="wrap flex min-h-[76px] items-center justify-between gap-5 py-3">
+          <Link to="/" aria-label="Rulix home">
+            <Brand />
+          </Link>
+          <nav className="flex items-center gap-7 text-[13.5px] font-medium text-text-2 max-lg:gap-5">
             {NAV.map((item) => (
-              <Link key={item.to} to={item.to} className="transition-colors hover:text-text-1 max-sm:hidden">
+              <Link key={item.to} to={item.to} className="transition-colors hover:text-text-1 max-md:hidden">
                 {item.label}
               </Link>
             ))}
-            <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-md:hidden">
+            <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-sm:hidden">
               Sign in
             </a>
-            <Link to="/contact" className="btn primary !py-2 !text-[13px]">Book audit</Link>
+            <Link to="/contact" className="btn primary !py-2.5 !text-[13px]">
+              Book memo audit
+            </Link>
           </nav>
         </div>
       </header>
@@ -67,40 +78,68 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-line-soft bg-bg-2">
-        <div className="wrap grid gap-8 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
+      <footer className="site-footer">
+        <div className="wrap grid gap-10 py-12 md:grid-cols-[1.2fr_0.75fr_0.75fr_0.9fr]">
           <div>
-            <Brand size={24} />
-            <p className="footnote mt-4 max-w-[44ch]">
-              Rulix is decision-support software for export-control review teams. It never issues
-              final ECCN, license, sanctions, or jurisdiction determinations. A qualified human
-              reviewer always decides.
+            <Brand variant="light" />
+            <p className="mt-5 max-w-[42ch] text-[13px] leading-6 text-white/58">
+              Rulix is decision-support software for export-control review teams. It never issues final ECCN, license, sanctions, or jurisdiction determinations.
             </p>
           </div>
-          <div className="text-[13.5px]">
-            <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Product</h4>
-            <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/#sample" className="hover:text-text-1">Sample audit output</Link></li>
-              <li><Link to="/#use-cases" className="hover:text-text-1">Use cases</Link></li>
-              <li><Link to="/security" className="hover:text-text-1">Security and data handling</Link></li>
-              <li><a href="https://app.rulix.cloud" className="hover:text-text-1">Hosted app</a></li>
-            </ul>
-          </div>
-          <div className="text-[13.5px]">
-            <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Company</h4>
-            <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/legal" className="hover:text-text-1">Legal and disclaimer</Link></li>
-              <li><Link to="/contact" className="hover:text-text-1">Contact</Link></li>
-            </ul>
+          <FooterColumn
+            title="Product"
+            links={[
+              ["Overview", "/#product"],
+              ["Sample packet", "/#sample"],
+              ["Use cases", "/#use-cases"],
+              ["Hosted app", "https://app.rulix.cloud"],
+            ]}
+          />
+          <FooterColumn
+            title="Company"
+            links={[
+              ["Security", "/security"],
+              ["Contact", "/contact"],
+              ["Legal", "/legal"],
+            ]}
+          />
+          <div className="border-l border-white/14 pl-7 max-md:border-l-0 max-md:pl-0">
+            <h4 className="footer-title">Hosted app</h4>
+            <p className="m-0 max-w-[26ch] text-[13px] leading-6 text-white/58">
+              Run audits in the isolated hosted environment.
+            </p>
+            <a href="https://app.rulix.cloud" className="mt-5 inline-flex items-center gap-2 text-[13px] font-semibold text-accent">
+              Open app
+              <ArrowUpRight size={15} />
+            </a>
           </div>
         </div>
-        <div className="border-t border-line-soft py-5">
-          <p className="wrap footnote m-0">
-            (c) {new Date().getFullYear()} Rulix. Research-grade prototype. Sanitized, public, or
-            approved input only. Do not submit CUI, ITAR technical data, or controlled information.
+        <div className="border-t border-white/10 py-5">
+          <p className="wrap m-0 flex flex-wrap items-center justify-between gap-3 text-[12px] text-white/48">
+            <span>(c) {new Date().getFullYear()} Rulix. Research-grade prototype.</span>
+            <span>Sanitized, public, or approved input only.</span>
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FooterColumn({ title, links }: { title: string; links: Array<[string, string]> }) {
+  return (
+    <div>
+      <h4 className="footer-title">{title}</h4>
+      <ul className="m-0 list-none space-y-2 p-0 text-[13px] text-white/58">
+        {links.map(([label, href]) => (
+          <li key={href}>
+            {href.startsWith("http") ? (
+              <a href={href} className="hover:text-white">{label}</a>
+            ) : (
+              <Link to={href} className="hover:text-white">{label}</Link>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
