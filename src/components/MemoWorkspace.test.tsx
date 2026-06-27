@@ -244,6 +244,7 @@ function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) 
         analysisMode="standard"
         onAnalysisModeChange={vi.fn()}
         backendNotice="Backend ready"
+        liveAnalysisAvailable={true}
         onRunAnalysis={onRunAnalysis}
         auditEvents={[]}
         chatMessages={[]}

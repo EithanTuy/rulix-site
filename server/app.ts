@@ -16,6 +16,7 @@ import type {
   LeadSearchRun,
   LeadWorkflow,
   OutreachJob,
+  ReviewResult,
   ReviewerDecision,
   UsageEvent,
   UserProfile
@@ -23,6 +24,7 @@ import type {
 import {
   draftMemoFromPublicWeb,
   getBedrockRuntime,
+  LiveCouncilUnavailableError,
   runCouncilAnalysis,
   runMemoBuildChat,
   runMemoChatWithHaiku,
@@ -762,11 +764,17 @@ export function createApp(options: CreateAppOptions = {}) {
 
     const state = await store.getAccountState(res.locals.user.id);
     const depth = coerceReviewDepth(req.body?.depth);
-    const result = await runCouncilAnalysis(memo, {
-      depth,
-      maxTokens: depth === "deep" ? 3600 : undefined,
-      onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
-    });
+    let result: ReviewResult;
+    try {
+      result = await runCouncilAnalysis(memo, {
+        depth,
+        maxTokens: depth === "deep" ? 3600 : undefined,
+        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+      });
+    } catch (error) {
+      sendCouncilError(res, error);
+      return;
+    }
     const updatedMemo = {
       ...memo,
       status: deriveReviewStatus(result, state.decisions[memo.id])
@@ -795,11 +803,17 @@ export function createApp(options: CreateAppOptions = {}) {
     }
 
     const depth = coerceReviewDepth(req.body?.depth);
-    const result = await runCouncilAnalysis(memo, {
-      depth,
-      maxTokens: depth === "deep" ? 3600 : undefined,
-      onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
-    });
+    let result: ReviewResult;
+    try {
+      result = await runCouncilAnalysis(memo, {
+        depth,
+        maxTokens: depth === "deep" ? 3600 : undefined,
+        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample)
+      });
+    } catch (error) {
+      sendCouncilError(res, error);
+      return;
+    }
     res.json({ result });
   });
 
@@ -1228,6 +1242,14 @@ function sendStoreError(res: Response, error: unknown) {
     return;
   }
   res.status(500).json({ error: "Unexpected account error." });
+}
+
+function sendCouncilError(res: Response, error: unknown) {
+  if (error instanceof LiveCouncilUnavailableError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return;
+  }
+  res.status(500).json({ error: "Live AI analysis failed. No deterministic analysis was recorded." });
 }
 
 // Persist a Bedrock usage sample for the admin dashboard. Best-effort: a

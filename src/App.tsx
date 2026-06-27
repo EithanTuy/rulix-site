@@ -50,7 +50,6 @@ type AnalysisRunState =
   | { status: "unanalyzed"; message: string }
   | { status: "running"; message: string }
   | { status: "live"; message: string }
-  | { status: "deterministic"; message: string }
   | { status: "failed"; message: string };
 
 type AuthState =
@@ -149,7 +148,7 @@ export function App() {
         setBackendNotice(
           health.provider.configured
             ? "Live AI analysis is available for authenticated reviews."
-            : "Live AI is unavailable. Deterministic rules will be clearly marked."
+            : "Live AI analysis is unavailable. Analysis is disabled until the provider is configured."
         );
       })
       .catch(() => {
@@ -513,8 +512,8 @@ export function App() {
       [memo.id]: {
         status: "running",
         message: backendHealth?.provider.configured
-          ? "AI Council is analyzing this Memo Builder draft…"
-          : "Live AI is unavailable. Running deterministic analysis."
+          ? "AI Council is analyzing this Memo Builder draft..."
+          : "Live AI is unavailable. Analysis will not run until the provider is configured."
       }
     }));
     setActiveView("reviews");
@@ -531,9 +530,7 @@ export function App() {
         if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
         setAnalysisStates((current) => ({
           ...current,
-          [memo.id]: result.provider.live
-            ? { status: "live", message: "Live AI analysis completed. Reviewer signoff is still required." }
-            : { status: "deterministic", message: result.provider.message }
+          [memo.id]: { status: "live", message: "Live AI analysis completed. Reviewer signoff is still required." }
         }));
         setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
       })
@@ -717,6 +714,16 @@ export function App() {
     if (blockDirtyDraft("running analysis")) return;
     if (!selectedMemo) return;
     const memo = selectedMemo;
+    if (backendHealth && !backendHealth.provider.configured) {
+      setAnalysisStates((current) => ({
+        ...current,
+        [memo.id]: {
+          status: "failed",
+          message: "Live AI analysis is unavailable. No deterministic analysis was recorded."
+        }
+      }));
+      return;
+    }
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 180000);
     setAnalysisStates((current) => ({
@@ -724,8 +731,8 @@ export function App() {
       [memo.id]: {
         status: "running",
         message: backendHealth?.provider.configured
-          ? `${ANALYSIS_MODE_CONFIG[analysisMode].label} is analyzing this memo. If it does not finish in 3 minutes, deterministic analysis will be recorded.`
-          : "Live AI is unavailable. Running deterministic analysis."
+          ? `${ANALYSIS_MODE_CONFIG[analysisMode].label} is analyzing this memo. No deterministic fallback will be recorded.`
+          : "Live AI availability is unknown. Rulix will fail closed if the provider is unavailable."
       }
     }));
 
@@ -744,25 +751,14 @@ export function App() {
         }));
         return;
       }
-      const failedToUseLiveAi = backendHealth?.provider.configured && result.provider.source !== "bedrock";
       setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
       if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
       setAnalysisStates((current) => ({
         ...current,
-        [memo.id]: failedToUseLiveAi
-          ? {
-              status: "failed",
-              message: `${result.provider.message} Deterministic rules were used for this result.`
-            }
-          : result.provider.live
-            ? {
-                status: "live",
-                message: "Live AI analysis completed. Reviewer signoff is still required."
-              }
-            : {
-                status: "deterministic",
-                message: "Deterministic analysis completed because no live AI provider was used."
-              }
+        [memo.id]: {
+          status: "live",
+          message: "Live AI analysis completed. Reviewer signoff is still required."
+        }
       }));
       setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
     } catch (error) {
@@ -772,7 +768,7 @@ export function App() {
         ...current,
         [memo.id]: {
           status: "failed",
-          message: `${message} Deterministic rules were not recorded; retry when the backend is available.`
+          message: `${message} No deterministic analysis was recorded; retry when live AI is available.`
         }
       }));
       addAuditEvent(memo.id, "AI analysis failed", "Backend AI analysis failed; no new result was recorded.", "review");
@@ -805,12 +801,13 @@ export function App() {
 
   const hydrateAccountState = (state: AccountReviewState) => {
     setMemoDraftDirty(false);
+    const liveResults = liveOnlyAnalysisResults(state.analysisResults ?? {});
     setMemos(state.memos ?? []);
     setSelectedMemoId(state.selectedMemoId ?? state.memos?.[0]?.id);
     setDecisions(state.decisions ?? {});
     setAuditEvents(state.auditEvents ?? []);
-    setAnalysisResults(state.analysisResults ?? {});
-    setAnalysisStates(deriveAnalysisStates(state.analysisResults ?? {}));
+    setAnalysisResults(liveResults);
+    setAnalysisStates(deriveAnalysisStates(liveResults));
     setChatMessages(state.chatMessages ?? {});
     const builderSessions = normalizeMemoBuilderSessions(state.memoBuilder);
     setMemoBuilderSessions(builderSessions);
@@ -946,6 +943,7 @@ export function App() {
                   analysisMode={analysisMode}
                   onAnalysisModeChange={setAnalysisMode}
                   backendNotice={backendNotice}
+                  liveAnalysisAvailable={backendHealth?.provider.configured !== false}
                   onRunAnalysis={runAnalysis}
                   decision={decision}
                   auditEvents={auditEvents.filter((event) => event.memoId === selectedMemo.id)}
@@ -1340,19 +1338,20 @@ function RulixLogo() {
 
 function deriveAnalysisStates(results: Record<string, ReviewResult>) {
   return Object.fromEntries(
-    Object.entries(results).map(([memoId, result]) => [
+    Object.entries(results).map(([memoId]) => [
       memoId,
-      result.provider.live
-        ? {
-            status: "live",
-            message: "Live AI analysis completed. Reviewer signoff is still required."
-          }
-        : {
-            status: result.provider.source === "fallback" ? "failed" : "deterministic",
-            message: result.provider.message
-          }
+      {
+        status: "live",
+        message: "Live AI analysis completed. Reviewer signoff is still required."
+      }
     ])
   ) as Record<string, AnalysisRunState>;
+}
+
+function liveOnlyAnalysisResults(results: Record<string, ReviewResult>) {
+  return Object.fromEntries(
+    Object.entries(results).filter(([, result]) => result.provider.live && result.provider.source === "bedrock")
+  ) as Record<string, ReviewResult>;
 }
 
 function clamp(value: number, min: number, max: number) {

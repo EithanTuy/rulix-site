@@ -28,9 +28,9 @@ $env:AWS_PROFILE = "rulix-deploy"
 
 ### 2. Optional Bedrock Live AI
 
-Without `BEDROCK_ENABLED=true` the app runs in deterministic local-rules mode.
-To enable live analysis, grant the Lambda execution role Bedrock model access
-and set the deployment flag:
+Without `BEDROCK_ENABLED=true`, reviewer-facing analysis is unavailable. To
+enable live analysis, grant the Lambda execution role Bedrock model access and
+set the deployment flag:
 
 ```powershell
 terraform apply -var bedrock_enabled=true
@@ -125,8 +125,8 @@ After deploy, verify the durable login path:
 CloudFront takes roughly 5-15 minutes to deploy.
 
 The CloudFront Lambda origin read timeout is 60 seconds. Live Bedrock council
-calls use a shorter backend deadline so Rulix can persist and return its
-deterministic fallback before the edge connection closes.
+calls use a shorter backend deadline so Rulix can fail closed with a clear
+live-AI-unavailable response before the edge connection closes.
 
 ## Tear Down
 

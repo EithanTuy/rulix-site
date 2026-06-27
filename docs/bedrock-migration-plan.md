@@ -16,7 +16,7 @@ before anything tell me how to give you the access key to my iam user account sa
   - `draftMemoFromPublicWeb()` — drafts a memo using the **`web_search` server-side tool**.
   - `getAnthropicRuntime()` — reports `{ configured, model }` for the health endpoint and startup log.
 - Callers: `server/index.ts` (startup log), `server/app.ts` (health endpoint + 3 feature handlers), `server/test-live-ai.ts`, `server/test-live-council.ts`.
-- Config today is gated purely on `process.env.ANTHROPIC_API_KEY`. When absent, everything falls back to the deterministic local rules engine (`src/lib/eccnReview.ts`). **Preserve this fallback behavior.**
+- Historical note: this migration originally preserved reviewer-visible fallback to the deterministic local rules engine when live AI was absent. Current production behavior supersedes that instruction: reviewer-facing analysis requires live Bedrock and fails closed when live AI is unavailable; local rules remain an internal council baseline.
 - Provider source is a discriminated union: `AnalysisSource = "anthropic" | "local-rules" | "fallback"` in `src/types.ts`, also referenced in `src/App.tsx`, `src/components/PublicDraftPanel.tsx`, and `src/styles.css`.
 
 ### ⚠️ Critical constraint: Bedrock does NOT support server-side tools

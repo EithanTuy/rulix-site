@@ -20,8 +20,18 @@ export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001
 export const DEFAULT_DEEP_BEDROCK_MODEL = "global.anthropic.claude-sonnet-4-6";
 export type CouncilDepth = "standard" | "deep";
 
+export class LiveCouncilUnavailableError extends Error {
+  readonly status = 503;
+  readonly code = "live_council_unavailable";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "LiveCouncilUnavailableError";
+  }
+}
+
 // Emitted (best-effort) after each live Bedrock call so callers can record
-// token usage for the admin dashboard. Never fires in local-fallback mode.
+// token usage for the admin dashboard. Never fires when live analysis is unavailable.
 export interface UsageSample {
   model: string;
   callType: UsageCallType;
@@ -229,23 +239,17 @@ export async function runCouncilAnalysis(
   memo: MemoRecord,
   options: CouncilOptions = {}
 ): Promise<ReviewResult> {
-  const localResult = analyzeMemo(memo);
   const runtime = getBedrockRuntime();
   const depth = options.depth ?? "standard";
   const model = councilModelForDepth(depth, runtime);
 
   if (!runtime.configured) {
-    return withProvider(localResult, {
-      source: "local-rules",
-      label: "Local rules council",
-      model: "local-rule-engine-v1",
-      depth,
-      live: false,
-      message: "Bedrock is not enabled on the backend, so the deterministic council is displayed.",
-      checkedAt: new Date().toISOString()
-    });
+    throw new LiveCouncilUnavailableError(
+      "Live AI analysis is not configured. No deterministic analysis was recorded."
+    );
   }
 
+  const localResult = analyzeMemo(memo);
   const startedAt = Date.now();
   try {
     const client = options.providerClient ?? (new AnthropicBedrock() as CouncilProviderClient);
@@ -303,17 +307,9 @@ export async function runCouncilAnalysis(
       latencyMs: Date.now() - startedAt
     });
   } catch (error) {
-    const checkedAt = new Date().toISOString();
-    return withProvider(localResult, {
-      source: "fallback",
-      label: "Local fallback council",
-      model,
-      depth,
-      live: false,
-      message: `Live Bedrock analysis failed (${safeError(error)}). Showing deterministic backend fallback.`,
-      checkedAt,
-      latencyMs: Date.now() - startedAt
-    });
+    throw new LiveCouncilUnavailableError(
+      `Live AI analysis failed (${safeError(error)}). No deterministic analysis was recorded.`
+    );
   }
 }
 

@@ -442,7 +442,7 @@ function SettingsPanel() {
       <div className="setting-card">
         <ShieldCheck size={22} />
         <strong>Model policy</strong>
-        <p>Live analysis is optional; deterministic review remains clearly labeled and never replaces human signoff.</p>
+        <p>Reviewer-facing analysis requires live AI; local rules remain an internal validation baseline and never replace human signoff.</p>
       </div>
     </section>
   );

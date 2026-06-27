@@ -51,12 +51,13 @@ One TypeScript codebase, two runtime halves served from a single origin:
 
 Key design points:
 
-- **AI with a deterministic floor.** Every analysis first computes a local
-  rules result. If `BEDROCK_ENABLED=true`, the Claude council runs through
-  Amazon Bedrock and its output is merged, but citation IDs are validated
-  against the real corpus and evidence excerpts are re-located in the actual
-  memo text, so the model cannot fabricate sources or highlights. With Bedrock
-  disabled, the deterministic result is shown and labeled as such. Default
+- **Live AI with an internal deterministic baseline.** Every analysis first
+  computes local rules internally so the Claude council has guardrails. If
+  `BEDROCK_ENABLED=true`, the council runs through Amazon Bedrock and its output
+  is merged, but citation IDs are validated against the real corpus and evidence
+  excerpts are re-located in the actual memo text, so the model cannot fabricate
+  sources or highlights. With Bedrock disabled or failing, reviewer-facing
+  analysis fails closed and no deterministic result is recorded. Default
   standard model is the **Haiku council** through the global Bedrock inference
   profile (`global.anthropic.claude-haiku-4-5-20251001-v1:0`). Deep council
   reviews use Claude Sonnet 4.6.
@@ -177,8 +178,9 @@ hosting switch, the App Runner attempt, and the UI revamp.
 2. CloudFront terminates TLS (ACM cert), forwards to the Lambda Function URL,
    adding the secret origin header.
 3. Express (in Lambda) checks the edge secret, serves the SPA or handles `/api`.
-4. Authed reviewer submits a memo → deterministic engine runs; if Bedrock is
-   enabled, the Claude **Haiku council** also runs and is merged with
+4. Authed reviewer submits a memo → the deterministic engine runs only as an
+   internal baseline; if Bedrock is enabled, the Claude **Haiku council** runs
+   and is merged with
    citation/range validation.
 5. Findings + recommendation render; reviewer records a decision; signoff gates
    the final status.
@@ -202,7 +204,7 @@ GoDaddy validation record → CloudFront). Subsequent deploys are a single apply
 - **Secrets** (AWS access keys and deployment credentials) are never committed
   and never deployed by the assistant. Live AI uses the AWS credential chain or
   Lambda execution role plus explicit `BEDROCK_ENABLED=true`; without that flag
-  the app runs in deterministic local-rules mode.
+  user-facing analysis is unavailable.
 - **Edge secret** prevents direct Function URL access in custom-domain deploys.
 - **Auth + CSRF** protect account data and mutating routes.
 - **Compliance:** this public commercial deployment is a sample/redacted-data

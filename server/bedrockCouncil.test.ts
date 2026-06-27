@@ -41,6 +41,14 @@ describe("Bedrock model routing", () => {
     expect(councilModelForDepth("deep", runtime)).toContain("sonnet-custom");
   });
 
+  it("fails closed instead of returning local deterministic analysis when Bedrock is disabled", async () => {
+    delete process.env.BEDROCK_ENABLED;
+
+    await expect(runCouncilAnalysis(reviewFixtures[0])).rejects.toThrow(
+      "Live AI analysis is not configured. No deterministic analysis was recorded."
+    );
+  });
+
   it("runs a mocked standard provider response through the live council path", async () => {
     process.env.BEDROCK_ENABLED = "true";
     delete process.env.BEDROCK_MODEL;
@@ -133,6 +141,20 @@ describe("Bedrock model routing", () => {
     expect(result.findings.some((finding) =>
       finding.status === "missing" && finding.title.includes("Camera sensor parameters")
     )).toBe(true);
+  });
+
+  it("fails closed instead of returning fallback analysis when the provider errors", async () => {
+    process.env.BEDROCK_ENABLED = "true";
+    const create = vi.fn(async (_body: unknown, _options?: unknown) => {
+      throw new Error("provider timeout");
+    });
+    const client: CouncilProviderClient = {
+      messages: { create }
+    };
+
+    await expect(runCouncilAnalysis(reviewFixtures[0], { providerClient: client })).rejects.toThrow(
+      "Live AI analysis failed (provider timeout). No deterministic analysis was recorded."
+    );
   });
 });
 

@@ -24,12 +24,13 @@ interface AnalysisPanelProps {
   memo: MemoRecord;
   result?: ReviewResult;
   analysisState: {
-    status: "unanalyzed" | "running" | "live" | "deterministic" | "failed";
+    status: "unanalyzed" | "running" | "live" | "failed";
     message: string;
   };
   analysisMode: AnalysisMode;
   onAnalysisModeChange: (mode: AnalysisMode) => void;
   backendNotice: string;
+  liveAnalysisAvailable: boolean;
   onRunAnalysis: () => void;
   decision?: ReviewerDecision;
   auditEvents: AuditEvent[];
@@ -51,6 +52,7 @@ export function AnalysisPanel({
   analysisMode,
   onAnalysisModeChange,
   backendNotice,
+  liveAnalysisAvailable,
   onRunAnalysis,
   decision,
   auditEvents,
@@ -139,8 +141,14 @@ export function AnalysisPanel({
                 type="button"
                 className="button primary full"
                 onClick={onRunAnalysis}
-                disabled={analysisState.status === "running" || memoDraftDirty}
-                title={memoDraftDirty ? "Save or discard memo edits before running analysis." : undefined}
+                disabled={analysisState.status === "running" || memoDraftDirty || !liveAnalysisAvailable}
+                title={
+                  memoDraftDirty
+                    ? "Save or discard memo edits before running analysis."
+                    : !liveAnalysisAvailable
+                      ? "Live AI analysis is unavailable."
+                      : undefined
+                }
               >
                 {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
               </button>
@@ -153,7 +161,7 @@ export function AnalysisPanel({
                   ? "Run analysis before recording a reviewer decision."
                   : activeTab === "audit"
                     ? "Audit events will appear here as intake, analysis, chat edits, and decisions are recorded."
-                    : "Rulix will try live AI analysis when configured. If live AI fails or is unavailable, the app will clearly mark the result as deterministic rules analysis."}
+                    : "Rulix requires live AI analysis for reviewer-facing results. If live AI fails or is unavailable, no analysis result is recorded."}
               </p>
             </section>
           </>
@@ -183,8 +191,14 @@ export function AnalysisPanel({
               type="button"
               className="button small"
               onClick={onRunAnalysis}
-              disabled={memoDraftDirty}
-              title={memoDraftDirty ? "Save or discard memo edits before rerunning analysis." : undefined}
+              disabled={memoDraftDirty || !liveAnalysisAvailable}
+              title={
+                memoDraftDirty
+                  ? "Save or discard memo edits before rerunning analysis."
+                  : !liveAnalysisAvailable
+                    ? "Live AI analysis is unavailable."
+                    : undefined
+              }
             >
               Re-run Analysis
             </button>
@@ -469,8 +483,7 @@ function SupportTabs({
 
 function analysisStatusTitle(status: AnalysisPanelProps["analysisState"]["status"]) {
   if (status === "live") return "Live AI analysis";
-  if (status === "failed") return "AI failed - deterministic result";
-  if (status === "deterministic") return "Deterministic analysis";
+  if (status === "failed") return "AI analysis unavailable";
   if (status === "running") return "AI analysis running";
   return "Unanalyzed";
 }

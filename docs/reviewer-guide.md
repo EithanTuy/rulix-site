@@ -41,10 +41,9 @@ Newly uploaded, pasted, or created memos are intentionally Unanalyzed. The revie
 - Unanalyzed: no review result has been produced yet.
 - AI working: live AI analysis is currently running.
 - Live AI analysis: the AI provider returned a structured review.
-- Deterministic analysis: local rules produced the review because no live AI provider was used.
-- AI failed - deterministic result: live AI failed or timed out, and deterministic rules were used instead.
+- AI analysis unavailable: live AI was not configured, failed, or timed out; no reviewer-facing analysis result was recorded.
 
-If live AI does not finish within 3 minutes, Rulix records a deterministic result and clearly marks it as AI failed - deterministic result.
+If live AI does not finish within 3 minutes, Rulix fails closed and asks the reviewer to retry when live AI is available. Local rules remain an internal validation baseline for the live council, not a user-selectable or recorded analysis mode.
 
 ## Analysis Modes
 

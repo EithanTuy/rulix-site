@@ -14,7 +14,7 @@ hit along the way. See `docs/aws-deploy.md` for the step-by-step runbook.
 | Compute | Lambda `rulix-prod-app` (Node 20, Express UI + `/api`) |
 | Edge / TLS | CloudFront `dwvgir86b7phl.cloudfront.net`, ACM cert for `app.rulix.cloud` and `dashboard.rulix.cloud` |
 | DNS | GoDaddy `rulix.cloud`: ACM validation CNAMEs + `app` and `dashboard` to CloudFront |
-| AI mode | Bedrock-enabled in production, with deterministic fallback behavior |
+| AI mode | Bedrock-enabled in production; reviewer-facing analysis fails closed when live AI is unavailable |
 | Auth mode | Invite-only custom auth with DynamoDB tables and SESv2 email when `AUTH_EMAIL_FROM` is configured |
 
 Verified end-to-end: UI loads, `/api/health` 200, `/api/ai/review` returns
@@ -22,8 +22,8 @@ grounded findings when called from an authenticated session.
 
 Deep Sonnet reviews are bounded to 50 seconds and CloudFront waits up to 60
 seconds for the Lambda origin. If Sonnet exceeds the deadline, the backend
-returns and records the deterministic fallback instead of exposing a
-CloudFront 504 page.
+returns a live-AI-unavailable error instead of recording a deterministic
+review result or exposing a CloudFront 504 page.
 
 ---
 
@@ -50,8 +50,8 @@ application log group ARN.
 ### 2. Initial Local-Rules Mode, Then Bedrock Enabled (RESOLVED)
 
 The first deployment used the deterministic council only. Production has since
-been redeployed with Bedrock enabled and deterministic fallback behavior still
-available when model calls fail or time out.
+been redeployed with Bedrock enabled. Reviewer-facing analysis now requires
+live AI; deterministic local rules remain an internal baseline only.
 
 To explicitly redeploy with Bedrock enabled:
 

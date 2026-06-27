@@ -295,20 +295,21 @@ describe("Rulix ECCN API", () => {
     });
   });
 
-  it("analyzes an ad hoc memo through the authenticated fallback backend path", async () => {
+  it("rejects ad hoc analysis when live AI is unavailable", async () => {
     const { agent, csrfToken } = await signedInAgent("analysis@example.com");
     const response = await agent
       .post("/api/ai/review")
       .set("x-rulix-csrf", csrfToken)
       .send({ memo: reviewFixtures[0] })
-      .expect(200);
+      .expect(503);
 
-    expect(response.body.result.memoId).toBe(reviewFixtures[0].id);
-    expect(response.body.result.recommended.eccn).toBe("3A001.a.5");
-    expect(response.body.result.provider.source).toBe("local-rules");
+    expect(response.body).toMatchObject({
+      code: "live_council_unavailable",
+      error: "Live AI analysis is not configured. No deterministic analysis was recorded."
+    });
   });
 
-  it("accepts analysis depth but does not trust client-supplied model selection", async () => {
+  it("does not expose deterministic analysis for client-supplied model requests", async () => {
     const { agent, csrfToken } = await signedInAgent("depth@example.com");
     const response = await agent
       .post("/api/ai/review")
@@ -318,11 +319,10 @@ describe("Rulix ECCN API", () => {
         depth: "deep",
         model: "claude-opus-4-8"
       })
-      .expect(200);
+      .expect(503);
 
-    expect(response.body.result.provider.depth).toBe("deep");
-    expect(response.body.result.provider.model).toBe("local-rule-engine-v1");
-    expect(response.body.result.modelPolicy).not.toContain("Sonnet");
+    expect(response.body.code).toBe("live_council_unavailable");
+    expect(response.body.error).toContain("No deterministic analysis was recorded");
   });
 
   it("preserves server-side audit events across later client state saves", async () => {
@@ -333,14 +333,14 @@ describe("Rulix ECCN API", () => {
       selectedMemoId: reviewFixtures[0].id
     });
 
-    const analysisResponse = await agent
-      .post(`/api/reviews/${reviewFixtures[0].id}/analyze`)
+    const editedMemoText = `${reviewFixtures[0].memoText}\n\nReviewer note: confirm model number before signoff.`;
+    const editResponse = await agent
+      .patch(`/api/reviews/${reviewFixtures[0].id}`)
       .set("x-rulix-csrf", csrfToken)
-      .send({ depth: "deep", model: "claude-opus-4-8" })
+      .send({ memoText: editedMemoText })
       .expect(200);
 
-    expect(analysisResponse.body.result.provider.depth).toBe("deep");
-    expect(analysisResponse.body.auditEvents.some((event: { action: string }) => event.action === "Analysis completed")).toBe(true);
+    expect(editResponse.body.review.memoText).toBe(editedMemoText);
 
     await saveState(agent, csrfToken, {
       ...emptyAccountState(),
@@ -350,7 +350,7 @@ describe("Rulix ECCN API", () => {
 
     const stateResponse = await agent.get("/api/account/state").expect(200);
     expect(
-      stateResponse.body.state.auditEvents.some((event: { action: string }) => event.action === "Analysis completed")
+      stateResponse.body.state.auditEvents.some((event: { action: string }) => event.action === "Memo edited")
     ).toBe(true);
   });
 
