@@ -37,6 +37,7 @@ import {
   type OutreachProviderConfig
 } from "../lib/apiClient";
 import type { AdminMetrics, MetricBucket, UserAdminSummary, UserProfile } from "../types";
+import { BrandLogo } from "./BrandLogo";
 import { OutreachWriterPanel } from "./OutreachWriterPanel";
 import { LeadsPanel } from "./LeadsPanel";
 import { LeadReviewQueue } from "./LeadReviewQueue";
@@ -162,11 +163,7 @@ function DashboardFrame({ children, compact = false }: { children: ReactNode; co
   return (
     <div className={`dash-auth-shell${compact ? " compact" : ""}`}>
       <div className="dash-auth-brand">
-        <RulixMark />
-        <div>
-          <strong>Rulix</strong>
-          <span>Operations</span>
-        </div>
+        <BrandLogo tone="light" size="rail" product="Operations" />
       </div>
       {children}
       <p className="dash-auth-foot">Secure administration for Rulix ECCN</p>
@@ -289,11 +286,7 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
     <div className="dash-app-shell">
       <aside className="dash-rail">
         <div className="dash-brand">
-          <RulixMark />
-          <div>
-            <strong>Rulix</strong>
-            <span>Operations</span>
-          </div>
+          <BrandLogo tone="light" size="rail" product="Operations" />
         </div>
         <nav aria-label="Operations dashboard">
           {DASHBOARD_TABS.map((tab) => {
@@ -940,17 +933,6 @@ function DashboardSkeleton() {
         {Array.from({ length: 3 }, (_, index) => <div className="dash-chart-card dash-skeleton" key={index} />)}
       </section>
     </>
-  );
-}
-
-function RulixMark() {
-  return (
-    <span className="dash-brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 44 44">
-        <path d="M7 8.5h19.5c6.1 0 10.5 4 10.5 9.7 0 4-2.2 7.2-5.7 8.7L38 35.5h-8.4l-5.8-7.6h-8.9v7.6H7V8.5Zm7.9 6.6v6.5h10.7c2 0 3.3-1.3 3.3-3.2 0-2-1.3-3.3-3.3-3.3H14.9Z" />
-        <path d="M15.8 23.7h9.4l4 5.3H15.8v-5.3Z" />
-      </svg>
-    </span>
   );
 }
 

@@ -39,6 +39,7 @@ import type {
 } from "./types";
 import { AdminConsole } from "./components/AdminConsole";
 import { AnalysisPanel } from "./components/AnalysisPanel";
+import { BrandLogo } from "./components/BrandLogo";
 import { MemoDraftChatPanel } from "./components/MemoDraftChatPanel";
 import { MemoWorkspace } from "./components/MemoWorkspace";
 import { NewReviewModal } from "./components/NewReviewModal";
@@ -861,7 +862,7 @@ export function App() {
     return (
       <div className="auth-shell">
         <div className="auth-card compact">
-          <RulixLogo />
+          <BrandLogo tone="dark" size="auth" />
           <h1>Checking secure session</h1>
           <p>Loading your account-linked review workspace.</p>
         </div>
@@ -960,7 +961,7 @@ export function App() {
             ) : (
               <>
                 <main className="memo-workspace empty-workspace">
-                  <RulixLogo />
+                  <BrandLogo tone="dark" size="auth" />
                   <h1>No memos yet</h1>
                   <p>Create, upload, or paste a memo to begin an account-linked ECCN review.</p>
                   <button className="button primary" type="button" onClick={openNewReview}>
@@ -1186,7 +1187,7 @@ function AuthScreen({
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
-        <RulixLogo />
+        <BrandLogo tone="dark" size="auth" />
         <div>
           <h1>{authHeading(mode)}</h1>
           <p>
@@ -1322,18 +1323,6 @@ function formatDateTime(value: string) {
     hour: "numeric",
     minute: "2-digit"
   }).format(new Date(value));
-}
-
-function RulixLogo() {
-  return (
-    <div className="rulix-logo" aria-label="Rulix">
-      <svg viewBox="0 0 44 44" role="img">
-        <path d="M7 8.5h19.5c6.1 0 10.5 4 10.5 9.7 0 4-2.2 7.2-5.7 8.7L38 35.5h-8.4l-5.8-7.6h-8.9v7.6H7V8.5Zm7.9 6.6v6.5h10.7c2 0 3.3-1.3 3.3-3.2 0-2-1.3-3.3-3.3-3.3H14.9Z" />
-        <path d="M15.8 23.7h9.4l4 5.3H15.8v-5.3Z" />
-      </svg>
-      <span>Rulix</span>
-    </div>
-  );
 }
 
 function deriveAnalysisStates(results: Record<string, ReviewResult>) {
