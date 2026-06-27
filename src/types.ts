@@ -306,6 +306,11 @@ export interface AccountReviewState {
       dataClass: DataClass;
       memoText: string;
       attachments?: string[];
+      source?: MemoBuilderDraftSource;
+      qualityChecks?: string[];
+      missingFacts?: string[];
+      sourceNotes?: string[];
+      reviewContextMemoId?: string;
     };
   };
   outreachDrafts?: Record<string, OutreachDraft>;
@@ -320,6 +325,8 @@ export interface MemoBuilderSession {
   title: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   updatedAt: string;
+  starterPrompt?: string;
+  contextMemoId?: string;
   draft?: {
     title: string;
     itemFamily: string;
@@ -328,8 +335,15 @@ export interface MemoBuilderSession {
     dataClass: DataClass;
     memoText: string;
     attachments?: string[];
+    source?: MemoBuilderDraftSource;
+    qualityChecks?: string[];
+    missingFacts?: string[];
+    sourceNotes?: string[];
+    reviewContextMemoId?: string;
   };
 }
+
+export type MemoBuilderDraftSource = "chat" | "attachments" | "sample" | "review-improvement";
 
 export interface NewReviewInput {
   title: string;

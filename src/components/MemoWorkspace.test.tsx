@@ -92,6 +92,7 @@ describe("MemoWorkspace", () => {
         onMemoTextChange={onMemoTextChange}
         onArchiveMemo={vi.fn()}
         onCreatePublicDraft={vi.fn()}
+        onImproveWithAi={vi.fn()}
         onDirtyChange={onDirtyChange}
       />
     );
@@ -123,6 +124,7 @@ describe("MemoWorkspace", () => {
         onMemoTextChange={onMemoTextChange}
         onArchiveMemo={vi.fn()}
         onCreatePublicDraft={vi.fn()}
+        onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
     );
@@ -148,6 +150,7 @@ describe("MemoWorkspace", () => {
         onMemoTextChange={vi.fn()}
         onArchiveMemo={vi.fn()}
         onCreatePublicDraft={vi.fn()}
+        onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
     );
@@ -166,6 +169,7 @@ describe("MemoWorkspace", () => {
         onMemoTextChange={vi.fn()}
         onArchiveMemo={vi.fn()}
         onCreatePublicDraft={vi.fn()}
+        onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
     );
@@ -225,6 +229,7 @@ function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) 
         onSelect={selectMemo}
         onFile={async () => undefined}
         onPasteMemo={vi.fn()}
+        onBuildWithAi={vi.fn()}
       />
       <MemoWorkspace
         memo={selectedMemo}
@@ -233,6 +238,7 @@ function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) 
         onMemoTextChange={vi.fn()}
         onArchiveMemo={vi.fn()}
         onCreatePublicDraft={vi.fn()}
+        onImproveWithAi={vi.fn()}
         onDirtyChange={setMemoDraftDirty}
       />
       <AnalysisPanel

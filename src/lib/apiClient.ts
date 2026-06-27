@@ -3,6 +3,8 @@ import type {
   AdminMetrics,
   AuditEvent,
   CorpusSnapshot,
+  DataClass,
+  MemoBuilderDraftSource,
   MemoChatMessage,
   MemoRecord,
   OutreachDraft,
@@ -273,9 +275,14 @@ export interface MemoBuildDraft {
   itemFamily: string;
   manufacturer?: string;
   intendedUse?: string;
-  dataClass: import("../types").DataClass;
+  dataClass: DataClass;
   memoText: string;
   attachments?: string[];
+  source?: MemoBuilderDraftSource;
+  qualityChecks?: string[];
+  missingFacts?: string[];
+  sourceNotes?: string[];
+  reviewContextMemoId?: string;
 }
 
 export async function sendMemoBuildChat(messages: MemoBuildMessage[], signal?: AbortSignal) {

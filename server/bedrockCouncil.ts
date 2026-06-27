@@ -705,6 +705,9 @@ Memo Builder quality requirements:
 - Use markdown sections: Executive summary; Item and source documents reviewed; Item description; Technical specifications relevant to ECCN screening; Intended use and end-user assumptions; Proposed classification/review path; Rationale and CCL screening notes; Information still needed; Verification checklist.
 - Do not return a one-paragraph memo, filler language, or fake certainty.
 - If a specification is missing, name the missing field instead of guessing.
+- In qualityChecks, list 2-5 short checks the draft satisfies.
+- In missingFacts, list critical fields the reviewer still needs, or return an empty array if none are apparent.
+- In sourceNotes, list the source basis and caveats, especially when the draft came from attachments or prior review context.
 - Never claim final legal determination; present it as a draft requiring reviewer signoff.`;
 
 const MEMO_BUILDER_PROVIDER_TIMEOUT_MS = 115000;
@@ -719,7 +722,10 @@ const MEMO_BUILDER_DRAFT_SCHEMA = {
     manufacturer: { type: "string" },
     intendedUse: { type: "string" },
     dataClass: { type: "string", enum: ["public", "proprietary", "export-controlled", "itar-risk", "cui"] },
-    memoText: { type: "string" }
+    memoText: { type: "string" },
+    qualityChecks: { type: "array", items: { type: "string" } },
+    missingFacts: { type: "array", items: { type: "string" } },
+    sourceNotes: { type: "array", items: { type: "string" } }
   }
 } as const;
 
@@ -735,6 +741,9 @@ export interface MemoBuildDraft {
   intendedUse?: string;
   dataClass: DataClass;
   memoText: string;
+  qualityChecks?: string[];
+  missingFacts?: string[];
+  sourceNotes?: string[];
 }
 
 export interface MemoBuildChatResult {
@@ -810,7 +819,10 @@ export async function runMemoBuildChat(
         manufacturer: typeof input.manufacturer === "string" && input.manufacturer.trim() ? input.manufacturer.trim() : undefined,
         intendedUse: typeof input.intendedUse === "string" && input.intendedUse.trim() ? input.intendedUse.trim() : undefined,
         dataClass: isValidDataClass(input.dataClass) ? input.dataClass : "proprietary",
-        memoText: asLongString(input.memoText, "", 16000)
+        memoText: asLongString(input.memoText, "", 16000),
+        qualityChecks: stringArray(input.qualityChecks, 5),
+        missingFacts: stringArray(input.missingFacts, 8),
+        sourceNotes: stringArray(input.sourceNotes, 6)
       }
     };
   }
@@ -828,4 +840,13 @@ function isValidDataClass(value: unknown): value is DataClass {
     value === "itar-risk" ||
     value === "cui"
   );
+}
+
+function stringArray(value: unknown, maxItems: number) {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+        .map((item) => item.trim().slice(0, 240))
+        .slice(0, maxItems)
+    : undefined;
 }

@@ -6,6 +6,7 @@ import {
   FileEdit,
   FileText,
   Highlighter,
+  Wand2,
   ZoomIn,
   ZoomOut
 } from "lucide-react";
@@ -24,6 +25,7 @@ interface MemoWorkspaceProps {
   onMemoTextChange: (memoId: string, memoText: string) => void;
   onArchiveMemo: (memoId: string) => void;
   onCreatePublicDraft: (title: string, memoText: string) => void;
+  onImproveWithAi: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }
 
@@ -35,6 +37,7 @@ export function MemoWorkspace({
   onMemoTextChange,
   onArchiveMemo,
   onCreatePublicDraft,
+  onImproveWithAi,
   onDirtyChange
 }: MemoWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceMode>("read");
@@ -151,6 +154,15 @@ export function MemoWorkspace({
           onClick={() => switchMode(mode === "draft" ? "read" : "draft")}
         >
           <FileEdit size={17} /> Draft Memo
+        </button>
+        <button
+          type="button"
+          className="tool"
+          disabled={draftDirty}
+          title={draftDirty ? "Save or discard memo edits before improving with AI." : "Improve with AI"}
+          onClick={onImproveWithAi}
+        >
+          <Wand2 size={17} /> Improve with AI
         </button>
         <button
           type="button"

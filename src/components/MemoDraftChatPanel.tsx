@@ -1,16 +1,35 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, FileText, MessageSquare, Paperclip, Plus, Send, Wand2, X } from "lucide-react";
-import { sendMemoBuildChat, type MemoBuildDraft, type MemoBuildMessage } from "../lib/apiClient";
+import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  Clipboard,
+  Download,
+  FileText,
+  ListChecks,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  RotateCcw,
+  Send,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X
+} from "lucide-react";
+import {
+  sendMemoBuildChat,
+  type MemoBuildDraft,
+  type MemoBuildMessage
+} from "../lib/apiClient";
 import { extractFileText, formatExtractedAttachment } from "../lib/documentIntake";
-import type { MemoBuilderSession } from "../types";
+import type { MemoBuilderDraftSource, MemoBuilderSession } from "../types";
 
 interface MemoDraftChatPanelProps {
   sessions: MemoBuilderSession[];
   activeSessionId?: string;
   onSessionsChange: (sessions: MemoBuilderSession[]) => void;
   onActiveSessionChange: (sessionId: string) => void;
-  onCreateMemo: (draft: MemoBuildDraft) => void;
-  onCreateAndAnalyze: (draft: MemoBuildDraft) => void;
+  onCreateMemo: (draft: MemoBuildDraft) => string | void;
+  onCreateAndAnalyze: (draft: MemoBuildDraft) => string | void;
 }
 
 interface BuilderAttachment {
@@ -21,10 +40,19 @@ interface BuilderAttachment {
   detail: string;
 }
 
+interface DraftSection {
+  title: string;
+  body: string;
+}
+
 const INITIAL_GREETING =
   "I'll help you draft a review-ready ECCN classification memo. Attach a datasheet, quote, screenshot, or manual, then tell me what you want drafted.";
 const ATTACHMENT_CONTEXT_MARKER = "\n\n---\nAttached source documents for Sonnet:\n";
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+const ITEM_STARTER =
+  "Draft a review-ready ECCN classification memo for this item. Ask only for truly blocking missing facts, and otherwise produce a complete draft with explicit verification items:\n\nItem:";
+const ATTACHMENT_STARTER =
+  "Draft a review-ready ECCN classification memo from the attached source documents. Preserve model numbers, manufacturer names, technical limits, units, and source caveats. Put unknown facts in Information still needed.";
 
 export function MemoDraftChatPanel({
   sessions,
@@ -38,9 +66,13 @@ export function MemoDraftChatPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [attachments, setAttachments] = useState<BuilderAttachment[]>([]);
+  const [copyNotice, setCopyNotice] = useState("");
+  const [writeNotice, setWriteNotice] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftCardRef = useRef<HTMLDivElement>(null);
+  const draftDocumentRef = useRef<HTMLElement>(null);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -49,6 +81,8 @@ export function MemoDraftChatPanel({
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? sessions[0];
   const messages = activeSession?.messages ?? [];
   const draft = activeSession?.draft;
+  const draftSections = useMemo(() => (draft ? parseDraftSections(draft.memoText) : []), [draft]);
+  const activeContextPrompt = activeSession?.starterPrompt;
 
   useEffect(() => {
     if (!activeSession && sessions.length === 0) {
@@ -60,8 +94,14 @@ export function MemoDraftChatPanel({
 
   useEffect(() => {
     const el = threadRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [activeSession?.id, messages, draft, busy]);
+    if (el && (busy || !draft)) el.scrollTop = el.scrollHeight;
+  }, [activeSession?.id, messages, busy, draft]);
+
+  useEffect(() => {
+    if (draft) {
+      window.requestAnimationFrame(() => draftCardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
+    }
+  }, [draft?.memoText]);
 
   const updateActiveSession = (patch: Partial<MemoBuilderSession>) => {
     const session = activeSession ?? createBlankSession();
@@ -87,12 +127,55 @@ export function MemoDraftChatPanel({
     onActiveSessionChange(session.id);
     setInput("");
     setError("");
+    setCopyNotice("");
+    setWriteNotice("");
     setAttachments([]);
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
-  const send = async () => {
-    const text = input.trim();
+  const useQuickStart = (kind: "item" | "attachments" | "sample" | "review") => {
+    setError("");
+    setCopyNotice("");
+    setWriteNotice("");
+    if (kind === "item") {
+      setInput(ITEM_STARTER);
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
+      return;
+    }
+
+    if (kind === "attachments") {
+      const hasReadyAttachment = attachments.some((attachment) => attachment.content.trim());
+      if (hasReadyAttachment) {
+        void send(ATTACHMENT_STARTER, "attachments");
+        return;
+      }
+      setInput(ATTACHMENT_STARTER);
+      fileInputRef.current?.click();
+      return;
+    }
+
+    if (kind === "review") {
+      setInput(activeContextPrompt ?? "Improve the current memo into a review-ready ECCN memo. Preserve useful facts and make missing facts explicit.");
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
+      return;
+    }
+
+    const sampleDraft = buildSampleDraft();
+    updateActiveSession({
+      title: "Sample RF amplifier memo",
+      messages: [
+        ...messages,
+        { role: "assistant", content: "Sample memo created. Review it below, then copy it or add it to Reviews." }
+      ],
+      draft: sampleDraft
+    });
+  };
+
+  const send = async (
+    overrideText?: string,
+    explicitSource?: MemoBuilderDraftSource
+  ) => {
+    const text = (overrideText ?? input).trim();
     const readyAttachments = attachments.filter((attachment) => attachment.content.trim());
     const unsentAttachments = attachments;
     if ((!text && readyAttachments.length === 0) || busy) return;
@@ -102,6 +185,7 @@ export function MemoDraftChatPanel({
     }
 
     const visibleText = text || "Draft an ECCN memo from the attached source documents.";
+    const draftSource = explicitSource ?? (readyAttachments.length ? "attachments" : activeSession?.contextMemoId ? "review-improvement" : "chat");
     const userMsg: MemoBuildMessage = {
       role: "user",
       content: buildUserContentForSonnet(visibleText, readyAttachments)
@@ -115,12 +199,14 @@ export function MemoDraftChatPanel({
     setAttachments([]);
     setBusy(true);
     setError("");
+    setCopyNotice("");
+    setWriteNotice("");
 
     try {
       const result = await sendMemoBuildChat(nextMessages);
       const assistantMsg: MemoBuildMessage = { role: "assistant", content: result.reply };
       const returnedDraft = result.draft
-        ? normalizeDraft(result.draft, readyAttachments, draft, nextMessages)
+        ? normalizeDraft(result.draft, readyAttachments, draft, nextMessages, draftSource, activeSession?.contextMemoId)
         : undefined;
       if (result.draft && !returnedDraft) {
         setError("Sonnet returned a draft that is too thin for review. Ask it to produce the full sectioned memo.");
@@ -196,25 +282,75 @@ export function MemoDraftChatPanel({
 
   const handleWrite = (analyze: boolean) => {
     if (!draft || !draft.memoText.trim()) return;
-    if (analyze) {
-      onCreateAndAnalyze(draft);
-    } else {
-      onCreateMemo(draft);
-    }
-    updateActiveSession({ draft: undefined });
+    const reviewId = analyze ? onCreateAndAnalyze(draft) : onCreateMemo(draft);
+    updateActiveSession({
+      draft: undefined,
+      starterPrompt: undefined,
+      contextMemoId: undefined
+    });
     setInput("");
     setError("");
+    setWriteNotice(reviewId ? `Added to Reviews as ${reviewId}.` : "Added to Reviews.");
+  };
+
+  const clearDraft = () => {
+    updateActiveSession({ draft: undefined });
+    setWriteNotice("");
+    setCopyNotice("");
+  };
+
+  const copyDraft = async () => {
+    if (!draft) return;
+    try {
+      await navigator.clipboard.writeText(draft.memoText);
+      setCopyNotice("Memo copied.");
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = draft.memoText;
+      textarea.setAttribute("readonly", "true");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand("copy");
+        setCopyNotice("Memo copied.");
+      } catch {
+        setCopyNotice("Copy failed. Select the memo text manually.");
+      } finally {
+        textarea.remove();
+      }
+    }
+  };
+
+  const downloadDraft = () => {
+    if (!draft) return;
+    const blob = new Blob([draft.memoText], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${safeFileName(draft.title)}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 250);
+    setCopyNotice("Markdown downloaded.");
   };
 
   const removeAttachment = (id: string) => {
     setAttachments((current) => current.filter((attachment) => attachment.id !== id));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
       void send();
     }
+  };
+
+  const scrollToDraftSection = (index: number) => {
+    const target = draftDocumentRef.current?.querySelector<HTMLElement>(`[data-section-index="${index}"]`);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -241,7 +377,7 @@ export function MemoDraftChatPanel({
               <MessageSquare size={14} />
               <span>
                 <strong>{session.title}</strong>
-                <small>{session.draft ? "Draft ready" : session.messages.length ? "In progress" : "Empty chat"}</small>
+                <small>{session.draft ? "Draft ready" : session.starterPrompt ? "Review context ready" : session.messages.length ? "In progress" : "Empty chat"}</small>
               </span>
             </button>
           ))}
@@ -253,11 +389,40 @@ export function MemoDraftChatPanel({
           <Wand2 size={20} />
           <div>
             <strong>Memo Builder</strong>
-            <span>Chat with Sonnet to draft a review-ready ECCN memo from your notes and attachments</span>
+            <span>Draft, copy, and send review-ready ECCN memos into Reviews</span>
           </div>
         </div>
 
         <div className="memo-builder-thread" ref={threadRef}>
+          <section className="memo-builder-quickstarts" aria-label="Memo Builder quick starts">
+            <button type="button" onClick={() => useQuickStart("item")} disabled={busy}>
+              <Sparkles size={16} />
+              <span>Draft from item description</span>
+            </button>
+            <button type="button" onClick={() => useQuickStart("attachments")} disabled={busy}>
+              <Paperclip size={16} />
+              <span>Draft from attachments</span>
+            </button>
+            <button type="button" onClick={() => useQuickStart("sample")} disabled={busy}>
+              <FileText size={16} />
+              <span>Create sample memo</span>
+            </button>
+            <button type="button" onClick={() => useQuickStart("review")} disabled={busy || !activeContextPrompt}>
+              <RotateCcw size={16} />
+              <span>Improve existing review</span>
+            </button>
+          </section>
+
+          {activeContextPrompt && (
+            <div className="memo-builder-context-banner">
+              <ListChecks size={16} />
+              <span>Review context is loaded. Use it to draft an improved memo or ask Sonnet for a focused rewrite.</span>
+              <button type="button" className="button small" onClick={() => useQuickStart("review")} disabled={busy}>
+                Use context
+              </button>
+            </div>
+          )}
+
           <div className="mb-msg mb-msg--assistant">
             <div className="mb-bubble">{INITIAL_GREETING}</div>
           </div>
@@ -277,26 +442,64 @@ export function MemoDraftChatPanel({
           )}
 
           {draft && !busy && (
-            <div className="mb-draft-card">
-              <div className="mb-draft-head">
-                <FileText size={15} />
-                <strong>{draft.title}</strong>
-                {draft.manufacturer && <span className="mb-draft-meta">{draft.manufacturer}</span>}
+            <div className="mb-draft-card" ref={draftCardRef}>
+              <div className="mb-draft-actionbar">
+                <div>
+                  <FileText size={16} />
+                  <span>
+                    <strong>{draft.title}</strong>
+                    <small>{draft.manufacturer || draft.itemFamily}</small>
+                  </span>
+                </div>
+                <div className="mb-draft-action-buttons">
+                  <button type="button" className="button small" onClick={() => void copyDraft()}>
+                    <Clipboard size={14} />
+                    Copy
+                  </button>
+                  <button type="button" className="button small" onClick={downloadDraft}>
+                    <Download size={14} />
+                    Download .md
+                  </button>
+                  <button type="button" className="button primary small" onClick={() => handleWrite(false)}>
+                    <Plus size={14} />
+                    Add to Reviews
+                  </button>
+                  <button type="button" className="button small" onClick={() => handleWrite(true)}>
+                    <CheckCircle2 size={14} />
+                    Add &amp; Analyze
+                  </button>
+                  <button type="button" className="tool danger" aria-label="Clear draft" title="Clear draft" onClick={clearDraft}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
-              <pre className="mb-draft-preview">{draft.memoText}</pre>
-              <p className="mb-draft-queue-note">
-                ECCN draft ready. Add it to the review queue to review, edit, and run council analysis.
-              </p>
-              <div className="mb-draft-actions">
-                <button type="button" className="button primary" onClick={() => handleWrite(false)}>
-                  <Plus size={14} />
-                  Add ECCN draft to review queue
-                </button>
-                <button type="button" className="button ghost" onClick={() => handleWrite(true)}>
-                  <CheckCircle2 size={14} />
-                  Add to queue &amp; analyze
-                </button>
-              </div>
+
+              {(copyNotice || writeNotice) && (
+                <div className="mb-draft-notice" aria-live="polite">
+                  {copyNotice || writeNotice}
+                </div>
+              )}
+
+              <DraftQualitySummary draft={draft} />
+
+              {draftSections.length > 1 && (
+                <nav className="mb-draft-sections" aria-label="Memo sections">
+                  {draftSections.map((section, index) => (
+                    <button type="button" key={`${section.title}-${index}`} onClick={() => scrollToDraftSection(index)}>
+                      {section.title}
+                    </button>
+                  ))}
+                </nav>
+              )}
+
+              <article className="mb-draft-document" ref={draftDocumentRef} aria-label="Generated memo draft">
+                {draftSections.map((section, index) => (
+                  <section key={`${section.title}-${index}`} data-section-index={index}>
+                    {section.title !== "Memo draft" && <h3>{section.title}</h3>}
+                    <div>{section.body}</div>
+                  </section>
+                ))}
+              </article>
             </div>
           )}
         </div>
@@ -359,8 +562,37 @@ export function MemoDraftChatPanel({
               <Send size={16} />
             </button>
           </div>
-          <p className="memo-chat-note">Ctrl+Enter to send · attached documents go to Sonnet as extracted source text · reviewer signoff required</p>
+          <p className="memo-chat-note">Ctrl+Enter to send - attached documents go to Sonnet as extracted source text - reviewer signoff required</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DraftQualitySummary({ draft }: { draft: MemoBuildDraft }) {
+  const qualityChecks = draft.qualityChecks?.length ? draft.qualityChecks : derivedQualityChecks(draft.memoText);
+  const missingFacts = draft.missingFacts?.length ? draft.missingFacts : derivedMissingFacts(draft.memoText);
+  const sourceNotes = draft.sourceNotes?.length ? draft.sourceNotes : derivedSourceNotes(draft);
+
+  return (
+    <div className="mb-draft-quality" aria-label="Draft quality notes">
+      <div>
+        <strong>Ready checks</strong>
+        {qualityChecks.map((item) => (
+          <span key={item}><CheckCircle2 size={13} /> {item}</span>
+        ))}
+      </div>
+      <div>
+        <strong>Still needs review</strong>
+        {missingFacts.map((item) => (
+          <span key={item}><ListChecks size={13} /> {item}</span>
+        ))}
+      </div>
+      <div>
+        <strong>Source basis</strong>
+        {sourceNotes.map((item) => (
+          <span key={item}><FileText size={13} /> {item}</span>
+        ))}
       </div>
     </div>
   );
@@ -400,12 +632,16 @@ function normalizeDraft(
   result: MemoBuildDraft,
   readyAttachments: BuilderAttachment[],
   currentDraft: MemoBuildDraft | undefined,
-  messages: MemoBuildMessage[]
+  messages: MemoBuildMessage[],
+  source: MemoBuilderDraftSource,
+  reviewContextMemoId?: string
 ) {
   const memoText = result.memoText.trim();
   if (!memoText) return undefined;
   return {
     ...result,
+    source,
+    reviewContextMemoId: reviewContextMemoId ?? currentDraft?.reviewContextMemoId,
     memoText,
     attachments: readyAttachments.length
       ? readyAttachments.map((attachment) => attachment.name)
@@ -429,4 +665,124 @@ function attachmentMethodLabel(method: string) {
   if (method === "bedrock-image") return "Image text extracted.";
   if (method === "bedrock-document") return "Document text extracted.";
   return "Text extracted.";
+}
+
+function parseDraftSections(memoText: string): DraftSection[] {
+  const lines = memoText.split(/\r?\n/);
+  const sections: DraftSection[] = [];
+  let title = "Memo draft";
+  let body: string[] = [];
+
+  for (const line of lines) {
+    const match = /^(#{1,3})\s+(.+)$/.exec(line.trim());
+    if (match) {
+      if (body.join("\n").trim() || sections.length === 0) {
+        sections.push({ title, body: body.join("\n").trim() });
+      }
+      title = match[2].replace(/\*\*/g, "").trim();
+      body = [];
+    } else {
+      body.push(line);
+    }
+  }
+
+  sections.push({ title, body: body.join("\n").trim() });
+  return sections.filter((section) => section.body || section.title !== "Memo draft");
+}
+
+function derivedQualityChecks(memoText: string) {
+  const checks = [];
+  if (/executive summary/i.test(memoText)) checks.push("Includes executive summary");
+  if (/technical specifications|specifications relevant/i.test(memoText)) checks.push("Calls out technical specifications");
+  if (/classification|review path|ccl/i.test(memoText)) checks.push("States proposed review path");
+  if (/verification checklist/i.test(memoText)) checks.push("Includes verification checklist");
+  return checks.length ? checks.slice(0, 4) : ["Sectioned memo draft is ready to review"];
+}
+
+function derivedMissingFacts(memoText: string) {
+  const missing = [];
+  if (/information still needed/i.test(memoText)) missing.push("Review the Information still needed section");
+  if (!/manufacturer/i.test(memoText)) missing.push("Manufacturer should be confirmed");
+  if (!/model|part number/i.test(memoText)) missing.push("Model or part number should be confirmed");
+  if (!missing.length) missing.push("Independent reviewer verification still required");
+  return missing.slice(0, 4);
+}
+
+function derivedSourceNotes(draft: MemoBuildDraft) {
+  if (draft.sourceNotes?.length) return draft.sourceNotes;
+  if (draft.attachments?.length) return [`Draft used ${draft.attachments.length} attached source document${draft.attachments.length === 1 ? "" : "s"}`];
+  if (draft.source === "sample") return ["Sample data only; not suitable for final signoff"];
+  if (draft.source === "review-improvement") return ["Draft used existing review context and still requires reviewer verification"];
+  return ["Drafted from chat context and requires source verification"];
+}
+
+function buildSampleDraft(): MemoBuildDraft {
+  return {
+    title: "TEST MEMO - RF Signal Amplifier Model XA-2400",
+    itemFamily: "RF signal amplifier",
+    manufacturer: "Acme RF Technologies (USA)",
+    intendedUse: "Research facility bench testing and instrument calibration",
+    dataClass: "public",
+    source: "sample",
+    qualityChecks: [
+      "Sectioned memo with review path",
+      "Explicit technical parameters",
+      "Missing facts isolated for reviewer follow-up"
+    ],
+    missingFacts: [
+      "Confirm final frequency range and gain from manufacturer datasheet",
+      "Confirm whether firmware or encryption features are included",
+      "Confirm country of origin and any existing manufacturer classification"
+    ],
+    sourceNotes: ["Synthetic sample memo for workflow testing only"],
+    memoText: [
+      "# ECCN Self-Classification Draft Memo",
+      "",
+      "## Executive summary",
+      "This draft memo evaluates the Acme RF Technologies XA-2400 signal amplifier as a bench-test radio frequency amplifier for research facility use. The draft is prepared for review purposes only and does not constitute a final legal classification or government determination.",
+      "",
+      "## Item and source documents reviewed",
+      "The working record identifies the item as the RF Signal Amplifier Model XA-2400 manufactured by Acme RF Technologies in the United States. This test memo uses placeholder source facts for product-flow validation. A reviewer must replace the placeholders with the final datasheet, purchase documentation, manufacturer statement, or other approved source evidence before signoff.",
+      "",
+      "## Item description",
+      "The XA-2400 is described as a laboratory RF signal amplifier intended to amplify low-power RF signals in research, calibration, and bench-test environments. The item is not described as a complete transmitter, radar system, electronic warfare system, or specially designed military end item in the current working facts.",
+      "",
+      "## Technical specifications relevant to ECCN screening",
+      "- Frequency range: placeholder 10 MHz to 6 GHz; reviewer must confirm.",
+      "- Small-signal gain: placeholder 24 dB nominal; reviewer must confirm gain flatness and maximum output power.",
+      "- Output power: placeholder +20 dBm maximum; reviewer must confirm whether higher-power options exist.",
+      "- Software or firmware: no controlled encryption, waveform generation, or adaptive signal processing identified in the placeholder facts.",
+      "- Accessories: no technical data package, production software, or military-rated module identified.",
+      "",
+      "## Intended use and end-user assumptions",
+      "The stated use is research facility bench testing and instrument calibration. Classification should be based on item characteristics, not transaction-specific end use. End-use, end-user, sanctions, and license-screening questions should remain separate from the ECCN technical classification memo.",
+      "",
+      "## Proposed classification/review path",
+      "Begin with EAR Category 3 and Category 5 review for electronic components, RF equipment, signal processing functionality, and any telecommunications or information-security functions. Based on the placeholder facts alone, the item may be a candidate for EAR99 or a low-risk electronics review path, but that conclusion cannot be finalized until the reviewer confirms the technical thresholds and source evidence.",
+      "",
+      "## Rationale and CCL screening notes",
+      "The placeholder facts do not identify military design intent, controlled cryptographic functionality, radar-specific functionality, or high-power RF transmission characteristics. The memo should document why nearby CCL entries do or do not apply after the reviewer confirms final frequency, gain, output power, modulation, firmware, and options.",
+      "",
+      "## Information still needed",
+      "- Final manufacturer datasheet or specification sheet.",
+      "- Country of origin and part-number variants.",
+      "- Maximum output power, gain, frequency range, and optional firmware features.",
+      "- Manufacturer classification statement, if available.",
+      "",
+      "## Verification checklist",
+      "- Confirm all technical parameters against the final datasheet.",
+      "- Confirm whether software, firmware, or technical data is included.",
+      "- Confirm no options change the classification-relevant thresholds.",
+      "- Run Rulix AI analysis and require human reviewer signoff before export or reliance."
+    ].join("\n")
+  };
+}
+
+function safeFileName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "eccn-memo-draft";
 }

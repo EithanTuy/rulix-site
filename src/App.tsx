@@ -43,6 +43,7 @@ import { BrandLogo } from "./components/BrandLogo";
 import { MemoDraftChatPanel } from "./components/MemoDraftChatPanel";
 import { MemoWorkspace } from "./components/MemoWorkspace";
 import { NewReviewModal } from "./components/NewReviewModal";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { ReviewList } from "./components/ReviewList";
 import { SidebarRail } from "./components/SidebarRail";
 import { TopBar } from "./components/TopBar";
@@ -232,6 +233,32 @@ export function App() {
   const openNewReview = () => {
     if (blockDirtyDraft("creating a new review")) return;
     setNewReviewOpen(true);
+  };
+
+  const openMemoBuilderForNewDraft = () => {
+    if (blockDirtyDraft("building a memo with AI")) return;
+    const session = createSeededBuilderSession(
+      "AI memo draft",
+      "Draft a review-ready ECCN classification memo. Ask for only the facts that are truly blocking, and if enough facts are provided, produce a complete memo with missing facts and verification steps clearly labeled."
+    );
+    setMemoBuilderSessions((current) => [session, ...current]);
+    setActiveMemoBuilderSessionId(session.id);
+    setActiveView("memo-builder");
+    setSyncNotice("Memo Builder ready with an AI drafting prompt.");
+  };
+
+  const openMemoBuilderForSelectedReview = () => {
+    if (!selectedMemo) return;
+    if (blockDirtyDraft("improving this memo with AI")) return;
+    const session = createSeededBuilderSession(
+      `Improve ${selectedMemo.title}`.slice(0, 60),
+      buildReviewImprovementPrompt(selectedMemo, reviewResult),
+      selectedMemo.id
+    );
+    setMemoBuilderSessions((current) => [session, ...current]);
+    setActiveMemoBuilderSessionId(session.id);
+    setActiveView("memo-builder");
+    setSyncNotice("Memo Builder loaded with review context.");
   };
 
   const focusSignoff = () => {
@@ -461,7 +488,7 @@ export function App() {
     addAuditEvent(
       memo.id,
       "AI-assisted memo created",
-      "Memo drafted via Memo Builder with Sonnet. Analysis has not been run.",
+      builderAuditDetail(draft, "Analysis has not been run."),
       "info"
     );
     setAnalysisStates((current) => ({
@@ -473,6 +500,8 @@ export function App() {
     }));
     setActiveView("reviews");
     setIntakeWarning(undefined);
+    setSyncNotice("AI draft added to Reviews.");
+    return memo.id;
   };
 
   const handleCreateAndAnalyzeBuilderMemo = (draft: MemoBuildDraft) => {
@@ -505,7 +534,7 @@ export function App() {
     addAuditEvent(
       memo.id,
       "AI-assisted memo created",
-      "Memo drafted via Memo Builder with Sonnet. Auto-analysis queued.",
+      builderAuditDetail(draft, "Auto-analysis queued."),
       "info"
     );
     setAnalysisStates((current) => ({
@@ -519,6 +548,7 @@ export function App() {
     }));
     setActiveView("reviews");
     setIntakeWarning(undefined);
+    setSyncNotice("AI draft added to Reviews; analysis queued.");
 
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 180000);
@@ -547,6 +577,7 @@ export function App() {
         }));
         addAuditEvent(memo.id, "AI analysis failed", "Analysis failed after Memo Builder creation.", "review");
       });
+    return memo.id;
   };
 
   const handleCreateReview = (input: NewReviewInput) => {
@@ -862,7 +893,8 @@ export function App() {
     return (
       <div className="auth-shell">
         <div className="auth-card compact">
-          <BrandLogo tone="dark" size="auth" />
+          <ThemeToggle className="auth-theme-toggle" />
+          <BrandLogo tone="adaptive" size="auth" />
           <h1>Checking secure session</h1>
           <p>Loading your account-linked review workspace.</p>
         </div>
@@ -916,6 +948,7 @@ export function App() {
               onSelect={selectMemo}
               onFile={handleFile}
               onPasteMemo={handlePasteMemo}
+              onBuildWithAi={openMemoBuilderForNewDraft}
             />
             <PanelResizeHandle
               label="Resize review queue"
@@ -931,6 +964,7 @@ export function App() {
                   onMemoTextChange={updateMemoText}
                   onArchiveMemo={archiveMemo}
                   onCreatePublicDraft={handleCreatePublicDraftMemo}
+                  onImproveWithAi={openMemoBuilderForSelectedReview}
                   onDirtyChange={setMemoDraftDirty}
                 />
                 <PanelResizeHandle
@@ -961,7 +995,8 @@ export function App() {
             ) : (
               <>
                 <main className="memo-workspace empty-workspace">
-                  <BrandLogo tone="dark" size="auth" />
+                  <ThemeToggle className="auth-theme-toggle" />
+                  <BrandLogo tone="adaptive" size="auth" />
                   <h1>No memos yet</h1>
                   <p>Create, upload, or paste a memo to begin an account-linked ECCN review.</p>
                   <button className="button primary" type="button" onClick={openNewReview}>
@@ -1041,6 +1076,71 @@ function normalizeMemoBuilderSessions(builder: AccountReviewState["memoBuilder"]
     ];
   }
   return [];
+}
+
+function createSeededBuilderSession(title: string, starterPrompt: string, contextMemoId?: string): MemoBuilderSession {
+  const now = new Date().toISOString();
+  return {
+    id: `builder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title,
+    messages: [],
+    starterPrompt,
+    contextMemoId,
+    updatedAt: now
+  };
+}
+
+function buildReviewImprovementPrompt(memo: MemoRecord, result: ReviewResult | undefined) {
+  const findings = result?.findings
+    .slice(0, 8)
+    .map((finding, index) => `${index + 1}. ${finding.status.toUpperCase()}: ${finding.title} - ${finding.claim}`)
+    .join("\n") || "No AI analysis findings are available yet. Improve structure, clarity, and missing-fact handling from the memo text.";
+  const infoRequests = result?.infoRequests.length
+    ? result.infoRequests.slice(0, 8).map((request, index) => `${index + 1}. ${request}`).join("\n")
+    : "No explicit information requests are available yet.";
+
+  return [
+    "Improve this existing ECCN memo into a cleaner review-ready draft.",
+    "Preserve useful facts, do not invent specifications, and make unknowns explicit in Information still needed.",
+    "Return a complete memo draft with the normal Rulix sections and reviewer-verification checklist.",
+    "",
+    `Title: ${memo.title}`,
+    `Item family: ${memo.itemFamily}`,
+    `Manufacturer: ${memo.manufacturer ?? "unknown"}`,
+    `Intended use: ${memo.intendedUse ?? "unknown"}`,
+    `Data class: ${memo.dataClass ?? "proprietary"}`,
+    "",
+    "Current review findings:",
+    findings,
+    "",
+    "Information requests:",
+    infoRequests,
+    "",
+    "Current memo text:",
+    clipForBuilderPrompt(memo.memoText, 14000)
+  ].join("\n");
+}
+
+function builderAuditDetail(draft: MemoBuildDraft, suffix: string) {
+  const sourceLabel =
+    draft.source === "attachments"
+      ? "from attached source documents"
+      : draft.source === "sample"
+        ? "from sample data"
+        : draft.source === "review-improvement"
+          ? "from existing review context"
+          : "from Memo Builder chat";
+  const quality = draft.qualityChecks?.length
+    ? ` Quality checks: ${draft.qualityChecks.slice(0, 3).join("; ")}.`
+    : "";
+  const missing = draft.missingFacts?.length
+    ? ` Missing facts flagged: ${draft.missingFacts.slice(0, 3).join("; ")}.`
+    : "";
+  return `Memo drafted via Memo Builder ${sourceLabel}. ${suffix}${quality}${missing}`.trim();
+}
+
+function clipForBuilderPrompt(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}\n\n[Memo text truncated for builder context]` : value;
 }
 
 function PanelResizeHandle({
@@ -1187,7 +1287,8 @@ function AuthScreen({
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
-        <BrandLogo tone="dark" size="auth" />
+        <ThemeToggle className="auth-theme-toggle" />
+        <BrandLogo tone="adaptive" size="auth" />
         <div>
           <h1>{authHeading(mode)}</h1>
           <p>

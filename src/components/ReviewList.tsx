@@ -3,7 +3,8 @@ import {
   FileText,
   Filter,
   Search,
-  UploadCloud
+  UploadCloud,
+  Wand2
 } from "lucide-react";
 import type { MemoRecord } from "../types";
 
@@ -20,6 +21,7 @@ interface ReviewListProps {
   onSelect: (memoId: string) => void;
   onFile: (file: File) => Promise<void>;
   onPasteMemo: (title: string, text: string) => void;
+  onBuildWithAi: () => void;
 }
 
 export function ReviewList({
@@ -31,7 +33,8 @@ export function ReviewList({
   onSearch,
   onSelect,
   onFile,
-  onPasteMemo
+  onPasteMemo,
+  onBuildWithAi
 }: ReviewListProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -98,6 +101,14 @@ export function ReviewList({
           >
             <FileText size={16} />
             Paste Text
+          </button>
+          <button
+            className="button small"
+            type="button"
+            onClick={onBuildWithAi}
+          >
+            <Wand2 size={16} />
+            Build with AI
           </button>
           <input
             ref={inputRef}
