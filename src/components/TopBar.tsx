@@ -1,6 +1,7 @@
 import { Building2, Download, LogOut, Plus, UserRound } from "lucide-react";
 import type { UserProfile } from "../types";
 import { BrandLogo } from "./BrandLogo";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface TopBarProps {
   tenant: string;
@@ -56,6 +57,7 @@ export function TopBar({
       </div>
       <div className="account-cluster" aria-label="Current account">
         <span>{syncNotice}</span>
+        <ThemeToggle className="theme-toggle--topbar" />
         <div className="avatar">{initials(user.name)}</div>
         <button className="icon-button" type="button" aria-label="Sign out" title={`Sign out ${user.email}`} onClick={onSignOut}>
           <LogOut size={17} />

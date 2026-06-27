@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rulix Demo - Resolve Review Gaps</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="rulix-video.css" />
+  </head>
+  <body>
+    <div
+      id="demo-resolve-review-gaps"
+      data-composition-id="demo-resolve-review-gaps"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="7"
+      data-track-index="0"
+    >
+      <div class="backgrid" data-layout-ignore></div>
+      <div class="grain" data-layout-ignore></div>
+      <div class="edge-rule" data-layout-ignore></div>
+
+      <section id="resolve-s1" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Demo 02</span>
+          <h1 class="scene-title">Turn evidence gaps into review work.</h1>
+          <p class="scene-copy">Findings become a reviewer checklist rather than disappearing into comments.</p>
+          <div class="question-card">
+            <strong>Will it fit our needs?</strong>
+            <span>Yes, when the team needs a repeatable path from analysis to reviewer action.</span>
+          </div>
+          <div class="proof-strip">
+            <span>Finding selected</span>
+            <span class="amber">Needs support</span>
+            <span>Reviewer context</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-decision" data-layout-allow-overflow>
+            <span class="media-tag">Selected memo finding</span>
+            <span class="timecode">00:02</span>
+            <img class="screen-image" src="captures/04-selected-finding.png" alt="Rulix selected finding before decision" />
+          </div>
+          <div class="callout top-right amber">
+            <strong>Gap is explicit</strong>
+            <span>The reviewer can see which facts still block acceptance.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="resolve-s2" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Reviewer action</span>
+          <h1 class="scene-title">Human signoff stays in control.</h1>
+          <p class="scene-copy">A reviewer records a decision note, requests more information, or overrides the recommendation.</p>
+          <div class="question-card">
+            <strong>What even is this?</strong>
+            <span>A structured support layer for legal and compliance review, not autonomous approval.</span>
+          </div>
+          <div class="proof-strip">
+            <span>Accept</span>
+            <span class="amber">Request more info</span>
+            <span>Override</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-right" data-layout-allow-overflow>
+            <span class="media-tag">Decision workflow</span>
+            <span class="timecode">00:06</span>
+            <img class="screen-image" src="captures/05-decision-review-gap.png" alt="Rulix reviewer decision workflow" />
+          </div>
+          <div class="callout mid-right amber">
+            <strong>Decision notes required</strong>
+            <span>Signoff is a documented reviewer act, not a hidden model state.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="final-mark">Resolve review gaps / real Rulix UI</div>
+    </div>
+    <script src="rulix-video.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["demo-resolve-review-gaps"] = window.createRulixTimeline(
+        "demo-resolve-review-gaps",
+        [
+          { id: "resolve-s1", at: 0 },
+          { id: "resolve-s2", at: 3.45 }
+        ],
+        7
+      );
+    </script>
+  </body>
+</html>

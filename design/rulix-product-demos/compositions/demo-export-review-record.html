@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rulix Demo - Export Review Record</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="rulix-video.css" />
+  </head>
+  <body>
+    <div
+      id="demo-export-review-record"
+      data-composition-id="demo-export-review-record"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="7"
+      data-track-index="0"
+    >
+      <div class="backgrid" data-layout-ignore></div>
+      <div class="grain" data-layout-ignore></div>
+      <div class="edge-rule" data-layout-ignore></div>
+
+      <section id="export-s1" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Demo 03</span>
+          <h1 class="scene-title">Preserve the review trail.</h1>
+          <p class="scene-copy">Analysis completion, memo intake, and reviewer decisions are visible in one audit view.</p>
+          <div class="question-card">
+            <strong>Will it fit our needs?</strong>
+            <span>Yes, when auditability matters as much as faster review.</span>
+          </div>
+          <div class="proof-strip">
+            <span class="green">Memo pasted</span>
+            <span>Analysis completed</span>
+            <span>Reviewer decision</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-right" data-layout-allow-overflow>
+            <span class="media-tag">Audit trail</span>
+            <span class="timecode">00:02</span>
+            <img class="screen-image" src="captures/06-audit-trail.png" alt="Rulix audit trail" />
+          </div>
+          <div class="callout top-right green">
+            <strong>Every action is visible</strong>
+            <span>The final state is backed by a short sequence of review events.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="export-s2" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Export</span>
+          <h1 class="scene-title">Create a defensible record.</h1>
+          <p class="scene-copy">The report export packages recommendation, evidence findings, reviewer notes, and audit trail.</p>
+          <div class="question-card">
+            <strong>What even is this?</strong>
+            <span>A way to turn review work into an internal record a team can explain.</span>
+          </div>
+          <div class="proof-strip">
+            <span>Decision record</span>
+            <span>Export notice</span>
+            <span class="green">Audit-ready output</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-right" data-layout-allow-overflow>
+            <span class="media-tag">Report exported</span>
+            <span class="timecode">00:06</span>
+            <img class="screen-image" src="captures/07-export-ready.png" alt="Rulix exported report state" />
+          </div>
+          <div class="data-ribbon" data-layout-allow-occlusion>
+            <span><strong>1</strong> memo</span>
+            <span><strong>5</strong> blockers found</span>
+            <span><strong>1</strong> decision note</span>
+            <span><strong>1</strong> report</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="final-mark">Export review record / real Rulix UI</div>
+    </div>
+    <script src="rulix-video.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["demo-export-review-record"] = window.createRulixTimeline(
+        "demo-export-review-record",
+        [
+          { id: "export-s1", at: 0 },
+          { id: "export-s2", at: 3.5 }
+        ],
+        7
+      );
+    </script>
+  </body>
+</html>

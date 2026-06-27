@@ -43,6 +43,7 @@ import { BrandLogo } from "./components/BrandLogo";
 import { MemoDraftChatPanel } from "./components/MemoDraftChatPanel";
 import { MemoWorkspace } from "./components/MemoWorkspace";
 import { NewReviewModal } from "./components/NewReviewModal";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { ReviewList } from "./components/ReviewList";
 import { SidebarRail } from "./components/SidebarRail";
 import { TopBar } from "./components/TopBar";
@@ -892,7 +893,8 @@ export function App() {
     return (
       <div className="auth-shell">
         <div className="auth-card compact">
-          <BrandLogo tone="dark" size="auth" />
+          <ThemeToggle className="auth-theme-toggle" />
+          <BrandLogo tone="adaptive" size="auth" />
           <h1>Checking secure session</h1>
           <p>Loading your account-linked review workspace.</p>
         </div>
@@ -993,7 +995,8 @@ export function App() {
             ) : (
               <>
                 <main className="memo-workspace empty-workspace">
-                  <BrandLogo tone="dark" size="auth" />
+                  <ThemeToggle className="auth-theme-toggle" />
+                  <BrandLogo tone="adaptive" size="auth" />
                   <h1>No memos yet</h1>
                   <p>Create, upload, or paste a memo to begin an account-linked ECCN review.</p>
                   <button className="button primary" type="button" onClick={openNewReview}>
@@ -1284,7 +1287,8 @@ function AuthScreen({
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
-        <BrandLogo tone="dark" size="auth" />
+        <ThemeToggle className="auth-theme-toggle" />
+        <BrandLogo tone="adaptive" size="auth" />
         <div>
           <h1>{authHeading(mode)}</h1>
           <p>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rulix Product Review Loop</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="rulix-video.css" />
+  </head>
+  <body>
+    <div
+      id="hero-rulix-review-loop"
+      data-composition-id="hero-rulix-review-loop"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="10.8"
+      data-track-index="0"
+    >
+      <div class="backgrid" data-layout-ignore></div>
+      <div class="grain" data-layout-ignore></div>
+      <div class="edge-rule" data-layout-ignore></div>
+
+      <section id="hero-s1" class="scene" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">01 / Intake</span>
+          <h1 class="scene-title">A memo enters the review queue.</h1>
+          <p class="scene-copy">Rulix starts from a real memo workspace, not a loose prompt thread.</p>
+          <div class="question-card">
+            <strong>Buyer question answered</strong>
+            <span>Can the team see what is being reviewed before AI analysis starts?</span>
+          </div>
+          <div class="proof-strip">
+            <span>Account workspace</span>
+            <span>Sanitized sample memo</span>
+            <span>Reviewer-owned flow</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell wide focus-center" data-layout-allow-overflow>
+            <span class="media-tag">Review queue and memo workspace</span>
+            <span class="timecode">00:01</span>
+            <img class="screen-image" src="captures/01-review-queue-and-memo.png" alt="Rulix review queue with memo workspace" />
+          </div>
+          <div class="callout top-right">
+            <strong>Draft review state</strong>
+            <span>The memo is visible before analysis and remains under reviewer control.</span>
+          </div>
+          <div class="callout bottom-right amber">
+            <strong>Run only when ready</strong>
+            <span>The analysis button is explicit, not hidden behind automation.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="hero-s2" class="scene" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">02 / Analysis</span>
+          <h1 class="scene-title">Rulix maps risk to the memo.</h1>
+          <p class="scene-copy">The analysis pass flags missing reasoning, evidence blockers, and review context.</p>
+          <div class="question-card">
+            <strong>Buyer question answered</strong>
+            <span>Can reviewers see where the conclusion is weak?</span>
+          </div>
+          <div class="proof-strip">
+            <span class="amber">Jurisdiction review</span>
+            <span class="red">Blocking evidence</span>
+            <span>Evidence Map</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell wide focus-right" data-layout-allow-overflow>
+            <span class="media-tag">AI analysis and evidence map</span>
+            <span class="timecode">00:04</span>
+            <img class="screen-image" src="captures/03-analysis-evidence-map.png" alt="Rulix analysis panel with evidence map" />
+            <div class="scanner" data-layout-ignore></div>
+          </div>
+          <div class="callout top-right amber">
+            <strong>Five blockers surfaced</strong>
+            <span>The review panel explains what needs support before signoff.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="hero-s3" class="scene" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">03 / Resolution</span>
+          <h1 class="scene-title">Findings turn into reviewer action.</h1>
+          <p class="scene-copy">Decision notes stay connected to highlighted memo evidence and human signoff.</p>
+          <div class="question-card">
+            <strong>Buyer question answered</strong>
+            <span>Does this fit a human review workflow?</span>
+          </div>
+          <div class="proof-strip">
+            <span>Reviewer checklist</span>
+            <span class="amber">Request more info</span>
+            <span>Human signoff</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell wide focus-decision" data-layout-allow-overflow>
+            <span class="media-tag">Decision tab with review gap</span>
+            <span class="timecode">00:07</span>
+            <img class="screen-image" src="captures/05-decision-review-gap.png" alt="Rulix decision tab with request more info" />
+          </div>
+          <div class="callout top-right amber">
+            <strong>Reviewer chooses the path</strong>
+            <span>The system supports signoff, information requests, and override workflows.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="hero-s4" class="scene" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">04 / Record</span>
+          <h1 class="scene-title">The review record is exportable.</h1>
+          <p class="scene-copy">Rulix preserves analysis, decisions, and audit events for downstream review.</p>
+          <div class="question-card">
+            <strong>Buyer question answered</strong>
+            <span>Can the team defend what happened after the review?</span>
+          </div>
+          <div class="proof-strip">
+            <span class="green">Audit trail</span>
+            <span>Decision record</span>
+            <span>Report exported</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell wide focus-right" data-layout-allow-overflow>
+            <span class="media-tag">Audit trail and export state</span>
+            <span class="timecode">00:10</span>
+            <img class="screen-image" src="captures/07-export-ready.png" alt="Rulix audit trail and exported report state" />
+          </div>
+          <div class="data-ribbon" data-layout-allow-occlusion>
+            <span><strong>1</strong> memo pasted</span>
+            <span><strong>1</strong> analysis completed</span>
+            <span><strong>1</strong> reviewer decision</span>
+            <span><strong>1</strong> report exported</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="final-mark">Rulix product proof / real app capture</div>
+    </div>
+    <script src="rulix-video.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["hero-rulix-review-loop"] = window.createRulixTimeline(
+        "hero-rulix-review-loop",
+        [
+          { id: "hero-s1", at: 0 },
+          { id: "hero-s2", at: 2.75 },
+          { id: "hero-s3", at: 5.45 },
+          { id: "hero-s4", at: 8.1 }
+        ],
+        10.8
+      );
+    </script>
+  </body>
+</html>

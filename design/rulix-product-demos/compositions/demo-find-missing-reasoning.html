@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rulix Demo - Find Missing Reasoning</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <link rel="stylesheet" href="rulix-video.css" />
+  </head>
+  <body>
+    <div
+      id="demo-find-missing-reasoning"
+      data-composition-id="demo-find-missing-reasoning"
+      data-width="1920"
+      data-height="1080"
+      data-start="0"
+      data-duration="7"
+      data-track-index="0"
+    >
+      <div class="backgrid" data-layout-ignore></div>
+      <div class="grain" data-layout-ignore></div>
+      <div class="edge-rule" data-layout-ignore></div>
+
+      <section id="find-s1" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Demo 01</span>
+          <h1 class="scene-title">Find missing reasoning before signoff.</h1>
+          <p class="scene-copy">Rulix ties evidence blockers to the exact memo passages reviewers need to inspect.</p>
+          <div class="question-card">
+            <strong>Will it fit our needs?</strong>
+            <span>Yes, when reviewers need structured gap-finding instead of a generic answer.</span>
+          </div>
+          <div class="proof-strip">
+            <span class="amber">Jurisdiction issue</span>
+            <span class="red">Blocking evidence</span>
+            <span>CCL support</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-right" data-layout-allow-overflow>
+            <span class="media-tag">Evidence Map</span>
+            <span class="timecode">00:02</span>
+            <img class="screen-image" src="captures/03-analysis-evidence-map.png" alt="Rulix evidence map showing blockers" />
+            <div class="scanner" data-layout-ignore></div>
+          </div>
+          <div class="callout top-right amber">
+            <strong>Review needed</strong>
+            <span>The recommendation is not treated as final when blockers remain.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="find-s2" class="scene compact" data-layout-allow-overlap>
+        <div class="scene-content">
+          <span class="scene-kicker">Selected finding</span>
+          <h1 class="scene-title">Click into the weak link.</h1>
+          <p class="scene-copy">The reviewer can select a finding and see the highlighted memo text in context.</p>
+          <div class="question-card">
+            <strong>What even is this?</strong>
+            <span>A review cockpit for memo reasoning, evidence, and human decisions.</span>
+          </div>
+          <div class="proof-strip">
+            <span>Highlighted passage</span>
+            <span>Finding detail</span>
+            <span class="green">Evidence context</span>
+          </div>
+        </div>
+        <div class="screen-zone">
+          <div class="screen-shell focus-decision" data-layout-allow-overflow>
+            <span class="media-tag">Memo highlight and finding detail</span>
+            <span class="timecode">00:06</span>
+            <img class="screen-image" src="captures/04-selected-finding.png" alt="Rulix selected finding highlighted in memo" />
+          </div>
+          <div class="callout mid-right">
+            <strong>Traceable reasoning</strong>
+            <span>The issue stays connected to the memo section and supporting source logic.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="final-mark">Find missing reasoning / real Rulix UI</div>
+    </div>
+    <script src="rulix-video.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["demo-find-missing-reasoning"] = window.createRulixTimeline(
+        "demo-find-missing-reasoning",
+        [
+          { id: "find-s1", at: 0 },
+          { id: "find-s2", at: 3.55 }
+        ],
+        7
+      );
+    </script>
+  </body>
+</html>

@@ -38,6 +38,7 @@ import {
 } from "../lib/apiClient";
 import type { AdminMetrics, MetricBucket, UserAdminSummary, UserProfile } from "../types";
 import { BrandLogo } from "./BrandLogo";
+import { ThemeToggle } from "./ThemeToggle";
 import { OutreachWriterPanel } from "./OutreachWriterPanel";
 import { LeadsPanel } from "./LeadsPanel";
 import { LeadReviewQueue } from "./LeadReviewQueue";
@@ -164,6 +165,7 @@ function DashboardFrame({ children, compact = false }: { children: ReactNode; co
     <div className={`dash-auth-shell${compact ? " compact" : ""}`}>
       <div className="dash-auth-brand">
         <BrandLogo tone="light" size="rail" product="Operations" />
+        <ThemeToggle className="theme-toggle--rail" />
       </div>
       {children}
       <p className="dash-auth-foot">Secure administration for Rulix ECCN</p>
@@ -326,6 +328,7 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
             <p>{activeTabInfo.description}</p>
           </div>
           <div className="dash-account">
+            <ThemeToggle className="theme-toggle--dash" />
             <div className="dash-avatar">{initials(user.name)}</div>
             <div>
               <strong>{user.name}</strong>

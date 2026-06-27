@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { DashboardApp } from "./components/DashboardApp";
 import { MarketingSite, isMarketingPath } from "./components/MarketingSite";
+import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
 import "./styles.css";
 
 // The public site, app, and operations dashboard share one bundle. Hostname is
@@ -46,6 +47,7 @@ const appSurface = isAppSurface();
 const Root = dashboardSurface ? DashboardApp : appSurface ? App : isMarketingSurface() ? MarketingSite : MarketingSite;
 
 document.title = dashboardSurface ? "Rulix Dash" : appSurface ? "Rulix ECCN" : "Rulix";
+applyTheme(getInitialTheme());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
