@@ -23,10 +23,10 @@ export function Brand({ variant = "dark", compact = false }: BrandProps) {
 }
 
 const NAV = [
-  { to: "/#product", label: "Product" },
-  { to: "/#sample", label: "Sample packet" },
-  { to: "/security", label: "Security" },
-  { to: "/contact", label: "Contact" },
+  { to: "/#outcome", label: "Outcome" },
+  { to: "/#methodology", label: "Methodology" },
+  { to: "/#proof", label: "Proof" },
+  { to: "/#faq", label: "FAQ" },
 ];
 
 export function Layout() {
@@ -67,8 +67,8 @@ export function Layout() {
             <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-sm:hidden">
               Sign in
             </a>
-            <Link to="/contact" className="btn primary !py-2.5 !text-[13px]">
-              Book memo audit
+            <Link to="/#lead" className="btn primary !py-2.5 !text-[13px]">
+              Book consult
             </Link>
           </nav>
         </div>
@@ -90,8 +90,9 @@ export function Layout() {
             title="Product"
             links={[
               ["Overview", "/#product"],
-              ["Sample packet", "/#sample"],
-              ["Use cases", "/#use-cases"],
+              ["Methodology", "/#methodology"],
+              ["Proof", "/#proof"],
+              ["FAQ", "/#faq"],
               ["Hosted app", "https://app.rulix.cloud"],
             ]}
           />
