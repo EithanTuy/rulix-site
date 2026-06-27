@@ -89,6 +89,7 @@ export function App() {
   const [backendNotice, setBackendNotice] = useState("Checking analysis service...");
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("standard");
   const [selectedFindingId, setSelectedFindingId] = useState<string | undefined>();
+  const [memoDraftDirty, setMemoDraftDirty] = useState(false);
   const [panelSizes, setPanelSizes] = useState({ reviewList: 400, analysis: 456 });
   const memosRef = useRef<MemoRecord[]>([]);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
@@ -210,6 +211,37 @@ export function App() {
       .includes(search.toLowerCase())
   );
 
+  const blockDirtyDraft = (action: string) => {
+    if (!memoDraftDirty) return false;
+    setSyncNotice(`Save or discard memo edits before ${action}.`);
+    return true;
+  };
+
+  const selectMemo = (memoId: string) => {
+    if (memoId === selectedMemo?.id) return;
+    if (blockDirtyDraft("switching memos")) return;
+    setSelectedMemoId(memoId);
+  };
+
+  const changeActiveView = (view: AppView) => {
+    if (view === activeView) return;
+    if (blockDirtyDraft("opening another workspace")) return;
+    setActiveView(view);
+  };
+
+  const openNewReview = () => {
+    if (blockDirtyDraft("creating a new review")) return;
+    setNewReviewOpen(true);
+  };
+
+  const focusSignoff = () => {
+    if (blockDirtyDraft("recording a decision")) return;
+    setActiveView("reviews");
+    window.setTimeout(() => {
+      document.querySelector(".decision-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
   const beginPanelResize = (
     panel: "reviewList" | "analysis",
     event: PointerEvent<HTMLButtonElement>
@@ -221,7 +253,7 @@ export function App() {
     const startX = event.clientX;
     const startSizes = panelSizes;
     const workspaceWidth = workspace.getBoundingClientRect().width;
-    const railWidth = 64;
+    const railWidth = 76;
     const handleWidth = 12;
     const minimumMemoWidth = 440;
 
@@ -307,6 +339,7 @@ export function App() {
   };
 
   const handleSignOut = async () => {
+    if (blockDirtyDraft("signing out")) return;
     await signOut().catch(() => undefined);
     hydrateAccountState(emptyAccountState());
     setStateReady(false);
@@ -314,6 +347,7 @@ export function App() {
   };
 
   const handleFile = async (file: File) => {
+    if (blockDirtyDraft("uploading another memo")) return;
     try {
       setIntakeWarning(`Reading ${file.name}...`);
       const result = await memoFromFile(file);
@@ -344,6 +378,7 @@ export function App() {
   };
 
   const handlePasteMemo = (title: string, text: string) => {
+    if (blockDirtyDraft("pasting another memo")) return;
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
       id: `paste-${Date.now()}`,
@@ -372,6 +407,7 @@ export function App() {
   };
 
   const handleCreatePublicDraftMemo = (title: string, memoText: string) => {
+    if (blockDirtyDraft("creating a public draft")) return;
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
       id: `public-draft-${Date.now()}`,
@@ -404,6 +440,7 @@ export function App() {
   };
 
   const handleCreateBuilderMemo = (draft: MemoBuildDraft) => {
+    if (blockDirtyDraft("creating another memo")) return;
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
       id: `ai-draft-${Date.now()}`,
@@ -439,6 +476,7 @@ export function App() {
   };
 
   const handleCreateAndAnalyzeBuilderMemo = (draft: MemoBuildDraft) => {
+    if (blockDirtyDraft("creating and analyzing another memo")) return;
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
       id: `ai-draft-${Date.now()}`,
@@ -514,6 +552,7 @@ export function App() {
   };
 
   const handleCreateReview = (input: NewReviewInput) => {
+    if (blockDirtyDraft("creating a new review")) return;
     const now = new Date().toISOString().slice(0, 10);
     const memo: MemoRecord = {
       id: `review-${Date.now()}`,
@@ -583,9 +622,11 @@ export function App() {
       return next;
     });
     addAuditEvent(memoId, "Memo edited", detail, "review");
+    setMemoDraftDirty(false);
   };
 
   const archiveMemo = (memoId: string) => {
+    if (memoId === selectedMemo?.id && blockDirtyDraft("archiving this memo")) return;
     if (analysisStates[memoId]?.status === "running") {
       setSyncNotice("Wait for the running analysis before archiving this memo.");
       return;
@@ -616,6 +657,7 @@ export function App() {
   };
 
   const handleDecision = (action: ReviewerDecision["action"], notes: string) => {
+    if (blockDirtyDraft("recording a decision")) return;
     if (!selectedMemo || !reviewResult) return;
     const nextDecision = {
       action,
@@ -643,6 +685,7 @@ export function App() {
   };
 
   const exportReport = () => {
+    if (blockDirtyDraft("exporting a report")) return;
     if (!selectedMemo || !reviewResult) {
       setExportNotice("Run analysis before export");
       window.setTimeout(() => setExportNotice(""), 3200);
@@ -671,6 +714,7 @@ export function App() {
   };
 
   const runAnalysis = async () => {
+    if (blockDirtyDraft("running analysis")) return;
     if (!selectedMemo) return;
     const memo = selectedMemo;
     const controller = new AbortController();
@@ -736,6 +780,9 @@ export function App() {
   };
 
   const handleSendMemoChat = async (memoId: string, message: string) => {
+    if (memoId === selectedMemo?.id && blockDirtyDraft("using memo chat")) {
+      throw new Error("Save or discard memo edits before using memo chat.");
+    }
     if (analysisStates[memoId]?.status === "running") {
       throw new Error("Wait for the running analysis before changing this memo.");
     }
@@ -746,6 +793,7 @@ export function App() {
   };
 
   const handleApplyChatSuggestion = (memoId: string, messageId: string, proposedMemoText: string) => {
+    if (memoId === selectedMemo?.id && blockDirtyDraft("applying a chat edit")) return;
     updateMemoText(memoId, proposedMemoText, "Memo text updated from a chat-assisted reviewer edit.");
     setChatMessages((current) => ({
       ...current,
@@ -756,6 +804,7 @@ export function App() {
   };
 
   const hydrateAccountState = (state: AccountReviewState) => {
+    setMemoDraftDirty(false);
     setMemos(state.memos ?? []);
     setSelectedMemoId(state.selectedMemoId ?? state.memos?.[0]?.id);
     setDecisions(state.decisions ?? {});
@@ -841,14 +890,9 @@ export function App() {
         tenant="Research Facility Pilot"
         user={auth.user}
         syncNotice={syncNotice}
-        onNewReview={() => setNewReviewOpen(true)}
+        onNewReview={openNewReview}
         onExport={exportReport}
-        onSignoff={() => {
-          setActiveView("reviews");
-          window.setTimeout(() => {
-            document.querySelector(".decision-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }, 0);
-        }}
+        onSignoff={focusSignoff}
         onSignOut={handleSignOut}
         signoffReady={decision?.action === "accept"}
         exportNotice={exportNotice}
@@ -861,7 +905,7 @@ export function App() {
           "--analysis-panel-width": `${panelSizes.analysis}px`
         } as CSSProperties}
       >
-        <SidebarRail activeView={activeView} onViewChange={setActiveView} />
+        <SidebarRail activeView={activeView} onViewChange={changeActiveView} />
         {activeView === "reviews" ? (
           <>
             <ReviewList
@@ -871,7 +915,7 @@ export function App() {
               warning={intakeWarning}
               corpusLabel={officialCorpus.label}
               onSearch={setSearch}
-              onSelect={setSelectedMemoId}
+              onSelect={selectMemo}
               onFile={handleFile}
               onPasteMemo={handlePasteMemo}
             />
@@ -889,6 +933,7 @@ export function App() {
                   onMemoTextChange={updateMemoText}
                   onArchiveMemo={archiveMemo}
                   onCreatePublicDraft={handleCreatePublicDraftMemo}
+                  onDirtyChange={setMemoDraftDirty}
                 />
                 <PanelResizeHandle
                   label="Resize analysis panel"
@@ -906,6 +951,7 @@ export function App() {
                   auditEvents={auditEvents.filter((event) => event.memoId === selectedMemo.id)}
                   chatMessages={chatMessages[selectedMemo.id] ?? []}
                   analysisLocked={analysisState.status === "running"}
+                  memoDraftDirty={memoDraftDirty}
                   onDecision={handleDecision}
                   onSendChat={handleSendMemoChat}
                   onApplyChatSuggestion={handleApplyChatSuggestion}
@@ -919,7 +965,7 @@ export function App() {
                   <RulixLogo />
                   <h1>No memos yet</h1>
                   <p>Create, upload, or paste a memo to begin an account-linked ECCN review.</p>
-                  <button className="button primary" type="button" onClick={() => setNewReviewOpen(true)}>
+                  <button className="button primary" type="button" onClick={openNewReview}>
                     New Review
                   </button>
                 </main>
@@ -954,6 +1000,11 @@ export function App() {
             reviewResults={reviewResults}
             corpus={officialCorpus}
             onSelectMemo={(memoId) => {
+              if (memoId === selectedMemo?.id) {
+                setActiveView("reviews");
+                return;
+              }
+              if (blockDirtyDraft("opening another memo")) return;
               setSelectedMemoId(memoId);
               setActiveView("reviews");
             }}

@@ -45,6 +45,11 @@ export function ReviewList({
     .filter((memo) => statusFilter === "all" || memo.status === statusFilter)
     .sort((a, b) => compareMemos(a, b, sortMode));
   const queueCount = memos.filter((memo) => memo.status !== "signed-off").length;
+  const statusCounts = {
+    ready: memos.filter((memo) => memo.status === "ready").length,
+    needsInfo: memos.filter((memo) => memo.status === "needs-info").length,
+    conflict: memos.filter((memo) => memo.status === "conflict").length
+  };
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -67,6 +72,11 @@ export function ReviewList({
         <div>
           <strong>Review Queue</strong>
           <span>{queueCount} need action</span>
+        </div>
+        <div className="queue-metrics" aria-label="Queue health">
+          <span className="queue-metric ready"><strong>{statusCounts.ready}</strong> ready</span>
+          <span className="queue-metric needs-info"><strong>{statusCounts.needsInfo}</strong> needs info</span>
+          <span className="queue-metric conflict"><strong>{statusCounts.conflict}</strong> conflicts</span>
         </div>
       </div>
 

@@ -7,11 +7,13 @@ import {
 } from "lucide-react";
 import type { MemoChatMessage, MemoRecord } from "../types";
 import type { ReactNode } from "react";
+import { MemoDiffPreview } from "./MemoDiffPreview";
 
 interface MemoChatPanelProps {
   memo?: MemoRecord;
   chatMessages: MemoChatMessage[];
   analysisLocked: boolean;
+  memoDraftDirty: boolean;
   onSendChat: (memoId: string, message: string) => Promise<void>;
   onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
 }
@@ -20,6 +22,7 @@ export function MemoChatPanel({
   memo,
   chatMessages,
   analysisLocked,
+  memoDraftDirty,
   onSendChat,
   onApplyChatSuggestion
 }: MemoChatPanelProps) {
@@ -38,7 +41,7 @@ export function MemoChatPanel({
   }, [chatMessages]);
 
   const submitChat = async () => {
-    if (!memo || !chatDraft.trim()) return;
+    if (!memo || !chatDraft.trim() || memoDraftDirty) return;
     const message = chatDraft.trim();
     setChatDraft("");
     setChatBusy(true);
@@ -77,14 +80,15 @@ export function MemoChatPanel({
                     <strong>Suggested edit</strong>
                     <span>Review changes before applying</span>
                   </div>
-                  <SuggestedEditDiff
+                  <MemoDiffPreview
                     currentMemoText={memo.memoText}
                     proposedMemoText={message.proposedMemoText}
                   />
                   <button
                     type="button"
                     className={message.applied ? "button small applied" : "button primary small"}
-                    disabled={message.applied || analysisLocked}
+                    disabled={message.applied || analysisLocked || memoDraftDirty}
+                    title={memoDraftDirty ? "Save or discard memo edits before applying chat suggestions." : undefined}
                     onClick={() => onApplyChatSuggestion(memo.id, message.id, message.proposedMemoText!)}
                   >
                     {message.applied ? <CheckCircle2 size={16} /> : <Edit3 size={16} />}
@@ -111,168 +115,24 @@ export function MemoChatPanel({
           onChange={(event) => setChatDraft(event.target.value)}
           placeholder="Ask about or revise this memo..."
           rows={3}
-          disabled={!memo || analysisLocked}
+          disabled={!memo || analysisLocked || memoDraftDirty}
         />
         <button
           className="button primary small"
           type="button"
           onClick={submitChat}
-          disabled={!memo || analysisLocked || chatBusy || !chatDraft.trim()}
+          disabled={!memo || analysisLocked || memoDraftDirty || chatBusy || !chatDraft.trim()}
+          title={memoDraftDirty ? "Save or discard memo edits before using memo chat." : undefined}
         >
           <Send size={16} />
           Send
         </button>
       </div>
       {analysisLocked && <p className="memo-chat-note">Memo edits are locked until analysis finishes.</p>}
+      {memoDraftDirty && <p className="memo-chat-note">Save or discard memo edits before using chat.</p>}
       {chatError && <p className="memo-chat-error">{chatError}</p>}
     </section>
   );
-}
-
-function SuggestedEditDiff({
-  currentMemoText,
-  proposedMemoText
-}: {
-  currentMemoText: string;
-  proposedMemoText: string;
-}) {
-  const changes = diffWords(currentMemoText, proposedMemoText);
-  const visibleChanges = trimUnchangedContext(changes, 28);
-
-  return (
-    <div className="suggested-edit" aria-label="Suggested memo changes">
-      {visibleChanges.map((change, index) => {
-        if (change.type === "gap") {
-          return (
-            <span className="diff-gap" key={`gap-${index}`}>
-              ...
-            </span>
-          );
-        }
-        return (
-          <span className={`diff-token ${change.type}`} key={`${change.type}-${index}-${change.text}`}>
-            {change.text}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-type DiffChange =
-  | { type: "same" | "added" | "removed"; text: string }
-  | { type: "gap"; text?: string };
-
-function diffWords(currentMemoText: string, proposedMemoText: string): DiffChange[] {
-  const oldTokens = tokenizeForDiff(currentMemoText);
-  const newTokens = tokenizeForDiff(proposedMemoText);
-  if (oldTokens.length * newTokens.length > 1_500_000) {
-    return buildLargeDiffPreview(currentMemoText, proposedMemoText);
-  }
-  const rows = oldTokens.length + 1;
-  const cols = newTokens.length + 1;
-  const table = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
-
-  for (let i = oldTokens.length - 1; i >= 0; i -= 1) {
-    for (let j = newTokens.length - 1; j >= 0; j -= 1) {
-      table[i][j] = oldTokens[i] === newTokens[j]
-        ? table[i + 1][j + 1] + 1
-        : Math.max(table[i + 1][j], table[i][j + 1]);
-    }
-  }
-
-  const changes: DiffChange[] = [];
-  let oldIndex = 0;
-  let newIndex = 0;
-  while (oldIndex < oldTokens.length && newIndex < newTokens.length) {
-    if (oldTokens[oldIndex] === newTokens[newIndex]) {
-      pushDiffChange(changes, "same", oldTokens[oldIndex]);
-      oldIndex += 1;
-      newIndex += 1;
-    } else if (table[oldIndex + 1][newIndex] >= table[oldIndex][newIndex + 1]) {
-      pushDiffChange(changes, "removed", oldTokens[oldIndex]);
-      oldIndex += 1;
-    } else {
-      pushDiffChange(changes, "added", newTokens[newIndex]);
-      newIndex += 1;
-    }
-  }
-
-  while (oldIndex < oldTokens.length) {
-    pushDiffChange(changes, "removed", oldTokens[oldIndex]);
-    oldIndex += 1;
-  }
-  while (newIndex < newTokens.length) {
-    pushDiffChange(changes, "added", newTokens[newIndex]);
-    newIndex += 1;
-  }
-
-  return changes;
-}
-
-function buildLargeDiffPreview(currentMemoText: string, proposedMemoText: string): DiffChange[] {
-  const currentTrimmed = currentMemoText.trim();
-  const proposedTrimmed = proposedMemoText.trim();
-  if (proposedTrimmed.startsWith(currentTrimmed)) {
-    return [
-      { type: "gap" },
-      { type: "same", text: currentTrimmed.slice(-500) },
-      { type: "added", text: proposedTrimmed.slice(currentTrimmed.length) }
-    ];
-  }
-
-  return [
-    { type: "removed", text: currentTrimmed.slice(0, 900) },
-    { type: "gap" },
-    { type: "added", text: proposedTrimmed.slice(0, 900) }
-  ];
-}
-
-function tokenizeForDiff(value: string) {
-  return value.match(/\s+|[^\s]+/g) ?? [];
-}
-
-function pushDiffChange(
-  changes: DiffChange[],
-  type: "same" | "added" | "removed",
-  text: string
-) {
-  const previous = changes[changes.length - 1];
-  if (previous?.type === type) {
-    previous.text += text;
-    return;
-  }
-  changes.push({ type, text });
-}
-
-function trimUnchangedContext(changes: DiffChange[], contextTokens: number): DiffChange[] {
-  const importantIndexes = new Set<number>();
-  changes.forEach((change, index) => {
-    if (change.type === "added" || change.type === "removed") {
-      for (let offset = -contextTokens; offset <= contextTokens; offset += 1) {
-        const contextIndex = index + offset;
-        if (contextIndex >= 0 && contextIndex < changes.length) {
-          importantIndexes.add(contextIndex);
-        }
-      }
-    }
-  });
-
-  if (importantIndexes.size === 0) {
-    return changes.slice(-8);
-  }
-
-  const trimmed: DiffChange[] = [];
-  changes.forEach((change, index) => {
-    if (importantIndexes.has(index)) {
-      trimmed.push(change);
-      return;
-    }
-    if (trimmed[trimmed.length - 1]?.type !== "gap") {
-      trimmed.push({ type: "gap" });
-    }
-  });
-  return trimmed;
 }
 
 function ChatMessageText({ message, animate }: { message: MemoChatMessage; animate: boolean }) {

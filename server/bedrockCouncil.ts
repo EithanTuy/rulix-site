@@ -2,15 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { officialCorpus } from "../src/data/corpus";
 import { analyzeMemo } from "../src/lib/eccnReview";
+import {
+  COUNCIL_AGENT_ROLES,
+  mergeCouncilPayload,
+  type AiCouncilPayload
+} from "./councilQuality";
 import type {
-  AgentRole,
   DataClass,
   AnalysisProviderStatus,
-  ClassificationCandidate,
-  CouncilAgentRun,
-  EvidenceFinding,
-  EvidenceStatus,
-  JurisdictionFinding,
   MemoChatMessage,
   MemoRecord,
   ReviewResult,
@@ -33,12 +32,30 @@ export interface UsageSample {
   latencyMs: number;
 }
 
+export interface CouncilProviderResponseBlock {
+  type: string;
+  name?: string;
+  input?: unknown;
+  text?: string;
+}
+
+export interface CouncilProviderResponse {
+  content: CouncilProviderResponseBlock[];
+  usage?: unknown;
+}
+
+export interface CouncilProviderClient {
+  messages: {
+    create: (body: unknown, options?: unknown) => Promise<CouncilProviderResponse>;
+  };
+}
+
 interface CouncilOptions {
-  model?: string;
   depth?: CouncilDepth;
   maxTokens?: number;
   timeoutMs?: number;
   onUsage?: (sample: UsageSample) => void;
+  providerClient?: CouncilProviderClient;
 }
 
 interface MemoChatOptions {
@@ -67,26 +84,6 @@ export interface PublicMemoDraftResult {
   };
 }
 
-type AiCouncilPayload = Partial<
-  Pick<
-    ReviewResult,
-    "jurisdiction" | "recommended" | "alternatives" | "findings" | "infoRequests" | "agents"
-  >
->;
-
-const AGENT_ROLES: AgentRole[] = [
-  "memo-parser",
-  "jurisdiction-gate",
-  "eccn-candidate",
-  "evidence-mapper",
-  "citation-verifier",
-  "risk-reviewer",
-  "report-writer"
-];
-
-const EVIDENCE_STATUSES: EvidenceStatus[] = ["strong", "weak", "missing", "conflict"];
-const SOURCE_IDS = new Set(officialCorpus.chunks.map((chunk) => chunk.id));
-
 const SYSTEM_PROMPT = `You are an export-control classification memo review assistant for research facilities.
 You are not a lawyer and must not present a final legal determination.
 Act as a council of seven bounded subagents: memo-parser, jurisdiction-gate, eccn-candidate, evidence-mapper, citation-verifier, risk-reviewer, and report-writer.
@@ -94,6 +91,14 @@ Review the memo against the supplied official-source corpus excerpts and the det
 Each subagent must be represented in the agents array exactly once with either complete or blocked status.
 Prefer useful, reviewer-actionable blockers over vague caution. Do not block ready memos unless a concrete source-backed gap remains.
 Treat the deterministic baseline as a broad-category guardrail. Do not move to a different ECCN family unless the memo text itself contains source-supported facts for that family. Quantum/RF control pulses are not laser pulses.
+Role rubrics:
+- memo-parser extracts item identity, performance parameters, software/firmware facts, data class, use, end use, and explicit omissions from the memo only.
+- jurisdiction-gate evaluates EAR/ITAR posture and order-of-review issues without treating end use as classification proof.
+- eccn-candidate proposes the best supported ECCN family and alternatives, and lowers confidence when facts are incomplete.
+- evidence-mapper links memo claims and omissions to exact sourceChunkIds from the supplied official corpus.
+- citation-verifier rejects unsupported sourceChunkIds and identifies claims that are not grounded in corpus excerpts.
+- risk-reviewer produces only actionable blockers tied to missing facts, conflicts, or jurisdiction risk.
+- report-writer summarizes only the structured outputs from the prior agents and must not invent new facts.
 Use the record_eccn_review tool to return structured results.`;
 
 const AI_REVIEW_SCHEMA = {
@@ -155,7 +160,7 @@ const AI_REVIEW_SCHEMA = {
           rationale: { type: "string" },
           excerpt: { type: "string" },
           sourceChunkIds: { type: "array", items: { type: "string" } },
-          agent: { type: "string", enum: AGENT_ROLES },
+          agent: { type: "string", enum: COUNCIL_AGENT_ROLES },
           severity: { type: "string", enum: ["info", "review", "escalate"] }
         }
       }
@@ -168,7 +173,7 @@ const AI_REVIEW_SCHEMA = {
         additionalProperties: false,
         required: ["role", "label", "status", "summary"],
         properties: {
-          role: { type: "string", enum: AGENT_ROLES },
+          role: { type: "string", enum: COUNCIL_AGENT_ROLES },
           label: { type: "string" },
           status: { type: "string", enum: ["complete", "blocked"] },
           summary: { type: "string" }
@@ -227,7 +232,7 @@ export async function runCouncilAnalysis(
   const localResult = analyzeMemo(memo);
   const runtime = getBedrockRuntime();
   const depth = options.depth ?? "standard";
-  const model = options.model ?? councilModelForDepth(depth, runtime);
+  const model = councilModelForDepth(depth, runtime);
 
   if (!runtime.configured) {
     return withProvider(localResult, {
@@ -243,7 +248,7 @@ export async function runCouncilAnalysis(
 
   const startedAt = Date.now();
   try {
-    const client = new AnthropicBedrock();
+    const client = options.providerClient ?? (new AnthropicBedrock() as CouncilProviderClient);
     const response = await client.messages.create(
       {
         model,
@@ -277,13 +282,16 @@ export async function runCouncilAnalysis(
     );
     const rawText = response.content
       .filter((block) => block.type === "text")
-      .map((block) => block.text)
+      .map((block) => (typeof block.text === "string" ? block.text : ""))
       .join("\n")
       .trim();
     const payload = toolBlock ? (toolBlock.input as AiCouncilPayload) : parseJsonPayload(rawText);
     const checkedAt = new Date().toISOString();
 
-    return withProvider(mergeAiPayload(memo, localResult, payload, { model, depth }), {
+    return withProvider(mergeCouncilPayload(memo, localResult, payload, {
+      providerLabel: providerLabel(model),
+      depth
+    }), {
       source: "bedrock",
       label: providerLabel(model),
       model,
@@ -576,7 +584,7 @@ function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult, depth: 
           ? "Run a deep full-council review of whether the memo's ECCN classification is supported. In addition to evidence, bad reasoning, conflicts, and missing information, identify anything that would make a reviewer unhappy: ambiguous blocker wording, missing next action, unsupported confidence, overblocking a ready memo, or underblocking a risky memo. Prefer precise source chunk IDs from the corpus."
           : "Run a full-council review of whether the memo's ECCN classification is supported. Highlight good evidence, bad reasoning, conflicts, and missing information. Prefer precise source chunk IDs from the corpus.",
       analysisDepth: depth,
-      fullCouncilRoles: AGENT_ROLES,
+      fullCouncilRoles: COUNCIL_AGENT_ROLES,
       blockerPolicy:
         "Mark an agent blocked only when the memo cannot support reviewer signoff without a specific missing fact, conflict, or jurisdiction issue. Make each info request actionable.",
       memo,
@@ -604,117 +612,6 @@ function parseJsonPayload(rawText: string): AiCouncilPayload {
   return JSON.parse(withoutFence.slice(start, end + 1)) as AiCouncilPayload;
 }
 
-function mergeAiPayload(
-  memo: MemoRecord,
-  localResult: ReviewResult,
-  payload: AiCouncilPayload,
-  runtime: { model: string; depth: CouncilDepth }
-): ReviewResult {
-  const findings = Array.isArray(payload.findings)
-    ? payload.findings
-        .map((finding, index) =>
-          normalizeFinding(memo.memoText, finding, localResult.findings[index], index)
-        )
-        .filter((finding): finding is EvidenceFinding => Boolean(finding))
-    : [];
-
-  const mergedFindings = mergeFindings(findings, localResult.findings);
-  const infoRequests = sanitizeStringArray(payload.infoRequests).slice(0, 10);
-  const mergedInfoRequests = uniqueStrings([...infoRequests, ...buildInfoRequests(mergedFindings)]).slice(0, 10);
-
-  return {
-    ...localResult,
-    generatedAt: new Date().toISOString(),
-    modelPolicy: `${providerLabel(runtime.model)} ${runtime.depth} full-council review with deterministic citation/range validation; human export-control signoff required.`,
-    jurisdiction: normalizeJurisdiction(payload.jurisdiction, localResult.jurisdiction),
-    recommended: normalizeRecommendedCandidate(memo.memoText, payload.recommended, localResult.recommended),
-    alternatives: Array.isArray(payload.alternatives)
-      ? payload.alternatives
-          .map((candidate, index) => normalizeCandidate(candidate, localResult.alternatives[index]))
-          .filter((candidate): candidate is ClassificationCandidate => Boolean(candidate))
-      : localResult.alternatives,
-    findings: mergedFindings,
-    infoRequests: mergedInfoRequests,
-    agents: normalizeAgents(payload.agents, localResult.agents, mergedFindings)
-  };
-}
-
-function mergeFindings(aiFindings: EvidenceFinding[], localFindings: EvidenceFinding[]) {
-  if (aiFindings.length === 0) return localFindings;
-  const localGuardrails = localFindings.filter(
-    (finding) => finding.status === "missing" || finding.status === "conflict"
-  );
-  return [
-    ...aiFindings,
-    ...localGuardrails.filter((localFinding) =>
-      !aiFindings.some((aiFinding) => isSimilarFinding(aiFinding, localFinding))
-    )
-  ].sort(sortMergedFindings);
-}
-
-function isSimilarFinding(a: EvidenceFinding, b: EvidenceFinding) {
-  const sameTitle = a.title.trim().toLowerCase() === b.title.trim().toLowerCase();
-  const sharedSource = a.sourceChunkIds.some((id) => b.sourceChunkIds.includes(id));
-  return sameTitle || (sharedSource && a.agent === b.agent && a.status === b.status);
-}
-
-function sortMergedFindings(a: EvidenceFinding, b: EvidenceFinding) {
-  const weight = { conflict: 0, missing: 1, weak: 2, strong: 3 };
-  if (weight[a.status] !== weight[b.status]) return weight[a.status] - weight[b.status];
-  return (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER);
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
-
-function normalizeRecommendedCandidate(
-  memoText: string,
-  value: unknown,
-  fallback: ClassificationCandidate
-) {
-  const candidate = normalizeCandidate(value, fallback) ?? fallback;
-  if (isUnsupportedFamilyShift(memoText, candidate, fallback)) {
-    return fallback;
-  }
-  return candidate;
-}
-
-function isUnsupportedFamilyShift(
-  memoText: string,
-  candidate: ClassificationCandidate,
-  fallback: ClassificationCandidate
-) {
-  const candidateFamily = candidateCategory(candidate);
-  const fallbackFamily = candidateCategory(fallback);
-  return Boolean(
-    candidateFamily &&
-      fallbackFamily &&
-      candidateFamily !== fallbackFamily &&
-      !memoSupportsCategory(memoText, candidateFamily)
-  );
-}
-
-function candidateCategory(candidate: ClassificationCandidate) {
-  const text = `${candidate.eccn} ${candidate.label} ${candidate.summary}`.toLowerCase();
-  if (/6a005|laser|femtosecond|wavelength/.test(text)) return "laser";
-  if (/6a003|camera|imaging|sensor/.test(text)) return "camera";
-  if (/cryogenic|cryostat|low-temperature|3a001\.a\.5/.test(text)) return "cryogenic";
-  if (/3d001|quantum|\brf\b|microwave|electronics|firmware|software/.test(text)) return "electronics";
-  if (/ear99|no specific ccl|classification path/.test(text)) return "ear99";
-  return undefined;
-}
-
-function memoSupportsCategory(memoText: string, category: string) {
-  const text = memoText.toLowerCase();
-  if (category === "laser") return /laser|femtosecond|wavelength|pulse energy|beam quality/.test(text);
-  if (category === "camera") return /camera|imaging|cmos|frames per second|fps|sensor/.test(text);
-  if (category === "cryogenic") return /cryogenic|cryostat|pulse tube|joule-thomson|dewar|1\.2 k/.test(text);
-  if (category === "electronics") return /quantum|microwave|\brf\b|waveform|qubit|firmware|software|electronics/.test(text);
-  if (category === "ear99") return /manufacturer classification|ccl screening|no listed performance|ear99/.test(text);
-  return false;
-}
-
 function providerLabel(model: string) {
   const normalized = model.toLowerCase();
   if (normalized.includes("haiku")) return "Claude Haiku council via Bedrock";
@@ -728,169 +625,6 @@ function bedrockDeadlineMs() {
   return Number.isFinite(configured) && configured >= 5_000
     ? Math.min(configured, 52_000)
     : 50_000;
-}
-
-function normalizeJurisdiction(
-  value: unknown,
-  fallback: JurisdictionFinding
-): JurisdictionFinding {
-  const input = asRecord(value);
-  if (!input) return fallback;
-
-  const outcome =
-    input.outcome === "ear-likely" ||
-    input.outcome === "itar-risk" ||
-    input.outcome === "insufficient-info"
-      ? input.outcome
-      : fallback.outcome;
-
-  return {
-    outcome,
-    summary: asString(input.summary, fallback.summary),
-    rationale: asString(input.rationale, fallback.rationale),
-    sourceChunkIds: normalizeChunkIds(input.sourceChunkIds, fallback.sourceChunkIds)
-  };
-}
-
-function normalizeCandidate(
-  value: unknown,
-  fallback?: ClassificationCandidate
-): ClassificationCandidate | undefined {
-  const input = asRecord(value);
-  if (!input && !fallback) return undefined;
-  if (!input) return fallback;
-
-  return {
-    eccn: asString(input.eccn, fallback?.eccn ?? "Review needed"),
-    label: asString(input.label, fallback?.label ?? "Classification review needed"),
-    confidence: asConfidence(input.confidence, fallback?.confidence ?? 0.5),
-    risk: input.risk === "low" || input.risk === "medium" || input.risk === "high"
-      ? input.risk
-      : fallback?.risk ?? "medium",
-    summary: asString(input.summary, fallback?.summary ?? "Additional reviewer analysis is required."),
-    sourceChunkIds: normalizeChunkIds(input.sourceChunkIds, fallback?.sourceChunkIds ?? ["chunk-eccn-method"])
-  };
-}
-
-function normalizeFinding(
-  memoText: string,
-  value: unknown,
-  fallback: EvidenceFinding | undefined,
-  index: number
-): EvidenceFinding | undefined {
-  const input = asRecord(value);
-  if (!input && !fallback) return undefined;
-  if (!input) return fallback;
-
-  const excerpt = asString(input.excerpt, fallback?.excerpt ?? "");
-  const range = locateExcerpt(memoText, excerpt);
-  const status = EVIDENCE_STATUSES.includes(input.status as EvidenceStatus)
-    ? (input.status as EvidenceStatus)
-    : fallback?.status ?? "weak";
-  const agent = AGENT_ROLES.includes(input.agent as AgentRole)
-    ? (input.agent as AgentRole)
-    : fallback?.agent ?? "risk-reviewer";
-  const severity =
-    input.severity === "info" || input.severity === "review" || input.severity === "escalate"
-      ? input.severity
-      : fallback?.severity ?? (status === "conflict" ? "escalate" : "review");
-
-  const normalized: EvidenceFinding = {
-    id: asString(input.id, fallback?.id ?? `ai-finding-${index + 1}`),
-    status,
-    title: asString(input.title, fallback?.title ?? "Review finding"),
-    claim: asString(input.claim, fallback?.claim ?? (excerpt || "Review supporting evidence.")),
-    rationale: asString(input.rationale, fallback?.rationale ?? "Reviewer should verify this claim."),
-    excerpt: excerpt || fallback?.excerpt,
-    start: range?.start ?? fallback?.start,
-    end: range?.end ?? fallback?.end,
-    sourceChunkIds: normalizeChunkIds(input.sourceChunkIds, fallback?.sourceChunkIds ?? ["chunk-eccn-method"]),
-    agent,
-    severity
-  };
-
-  return softenLowRiskProceduralBlocker(memoText, normalized);
-}
-
-function softenLowRiskProceduralBlocker(memoText: string, finding: EvidenceFinding) {
-  const findingText = `${finding.title} ${finding.claim} ${finding.rationale}`;
-  if (
-    (finding.status === "missing" || finding.status === "conflict") &&
-    isLowRiskEar99Memo(memoText) &&
-    !/pulse energy|spectral sensitivity|cooling capacity|timing resolution|source code|firmware.*provided|software.*provided|radiation hardening present|encryption present/i.test(findingText)
-  ) {
-    return {
-      ...finding,
-      status: "weak" as const,
-      severity: finding.severity === "escalate" ? "review" as const : finding.severity,
-      rationale: `${finding.rationale} Backend validation downgraded this to procedural guidance because the memo documents an EAR99-style item with no affirmative defense indicators or concrete controlled-parameter gap.`
-    };
-  }
-  return finding;
-}
-
-function isLowRiskEar99Memo(memoText: string) {
-  const text = memoText.toLowerCase();
-  const hasEar99Path = /ear99|manufacturer classification|ccl screening|no listed performance/.test(text);
-  const hasAffirmativeDefenseCue = /weapon|missile|defense|usml|nuclear|military end-use|military application/.test(text);
-  return hasEar99Path && !hasAffirmativeDefenseCue;
-}
-
-function normalizeAgents(
-  value: unknown,
-  fallback: CouncilAgentRun[],
-  findings: EvidenceFinding[]
-): CouncilAgentRun[] {
-  const inputs = Array.isArray(value) ? value.map(asRecord).filter(Boolean) : [];
-  return fallback.map((agent) => {
-    const input = inputs.find((item) => item?.role === agent.role);
-    const roleFindings = findings.filter((finding) => finding.agent === agent.role);
-    const blockers = roleFindings.filter(
-      (finding) => finding.status === "missing" || finding.status === "conflict"
-    );
-    const validatedStatus = blockers.length > 0 ? "blocked" : "complete";
-    if (!input) {
-      return {
-        ...agent,
-        status: validatedStatus
-      };
-    }
-
-    return {
-      role: agent.role,
-      label: asString(input.label, agent.label),
-      status: validatedStatus,
-      summary:
-        input.status === "blocked" && validatedStatus === "complete"
-          ? "No blocking issue found after backend validation."
-          : asString(input.summary, agent.summary)
-    };
-  });
-}
-
-function buildInfoRequests(findings: EvidenceFinding[]) {
-  return findings
-    .filter((finding) => finding.status === "missing" || finding.status === "weak")
-    .map((finding) => finding.claim);
-}
-
-function normalizeChunkIds(value: unknown, fallback: string[]) {
-  const ids = sanitizeStringArray(value).filter((id) => SOURCE_IDS.has(id));
-  return ids.length > 0 ? ids : fallback.filter((id) => SOURCE_IDS.has(id));
-}
-
-function sanitizeStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean);
-}
-
-function locateExcerpt(memoText: string, excerpt: string) {
-  if (!excerpt.trim()) return undefined;
-  const index = memoText.toLowerCase().indexOf(excerpt.trim().toLowerCase());
-  if (index < 0) return undefined;
-  return { start: index, end: index + excerpt.trim().length };
 }
 
 function withProvider(result: ReviewResult, provider: AnalysisProviderStatus): ReviewResult {
@@ -913,12 +647,6 @@ function asString(value: unknown, fallback: string) {
 
 function asLongString(value: unknown, fallback: string, maxLength: number) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : fallback;
-}
-
-function asConfidence(value: unknown, fallback: number) {
-  const numberValue = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(numberValue)) return fallback;
-  return Math.max(0, Math.min(0.99, numberValue));
 }
 
 function safeError(error: unknown) {

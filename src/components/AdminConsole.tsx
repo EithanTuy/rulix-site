@@ -468,20 +468,37 @@ function AuditPanel({
         <h2>Review Readiness and Audit</h2>
       </div>
       <div className="readiness-list">
+        <div className="readiness-row readiness-row-head" aria-hidden="true">
+          <span>Memo</span>
+          <span>Status</span>
+          <span>Readiness</span>
+          <span>Decision</span>
+        </div>
         {memos.map((memo) => {
           const result = reviewResults[memo.id];
           const readiness = result ? summarizeReadiness(result) : undefined;
           return (
             <button className="readiness-row" type="button" onClick={() => onSelectMemo(memo.id)} key={memo.id}>
               <strong>{memo.title}</strong>
-              <span>{memo.status}</span>
-              <span>{readiness?.label ?? "Unanalyzed"}</span>
+              <span className={`review-status-pill ${memo.status}`}>{reviewStatusLabel(memo.status)}</span>
+              <span className={readiness ? readinessClassName(readiness.label) : "readiness-pill unanalyzed"}>
+                {readiness?.label ?? "Unanalyzed"}
+              </span>
               <small>{decisions[memo.id]?.action ?? "No reviewer decision"}</small>
             </button>
           );
         })}
       </div>
       <div className="audit-table">
+        {auditEvents.length > 0 && (
+          <div className="audit-row audit-row-head" aria-hidden="true">
+            <span />
+            <span>Event</span>
+            <span>Actor</span>
+            <span>Time</span>
+            <span>Detail</span>
+          </div>
+        )}
         {auditEvents.slice(0, 16).map((event) => (
           <div className="audit-row" key={event.id}>
             <span className={`status-dot ${event.severity === "info" ? "green" : "amber"}`} />
@@ -496,13 +513,25 @@ function AuditPanel({
   );
 }
 
+function reviewStatusLabel(status: MemoRecord["status"]) {
+  if (status === "needs-info") return "Needs info";
+  if (status === "signed-off") return "Signed off";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function readinessClassName(label: string) {
+  if (label === "Blocked") return "readiness-pill blocked";
+  if (label === "Ready for signoff") return "readiness-pill ready";
+  return "readiness-pill review";
+}
+
 function viewTitle(view: AppView) {
   const titles = {
     reviews: ["Reviews", "AI-assisted memo review workspace."],
     controls: ["Controls", "Safety gates and compliance controls for AI classification review."],
     evidence: ["Evidence", "Cross-memo finding queue and evidence quality map."],
     corpus: ["Corpus", "Official source snapshots and retrieved source chunks."],
-    users: ["Users", "Role model for research-facility review workflows."],
+    users: ["Users", "Invite operators, review invite status, and keep access roles visible."],
     settings: ["Settings", "Tenant deployment, persistence, and model policy settings."],
     "memo-builder": ["Memo Builder", "Chat with Sonnet to draft a new ECCN classification memo."]
   } satisfies Record<AppView, [string, string]>;

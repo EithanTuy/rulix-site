@@ -303,6 +303,8 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
                 type="button"
                 className={activeTab === tab.id ? "active" : ""}
                 aria-current={activeTab === tab.id ? "page" : undefined}
+                aria-label={tab.label}
+                title={tab.label}
                 onClick={() => selectTab(tab.id)}
                 key={tab.id}
               >
@@ -727,17 +729,17 @@ function UsersTable({ users }: { users: UserAdminSummary[] }) {
           </div>
           {users.map((u) => (
             <div className="dash-table-row" key={u.id}>
-              <span className="dash-user">
+              <span className="dash-user" data-label="User">
                 <span className={`dash-dot ${u.online ? "online" : "offline"}`} />
                 <span>
                   <strong>{u.name}</strong>
                   <small>{u.email}</small>
                 </span>
               </span>
-              <span className="dash-role">{roleLabel(u.role)}</span>
-              <span>{u.lastSeenAt ? relativeTime(u.lastSeenAt) : "—"}</span>
-              <span>{num(u.usage.calls)}</span>
-              <span>{usd(u.usage.costUsd)}</span>
+              <span className="dash-role" data-label="Role">{roleLabel(u.role)}</span>
+              <span data-label="Last seen">{u.lastSeenAt ? relativeTime(u.lastSeenAt) : "—"}</span>
+              <span data-label="Calls">{num(u.usage.calls)}</span>
+              <span data-label="Spend">{usd(u.usage.costUsd)}</span>
             </div>
           ))}
           {users.length === 0 && <div className="dash-empty"><Users size={22} /><span>No accounts yet.</span></div>}

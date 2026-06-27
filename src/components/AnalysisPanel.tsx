@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ChevronRight,
   Check,
   Cloud,
   Cpu,
@@ -34,6 +35,7 @@ interface AnalysisPanelProps {
   auditEvents: AuditEvent[];
   chatMessages: MemoChatMessage[];
   analysisLocked: boolean;
+  memoDraftDirty: boolean;
   onDecision: (action: ReviewerDecision["action"], notes: string) => void;
   onSendChat: (memoId: string, message: string) => Promise<void>;
   onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
@@ -54,6 +56,7 @@ export function AnalysisPanel({
   auditEvents,
   chatMessages,
   analysisLocked,
+  memoDraftDirty,
   onDecision,
   onSendChat,
   onApplyChatSuggestion,
@@ -61,7 +64,7 @@ export function AnalysisPanel({
   selectedFindingId,
   onFindingSelect
 }: AnalysisPanelProps) {
-  const [activeTab, setActiveTab] = useState<SupportTab>("chat");
+  const [activeTab, setActiveTab] = useState<SupportTab>("analysis");
   const [notes, setNotes] = useState(decision?.notes ?? "");
   const [selectedAction, setSelectedAction] = useState<ReviewerDecision["action"] | undefined>(
     decision?.action
@@ -84,8 +87,18 @@ export function AnalysisPanel({
   const readiness = result ? summarizeReadiness(result) : undefined;
   const hasBlockingEvidence = Boolean(readiness?.blockers);
   const acceptBlocked = selectedAction === "accept" && hasBlockingEvidence;
-  const canSubmit = Boolean(selectedAction && notes.trim()) && !acceptBlocked;
+  const canSubmit = Boolean(selectedAction && notes.trim()) && !acceptBlocked && !memoDraftDirty;
   const selectedFinding = result?.findings.find((finding) => finding.id === selectedFindingId);
+  useEffect(() => {
+    setActiveTab(
+      preferredSupportTab({
+        result,
+        analysisStatus: analysisState.status,
+        hasBlockingEvidence,
+        decisionAction: decision?.action
+      })
+    );
+  }, [memo.id, result?.generatedAt, analysisState.status, hasBlockingEvidence, decision?.action]);
   const tabs = (
     <SupportTabs activeTab={activeTab} onTabChange={setActiveTab} />
   );
@@ -94,6 +107,7 @@ export function AnalysisPanel({
       memo={memo}
       chatMessages={chatMessages}
       analysisLocked={analysisLocked}
+      memoDraftDirty={memoDraftDirty}
       onSendChat={onSendChat}
       onApplyChatSuggestion={onApplyChatSuggestion}
     />
@@ -125,7 +139,8 @@ export function AnalysisPanel({
                 type="button"
                 className="button primary full"
                 onClick={onRunAnalysis}
-                disabled={analysisState.status === "running"}
+                disabled={analysisState.status === "running" || memoDraftDirty}
+                title={memoDraftDirty ? "Save or discard memo edits before running analysis." : undefined}
               >
                 {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
               </button>
@@ -168,6 +183,8 @@ export function AnalysisPanel({
               type="button"
               className="button small"
               onClick={onRunAnalysis}
+              disabled={memoDraftDirty}
+              title={memoDraftDirty ? "Save or discard memo edits before rerunning analysis." : undefined}
             >
               Re-run Analysis
             </button>
@@ -255,7 +272,7 @@ export function AnalysisPanel({
               <span className={`finding-badge ${finding.status}`}>{index + 1}</span>
               <span>{finding.title}</span>
               <strong className={finding.status}>{finding.status}</strong>
-              <ExternalLink size={14} />
+              <ChevronRight size={14} />
             </button>
           ))}
         </div>
@@ -353,8 +370,14 @@ export function AnalysisPanel({
           <button
             type="button"
             className={selectedAction === "accept" ? "decision-button accept selected" : "decision-button accept"}
-            disabled={hasBlockingEvidence}
-            title={hasBlockingEvidence ? "Resolve missing or conflicting evidence before accepting." : "Accept recommendation"}
+            disabled={hasBlockingEvidence || memoDraftDirty}
+            title={
+              memoDraftDirty
+                ? "Save or discard memo edits before recording a decision."
+                : hasBlockingEvidence
+                  ? "Resolve missing or conflicting evidence before accepting."
+                  : "Accept recommendation"
+            }
             onClick={() => setSelectedAction("accept")}
           >
             <Check size={16} /> Accept Recommendation
@@ -362,6 +385,8 @@ export function AnalysisPanel({
           <button
             type="button"
             className={selectedAction === "request-info" ? "decision-button info selected" : "decision-button info"}
+            disabled={memoDraftDirty}
+            title={memoDraftDirty ? "Save or discard memo edits before recording a decision." : undefined}
             onClick={() => setSelectedAction("request-info")}
           >
             <AlertTriangle size={16} /> Request More Info
@@ -369,6 +394,8 @@ export function AnalysisPanel({
           <button
             type="button"
             className={selectedAction === "override" ? "decision-button override selected" : "decision-button override"}
+            disabled={memoDraftDirty}
+            title={memoDraftDirty ? "Save or discard memo edits before recording a decision." : undefined}
             onClick={() => setSelectedAction("override")}
           >
             <X size={16} /> Override / Change ECCN
@@ -379,6 +406,7 @@ export function AnalysisPanel({
           onChange={(event) => setNotes(event.target.value)}
           placeholder="Add decision notes (required for signoff)..."
           rows={4}
+          disabled={memoDraftDirty}
         />
         <button
           type="button"
@@ -395,6 +423,11 @@ export function AnalysisPanel({
         {acceptBlocked && (
           <p className="decision-state warning">
             Missing or conflicting evidence is still blocking acceptance. Request more info or override instead.
+          </p>
+        )}
+        {memoDraftDirty && (
+          <p className="decision-state warning">
+            Save or discard memo edits before recording a decision.
           </p>
         )}
         {decision && <p className="decision-state">Current action: {decision.action}</p>}
@@ -440,6 +473,23 @@ function analysisStatusTitle(status: AnalysisPanelProps["analysisState"]["status
   if (status === "deterministic") return "Deterministic analysis";
   if (status === "running") return "AI analysis running";
   return "Unanalyzed";
+}
+
+function preferredSupportTab({
+  result,
+  analysisStatus,
+  hasBlockingEvidence,
+  decisionAction
+}: {
+  result?: ReviewResult;
+  analysisStatus: AnalysisPanelProps["analysisState"]["status"];
+  hasBlockingEvidence: boolean;
+  decisionAction?: ReviewerDecision["action"];
+}): SupportTab {
+  if (!result || analysisStatus === "unanalyzed" || analysisStatus === "running") return "analysis";
+  if (decisionAction) return "audit";
+  if (hasBlockingEvidence) return "analysis";
+  return "decision";
 }
 
 function depthLabel(depth: ReviewResult["provider"]["depth"]) {

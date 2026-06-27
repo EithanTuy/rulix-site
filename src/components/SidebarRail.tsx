@@ -4,7 +4,8 @@ import {
   FileText,
   Settings,
   ShieldCheck,
-  Wand2
+  Wand2,
+  UsersRound
 } from "lucide-react";
 import type { AppView } from "../types";
 
@@ -20,6 +21,7 @@ const navItems: NavItem[] = [
   { icon: BarChart3, label: "Evidence", view: "evidence" },
   { icon: BookOpen, label: "Sources", view: "corpus" },
   { icon: ShieldCheck, label: "Controls", view: "controls" },
+  { icon: UsersRound, label: "Users", view: "users" },
   { icon: Settings, label: "Settings", view: "settings" }
 ] as const;
 
@@ -44,6 +46,7 @@ export function SidebarRail({ activeView, onViewChange }: SidebarRailProps) {
               onClick={() => onViewChange(item.view)}
             >
               <Icon size={22} strokeWidth={1.8} />
+              <span className="rail-label">{item.label}</span>
             </button>
           );
         })}
