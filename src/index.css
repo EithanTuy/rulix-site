@@ -176,10 +176,10 @@
     background-size: auto, 36px 36px, 36px 36px;
   }
 
-  /* Scroll-reveal: starts hidden, .vis added by IntersectionObserver. */
+  /* Scroll-reveal: visible by default so crawlers and screenshots never hide copy. */
   .reveal {
-    opacity: 0;
-    transform: translateY(14px);
+    opacity: 1;
+    transform: none;
     transition: opacity 0.55s ease, transform 0.55s ease;
   }
   .reveal.vis {

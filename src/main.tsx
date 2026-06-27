@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createHashRouter, Navigate, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Contact } from "./pages/Contact";
-import { Home } from "./pages/Home";
+import { Home, type LandingVariant } from "./pages/Home";
 import { Legal } from "./pages/Legal";
 import { Security } from "./pages/Security";
 import "./index.css";
@@ -17,12 +17,24 @@ const future = {
   v7_skipActionErrorRevalidation: true,
 };
 
-const router = createHashRouter([
+const seoRoutes: Array<{ path: string; variant: LandingVariant }> = [
+  { path: "export-control-memo-review", variant: "memo-review" },
+  { path: "eccn-classification-assistant", variant: "eccn-assistant" },
+  { path: "ai-export-compliance-review", variant: "ai-review" },
+  { path: "university-export-control-review", variant: "university" },
+  { path: "manufacturer-eccn-review", variant: "manufacturer" },
+];
+
+const router = createBrowserRouter([
   {
     path: "/",
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
+      ...seoRoutes.map((route) => ({
+        path: route.path,
+        element: <Home variant={route.variant} />,
+      })),
       { path: "security", element: <Security /> },
       { path: "contact", element: <Contact /> },
       { path: "legal", element: <Legal /> },

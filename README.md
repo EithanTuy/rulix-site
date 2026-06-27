@@ -1,10 +1,10 @@
-# Rulix — marketing site
+# Rulix marketing site
 
 Public site for Rulix, the human-review-first export-control memo audit console.
 
-- **Stack:** Vite + React 18 + TypeScript + Tailwind CSS v4 (same design tokens as the reviewer console)
-- **Pages:** Home (`/#/`), Security (`/#/security`), Legal (`/#/legal`)
-- **Deploy:** static output (`dist/`) — Vercel-ready, no server required
+- **Stack:** Vite + React 18 + TypeScript + Tailwind CSS v4
+- **Pages:** Home (`/`), Security (`/security`), Legal (`/legal`), Contact (`/contact`), SEO landing pages
+- **Deploy:** Netlify static output (`dist/`) for `rulix.cloud`
 
 ## Develop
 
@@ -16,8 +16,18 @@ npm run dev     # http://localhost:5174
 ## Build
 
 ```sh
-npm run build   # typecheck + vite build → dist/
+npm run build   # typecheck + vite build -> dist/
 ```
+
+## SEO routes
+
+- `/export-control-memo-review`
+- `/eccn-classification-assistant`
+- `/ai-export-compliance-review`
+- `/university-export-control-review`
+- `/manufacturer-eccn-review`
+
+Netlify uses `public/_redirects` so these browser routes serve `index.html`.
 
 ## Messaging guardrails
 
