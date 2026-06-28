@@ -5624,7 +5624,8 @@ button {
   place-items: center;
   align-content: center;
   gap: 22px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     linear-gradient(135deg, rgba(14, 213, 220, 0.18), transparent 40%),
     linear-gradient(145deg, #05070b 0%, #08101b 58%, #0d1c26 100%);
@@ -5639,12 +5640,12 @@ button {
 }
 
 .dash-auth-shell .dash-auth-brand {
-  width: min(480px, 94vw);
+  width: min(480px, 100%);
   justify-content: space-between;
 }
 
 .dash-auth-card {
-  width: min(480px, 94vw);
+  width: min(480px, 100%);
   padding: 40px;
   display: grid;
   gap: 18px;
