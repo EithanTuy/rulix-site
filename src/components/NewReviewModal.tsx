@@ -8,17 +8,42 @@ interface NewReviewModalProps {
   onCreate: (input: NewReviewInput) => void;
 }
 
-const defaultMemo = `1.0 Item
-Describe the item, model, manufacturer, and relevant hardware/software/technology.
+function buildDefaultMemo(title: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  return `# Export control analysis for "${title}"
+**Date issued:** ${today}
+**Scope analyzed:** "${title}"
 
-2.0 Technical Characteristics
-List performance values, thresholds, materials, firmware/software, dimensions, and attachments.
+## ECCNs/ITAR considered
+- [List every ECCN/ITAR entry evaluated, e.g. EAR99, ECCN 3A001, USML Category XI]
 
-3.0 Jurisdiction and Classification
-Explain USML/ITAR screening first, then CCL/ECCN or EAR99 reasoning.
+## Description from ECCN/ITAR
+For each entry, include the exact verbatim text from the regulation and the version date.
 
-4.0 End Use
-Separate classification facts from transaction/license/end-use review.`;
+> "[Exact quoted description from the ECCN/ITAR entry]"
+— *[Regulation name, e.g. EAR 15 CFR Part 774, Supplement No. 1], as of [date]*
+
+## Analysis
+
+### [ECCN/ITAR entry]
+**Is the scope subject to [entry]?**
+
+Not subject — [Subcategory X.X]: [Explain why the item does not meet this criterion]
+
+---
+
+### [ECCN/ITAR entry if subject]
+**Scope is subject to ECCN/ITAR: "[entry]"**
+[Explanation grounded in the item's specifications]
+
+## Revision History
+| Date | Change |
+|------|--------|
+| ${today} | Initial draft |
+
+## Reference Documents
+- [Datasheet or document name — manufacturer, date]`;
+}
 
 export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps) {
   const [title, setTitle] = useState("New ECCN Classification Memo");
@@ -27,7 +52,12 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
   const [intendedUse, setIntendedUse] = useState("Research facility evaluation");
   const [dataClass, setDataClass] = useState<DataClass>("proprietary");
   const [sourcePath, setSourcePath] = useState<NewReviewInput["sourcePath"]>("self-classification");
-  const [memoText, setMemoText] = useState(defaultMemo);
+  const [memoText, setMemoText] = useState(() => buildDefaultMemo("New ECCN Classification Memo"));
+
+  const handleTitleChange = (next: string) => {
+    setTitle(next);
+    setMemoText(buildDefaultMemo(next));
+  };
   if (!open) return null;
 
   const close = () => {
@@ -64,7 +94,7 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
         <div className="modal-grid">
           <label>
             Memo title
-            <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            <input value={title} onChange={(event) => handleTitleChange(event.target.value)} />
           </label>
           <label>
             Manufacturer or source

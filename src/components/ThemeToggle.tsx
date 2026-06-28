@@ -9,7 +9,7 @@ export function getInitialTheme(): ThemeMode {
   if (typeof window === "undefined") return "light";
   const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light"; // always default to light; user can switch via toggle
 }
 
 export function applyTheme(mode: ThemeMode) {
