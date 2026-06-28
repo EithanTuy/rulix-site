@@ -7347,6 +7347,14 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
   align-items: start;
 }
 
+.product-demo-grid > *,
+.comparison-grid > *,
+.trust-grid > *,
+.credibility-grid > *,
+.request-grid > * {
+  min-width: 0;
+}
+
 .product-demo-grid > div:first-child,
 .comparison-grid > .site-section-header,
 .trust-grid > div:first-child,
@@ -7362,6 +7370,15 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .request-grid .site-section-header {
   margin: 0;
   text-align: left;
+}
+
+.product-demo-grid .site-section-header h2,
+.comparison-grid .site-section-header h2,
+.trust-grid .site-section-header h2,
+.credibility-grid .site-section-header h2,
+.request-grid .site-section-header h2 {
+  font-size: clamp(34px, 3.8vw, 52px);
+  line-height: 1.02;
 }
 
 .demo-stepper {
@@ -8569,6 +8586,14 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
     font-size: 12px;
   }
 
+  .site-hero {
+    padding: 42px 0 42px;
+  }
+
+  .site-hero-copy {
+    gap: 14px;
+  }
+
   .site-header-cta {
     display: none;
   }
@@ -8596,6 +8621,10 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
   .access-form,
   .case-study-card {
     padding: 16px;
+  }
+
+  .site-proof-row span {
+    min-height: 48px;
   }
 
   .hero-product-proof {
@@ -8988,8 +9017,11 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 }
 
 .theme-light .site-header {
-  border-bottom-color: rgba(202, 213, 226, 0.86);
+  border-color: rgba(202, 213, 226, 0.86);
   background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 22px 60px rgba(9, 19, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .theme-light .site-nav,
@@ -9035,6 +9067,11 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .theme-light .feature-card,
 .theme-light .use-case-card,
 .theme-light .workflow-card,
+.theme-light .product-proof-frame,
+.theme-light .demo-proof-panel,
+.theme-light .fit-card,
+.theme-light .faq-item,
+.theme-light .use-case-proof-card,
 .theme-light .comparison-table,
 .theme-light .access-form,
 .theme-light .case-study-card {
@@ -9044,13 +9081,40 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 }
 
 .theme-light .site-proof-row span,
+.theme-light .proof-hotspots span,
 .theme-light .demo-stepper button,
+.theme-light .demo-proof-pills span,
 .theme-light .workflow-card div,
 .theme-light .comparison-row,
+.theme-light .credibility-proof-list span,
 .theme-light .seo-link-grid a {
   border-color: rgba(202, 213, 226, 0.86);
   color: #364b63;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.theme-light .demo-proof-copy h3,
+.theme-light .use-case-proof-card h3,
+.theme-light .fit-card h3,
+.theme-light .case-study-card h3,
+.theme-light .faq-item button {
+  color: #071426;
+}
+
+.theme-light .demo-proof-copy p,
+.theme-light .use-case-proof-card p,
+.theme-light .fit-card p,
+.theme-light .faq-item p,
+.theme-light .proof-caption span,
+.theme-light .seo-link-grid span {
+  color: #5e7085;
+}
+
+.theme-light .access-form input,
+.theme-light .access-form select {
+  border-color: rgba(202, 213, 226, 0.9);
+  color: #172033;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .theme-light .theme-toggle--site {

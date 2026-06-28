@@ -509,7 +509,7 @@ export function MarketingSite() {
     <div className="marketing-site">
       <header className="site-header">
         <a className="site-brand" href="/" aria-label="Rulix home">
-          <BrandLogo tone="light" size="compact" />
+          <BrandLogo tone="adaptive" size="compact" />
         </a>
         <nav className="site-nav" aria-label="Primary">
           <a href="#product-demo">Product</a>
@@ -548,7 +548,7 @@ export function MarketingSite() {
       </main>
 
       <footer className="site-footer">
-        <BrandLogo tone="light" size="compact" />
+        <BrandLogo tone="adaptive" size="compact" />
         <p>Export-control memo review with human signoff.</p>
         <div>
           <a href="#product-demo">Product</a>
@@ -735,6 +735,7 @@ function ProductVideo({
   return (
     <div className="proof-video">
       <video
+        key={media.video}
         muted
         loop
         playsInline
