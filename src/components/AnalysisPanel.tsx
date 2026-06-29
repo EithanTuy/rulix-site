@@ -239,7 +239,7 @@ export function AnalysisPanel({
 
           {result.formatChecks && result.formatChecks.length > 0 && (
             <section className="format-compliance">
-              <h3>Documentation Format</h3>
+              <h3>Analysis Quality</h3>
               <div className="format-check-list">
                 {result.formatChecks.map((fc) => (
                   <div key={fc.key} className={`format-check-row ${fc.pass ? "pass" : "fail"}`}>

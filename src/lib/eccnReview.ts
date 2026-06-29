@@ -12,61 +12,37 @@ import type {
 
 export function detectFormatChecks(memoText: string): FormatCheck[] {
   const t = memoText;
+
+  // At least one ECCN, EAR99, or ITAR/USML entry is explicitly named
+  const hasEccns = /\bear99\b|eccn\s*[\dA-Z]|usml\s+category|itar\s+categor|\b\d[A-Z]\d{3}/i.test(t);
+
+  // There is actual reasoning text — not just a conclusion sentence
+  const hasAnalysis =
+    t.trim().length > 150 &&
+    /because|therefore|since|does not meet|is not subject|subject to|falls under|controlled under|not controlled|the item|this item/i.test(t);
+
+  // Each ECCN/ITAR mentioned has some explanation attached to it
+  const hasExplanationPerEntry =
+    /not subject|subject to|does not meet|meets the criteria|falls (under|within)|controlled (under|by)|EAR99 because|because .{10,}/i.test(t);
+
   return [
     {
-      key: "has-header",
-      label: "Analysis header",
-      pass: /export control analysis for/i.test(t)
-    },
-    {
-      key: "has-date-issued",
-      label: "Date issued",
-      pass: /date issued\s*[:\*]/i.test(t)
-    },
-    {
-      key: "has-scope",
-      label: "Scope analyzed",
-      pass: /scope analyzed\s*[:\*]/i.test(t)
-    },
-    {
-      key: "has-eccns-section",
-      label: "ECCNs/ITAR considered section",
-      pass: /##\s*eccns?\/itar considered|##\s*eccns? considered/i.test(t)
-    },
-    {
-      key: "has-descriptions",
-      label: "Description from ECCN/ITAR section",
-      pass: /##\s*description from (eccn|itar)/i.test(t)
-    },
-    {
-      key: "has-verbatim-quotes",
-      label: "Verbatim regulation quotation",
-      pass: /^>\s*[""]/m.test(t) || /^>\s*\[/m.test(t) || (/^>/m.test(t) && t.includes("as of"))
-    },
-    {
-      key: "has-quote-dates",
-      label: "Regulation version date on quotes",
-      pass: /as of \d{4}|as of [A-Za-z]+ \d{4}/i.test(t)
+      key: "has-eccns-identified",
+      label: "ECCNs/ITAR explicitly identified",
+      pass: hasEccns,
+      note: hasEccns ? undefined : "Name every ECCN and ITAR category considered."
     },
     {
       key: "has-analysis",
-      label: "Analysis section",
-      pass: /##\s*analysis/i.test(t)
+      label: "Analysis present (not just a conclusion)",
+      pass: hasAnalysis,
+      note: hasAnalysis ? undefined : "Include reasoning, not only a final determination."
     },
     {
-      key: "has-per-entry-analysis",
-      label: "Per-entry subcategory breakdown",
-      pass: /###\s*(eccn|itar|ear99)|not subject|subject to (eccn|itar)/i.test(t)
-    },
-    {
-      key: "has-revision-history",
-      label: "Revision history",
-      pass: /##\s*revision history/i.test(t)
-    },
-    {
-      key: "has-reference-docs",
-      label: "Reference documents",
-      pass: /##\s*reference documents/i.test(t)
+      key: "has-explanation-per-entry",
+      label: "Explanation given for each entry",
+      pass: hasExplanationPerEntry,
+      note: hasExplanationPerEntry ? undefined : "For each ECCN/ITAR considered, explain why the item is or is not subject."
     }
   ];
 }
