@@ -7,19 +7,20 @@ export function Brand({ size = 28 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-2.5">
       <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
-        <rect width="32" height="32" rx="2" fill="var(--accent)" />
-        <path d="M16 5l9 4v6c0 5.5-3.8 9.7-9 11-5.2-1.3-9-5.5-9-11V9l9-4z" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" />
-        <path d="M11.5 16.2l3 3 6-6.4" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <rect width="32" height="32" rx="6" fill="#f8fbff" />
+        <path d="M8 17.2 16.2 9 24 16.8v6.6h-6.7l-3.9-3.8-3.8 3.8H8v-6.2Z" fill="#0cc9bd" />
+        <path d="M14.1 21.1 8.7 15.7 12 12.3l5.5 5.5h5.8v5.8h-6.1l-3.1-2.5Z" fill="#111827" />
       </svg>
-      <strong className="text-[17px] tracking-tight">Rulix</strong>
+      <strong className="text-[24px] font-semibold tracking-tight text-white">rulix</strong>
     </span>
   );
 }
 
 const NAV = [
-  { to: "/#sample", label: "Sample audit" },
+  { to: "/#product-demo", label: "Product" },
+  { to: "/#fit-check", label: "Fit check" },
+  { to: "/#trust", label: "Trust" },
   { to: "/#use-cases", label: "Use cases" },
-  { to: "/security", label: "Security" },
 ];
 
 export function Layout() {
@@ -45,11 +46,11 @@ export function Layout() {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b border-line-soft bg-bg/90 backdrop-blur">
-        <div className="wrap flex min-h-[68px] items-center justify-between gap-5 py-3">
+    <div className="site-shell flex min-h-screen flex-col">
+      <header className="site-header">
+        <div className="site-wrap flex min-h-[58px] items-center justify-between gap-5">
           <Link to="/" aria-label="Rulix home"><Brand /></Link>
-          <nav className="flex items-center gap-7 text-[13.5px] font-medium text-text-2 max-md:gap-4">
+          <nav className="flex items-center gap-7 text-[13px] font-bold text-text-2 max-md:gap-4">
             {NAV.map((item) => (
               <Link key={item.to} to={item.to} className="transition-colors hover:text-text-1 max-sm:hidden">
                 {item.label}
@@ -58,7 +59,7 @@ export function Layout() {
             <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-md:hidden">
               Sign in
             </a>
-            <Link to="/contact" className="btn primary !py-2 !text-[13px]">Book audit</Link>
+            <Link to="/contact" className="site-button site-button-primary !min-h-[42px] !px-5 !text-[13px]">Request access</Link>
           </nav>
         </div>
       </header>
@@ -67,20 +68,19 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-line-soft bg-bg-2">
-        <div className="wrap grid gap-8 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
+      <footer className="site-footer">
+        <div className="site-wrap grid gap-8 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <Brand size={24} />
             <p className="footnote mt-4 max-w-[44ch]">
-              Rulix is decision-support software for export-control review teams. It never issues
-              final ECCN, license, sanctions, or jurisdiction determinations. A qualified human
-              reviewer always decides.
+              Export-control memo review with human signoff. Rulix supports qualified reviewers;
+              it does not replace final legal or compliance judgment.
             </p>
           </div>
           <div className="text-[13.5px]">
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Product</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/#sample" className="hover:text-text-1">Sample audit output</Link></li>
+              <li><Link to="/#product-demo" className="hover:text-text-1">Product in action</Link></li>
               <li><Link to="/#use-cases" className="hover:text-text-1">Use cases</Link></li>
               <li><Link to="/security" className="hover:text-text-1">Security and data handling</Link></li>
               <li><a href="https://app.rulix.cloud" className="hover:text-text-1">Hosted app</a></li>
@@ -95,8 +95,8 @@ export function Layout() {
           </div>
         </div>
         <div className="border-t border-line-soft py-5">
-          <p className="wrap footnote m-0">
-            (c) {new Date().getFullYear()} Rulix. Research-grade prototype. Sanitized, public, or
+          <p className="site-wrap footnote m-0">
+            (c) {new Date().getFullYear()} Rulix. Sanitized, public, or
             approved input only. Do not submit CUI, ITAR technical data, or controlled information.
           </p>
         </div>
