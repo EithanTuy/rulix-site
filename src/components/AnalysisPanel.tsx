@@ -19,6 +19,7 @@ import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
 import type { AuditEvent, MemoChatMessage, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
 import { MemoChatPanel } from "./MemoChatPanel";
+import { renderMarkdown, renderInline } from "../lib/markdown";
 
 type SupportTab = "chat" | "analysis" | "decision" | "audit";
 
@@ -262,9 +263,10 @@ export function AnalysisPanel({
             {result.jurisdiction.outcome === "ear-likely" ? "Pass" : "Review"}
           </span>
         </div>
-        <p>{result.jurisdiction.summary}</p>
+        <p dangerouslySetInnerHTML={{ __html: renderInline(result.jurisdiction.summary) }} />
         <p>
-          <strong>Reason:</strong> {result.jurisdiction.rationale}
+          <strong>Reason:</strong>{" "}
+          <span dangerouslySetInnerHTML={{ __html: renderInline(result.jurisdiction.rationale) }} />
         </p>
       </section>
 
@@ -273,7 +275,7 @@ export function AnalysisPanel({
             <p>{result.recommended.label}</p>
             <div className="eccn-explanation">
               <strong>Why this recommendation</strong>
-              <p>{result.recommended.summary}</p>
+              <p dangerouslySetInnerHTML={{ __html: renderInline(result.recommended.summary) }} />
               <small>
                 Confidence {Math.round(result.recommended.confidence * 100)}% | Risk {result.recommended.risk}
               </small>
@@ -281,7 +283,8 @@ export function AnalysisPanel({
                 <ul>
                   {result.findings.slice(0, 3).map((finding) => (
                     <li key={finding.id}>
-                      <strong>{finding.status}:</strong> {finding.claim}
+                      <strong>{finding.status}:</strong>{" "}
+                      <span dangerouslySetInnerHTML={{ __html: renderInline(finding.claim) }} />
                     </li>
                   ))}
                 </ul>

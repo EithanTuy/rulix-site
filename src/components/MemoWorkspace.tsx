@@ -11,6 +11,7 @@ import {
   ZoomOut
 } from "lucide-react";
 import { createHighlightSegments } from "../lib/highlights";
+import { renderMarkdown } from "../lib/markdown";
 import type { EvidenceFinding, MemoRecord, ReviewResult } from "../types";
 import { MemoDiffPreview } from "./MemoDiffPreview";
 import { PublicDraftPanel } from "./PublicDraftPanel";
@@ -338,7 +339,7 @@ function SelectedFindingCard({ finding }: { finding: EvidenceFinding }) {
     <div className={`selected-finding-card ${finding.status}`}>
       <strong>{finding.title}</strong>
       <span>{finding.status}</span>
-      <p>{finding.rationale}</p>
+      <div dangerouslySetInnerHTML={{ __html: renderMarkdown(finding.rationale) }} />
     </div>
   );
 }

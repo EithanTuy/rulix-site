@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { MemoChatMessage, MemoRecord } from "../types";
 import type { ReactNode } from "react";
+import { renderMarkdown } from "../lib/markdown";
 import { MemoDiffPreview } from "./MemoDiffPreview";
 
 interface MemoChatPanelProps {
@@ -169,70 +170,10 @@ function ChatMessageText({ message, animate }: { message: MemoChatMessage; anima
 }
 
 function FormattedChatText({ text, showCursor }: { text: string; showCursor: boolean }) {
-  const lines = text.split(/\n/);
-  const blocks: ReactNode[] = [];
-  let listItems: string[] = [];
-
-  const flushList = () => {
-    if (!listItems.length) return;
-    blocks.push(
-      <ul className="chat-list" key={`list-${blocks.length}`}>
-        {listItems.map((item, index) => (
-          <li key={`${item}-${index}`}>{formatInline(item)}</li>
-        ))}
-      </ul>
-    );
-    listItems = [];
-  };
-
-  lines.forEach((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushList();
-      return;
-    }
-
-    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
-    if (bullet) {
-      listItems.push(bullet[1]);
-      return;
-    }
-
-    flushList();
-    if (/^#{1,3}\s+/.test(trimmed)) {
-      blocks.push(
-        <strong className="chat-heading" key={`heading-${index}`}>
-          {formatInline(trimmed.replace(/^#{1,3}\s+/, ""))}
-        </strong>
-      );
-      return;
-    }
-
-    blocks.push(<p key={`p-${index}`}>{formatInline(trimmed)}</p>);
-  });
-
-  flushList();
-
   return (
     <>
-      {blocks}
+      <span dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />
       {showCursor && <span className="typing-cursor" aria-hidden="true" />}
     </>
   );
-}
-
-function formatInline(text: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).filter(Boolean);
-  return parts.map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return <code key={index}>{part.slice(1, -1)}</code>;
-    }
-    if (part.startsWith("*") && part.endsWith("*")) {
-      return <em key={index}>{part.slice(1, -1)}</em>;
-    }
-    return <span key={index}>{part}</span>;
-  });
 }
