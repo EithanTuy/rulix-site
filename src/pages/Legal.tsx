@@ -1,5 +1,7 @@
 // Legal.tsx — disclaimer, acceptable use, and privacy in one page (prototype stage).
 
+import { CONTACT_EMAIL_DISPLAY, createContactMailto } from "../lib/contact";
+
 export function Legal() {
   return (
     <section>
@@ -43,7 +45,7 @@ export function Legal() {
 
         <h2 className="mt-10 text-[20px]">Contact</h2>
         <p className="text-[14.5px] text-text-2">
-          Questions about these terms: <a className="text-accent" href="mailto:tuyilin2@msu.edu">tuyilin2@msu.edu</a>.
+          Questions about these terms: <a className="text-accent" href={createContactMailto("Rulix legal question", "Question:\n")}>{CONTACT_EMAIL_DISPLAY}</a>.
         </p>
       </div>
     </section>

@@ -115,7 +115,7 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    opacity: 0.42;
+    opacity: 0.3;
     background-image:
       linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
@@ -126,7 +126,7 @@
 
   .site-wrap,
   .wrap {
-    width: min(1140px, calc(100% - 48px));
+    width: min(1088px, calc(100% - 48px));
     margin-inline: auto;
   }
 
@@ -134,7 +134,7 @@
     position: sticky;
     top: 14px;
     z-index: 40;
-    width: min(1100px, calc(100% - 48px));
+    width: min(1088px, calc(100% - 48px));
     margin: 14px auto 0;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -179,6 +179,15 @@
   .btn:hover {
     transform: translateY(-1px);
     border-color: rgba(255, 255, 255, 0.28);
+  }
+
+  .site-button:focus-visible,
+  .btn:focus-visible,
+  .demo-stepper button:focus-visible,
+  .loop-step-list button:focus-visible,
+  .faq-item button:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 3px;
   }
 
   .site-button-primary,
@@ -252,7 +261,7 @@
 
   .site-hero {
     position: relative;
-    padding: 78px 0 72px;
+    padding: 66px 0 58px;
     border-bottom: 1px solid var(--border-soft);
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 24%),
@@ -262,14 +271,14 @@
   .site-hero-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 36px;
+    gap: 30px;
     align-items: start;
   }
 
   .site-hero-copy {
     display: grid;
     justify-items: center;
-    gap: 18px;
+    gap: 14px;
     text-align: center;
   }
 
@@ -298,17 +307,17 @@
   }
 
   .site-hero h1 {
-    max-width: 980px;
-    font-size: clamp(54px, 8.4vw, 86px);
-    line-height: 0.94;
+    max-width: 900px;
+    font-size: clamp(50px, 7.6vw, 78px);
+    line-height: 0.96;
   }
 
   .site-hero-subcopy {
-    max-width: 700px;
+    max-width: 650px;
     margin: 0;
     color: var(--text-2);
-    font-size: 18px;
-    line-height: 1.65;
+    font-size: 17px;
+    line-height: 1.58;
   }
 
   .site-actions {
@@ -328,13 +337,13 @@
   }
 
   .site-proof-row span {
-    min-height: 52px;
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     gap: 10px;
     border: 1px solid var(--border);
     border-radius: 999px;
-    padding: 0 18px;
+    padding: 0 15px;
     color: var(--text);
     background: rgba(255, 255, 255, 0.055);
     font-size: 13px;
@@ -343,8 +352,7 @@
 
   .site-proof-row svg,
   .feature-card svg,
-  .fit-card svg,
-  .use-case-proof-card > svg {
+  .fit-card svg {
     color: var(--accent-strong);
   }
 
@@ -368,9 +376,22 @@
   }
 
   .hero-product-proof {
-    width: min(100%, 980px);
+    width: min(100%, 920px);
     margin-inline: auto;
     padding: 16px;
+    transition:
+      transform 260ms ease,
+      border-color 260ms ease,
+      box-shadow 260ms ease;
+  }
+
+  .hero-product-proof:hover {
+    transform: translateY(-3px);
+    border-color: rgba(104, 248, 237, 0.32);
+    box-shadow:
+      0 42px 110px rgba(0, 0, 0, 0.38),
+      0 0 0 1px rgba(104, 248, 237, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .product-proof-top {
@@ -454,13 +475,13 @@
   }
 
   .site-section {
-    padding: 92px 0;
+    padding: 72px 0;
     border-bottom: 1px solid var(--border-soft);
   }
 
   .section-header {
-    max-width: 690px;
-    margin-bottom: 34px;
+    max-width: 620px;
+    margin-bottom: 28px;
   }
 
   .section-header > span {
@@ -473,33 +494,53 @@
   }
 
   .section-header h2 {
-    font-size: clamp(34px, 5vw, 64px);
+    font-size: clamp(32px, 4.5vw, 54px);
   }
 
   .section-header p {
-    margin: 14px 0 0;
+    margin: 12px 0 0;
     color: var(--text-2);
-    font-size: 16px;
-    line-height: 1.7;
+    font-size: 15.5px;
+    line-height: 1.62;
   }
 
-  .problem-grid,
+  .signal-grid,
   .fit-check-grid,
-  .workflow-grid,
-  .trust-list {
+  .workflow-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 14px;
+  }
+
+  .signal-strip {
+    padding: 22px 0 18px;
+    border-bottom: 1px solid var(--border-soft);
   }
 
   .feature-card,
   .fit-card,
   .workflow-card {
-    min-height: 210px;
+    min-height: 188px;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
-    padding: 24px;
+    padding: 22px;
     background: rgba(255, 255, 255, 0.05);
+    transition:
+      transform 210ms ease,
+      border-color 210ms ease,
+      background 210ms ease;
+  }
+
+  .feature-card:hover,
+  .fit-card:hover,
+  .workflow-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(104, 248, 237, 0.22);
+    background: rgba(255, 255, 255, 0.068);
+  }
+
+  .signal-grid .feature-card {
+    min-height: 150px;
   }
 
   .feature-card h3,
@@ -512,32 +553,29 @@
   .feature-card p,
   .fit-card p,
   .workflow-card p,
-  .case-study-card p,
-  .use-case-proof-card p {
+  .case-study-card p {
     color: var(--text-2);
   }
 
   .product-demo-grid,
+  .review-loop-grid,
   .comparison-grid,
-  .trust-grid,
   .credibility-grid,
   .faq-grid,
   .request-grid {
     display: grid;
-    grid-template-columns: 0.82fr 1.18fr;
-    gap: 42px;
+    grid-template-columns: 0.78fr 1.22fr;
+    gap: 34px;
     align-items: start;
   }
 
-  .demo-stepper,
-  .use-case-selector {
+  .demo-stepper {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
   }
 
-  .demo-stepper button,
-  .use-case-selector button {
+  .demo-stepper button {
     border: 1px solid var(--border-soft);
     border-radius: 999px;
     min-height: 44px;
@@ -546,6 +584,17 @@
     background: rgba(255, 255, 255, 0.055);
     font-size: 13px;
     font-weight: 850;
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      background 180ms ease;
+  }
+
+  .demo-stepper button:hover {
+    transform: translateY(-1px);
+    color: var(--text);
+    border-color: rgba(255, 255, 255, 0.22);
   }
 
   .demo-stepper button span {
@@ -555,8 +604,7 @@
     font-size: 11px;
   }
 
-  .demo-stepper button.is-active,
-  .use-case-selector button.is-active {
+  .demo-stepper button.is-active {
     border-color: rgba(24, 199, 188, 0.55);
     color: var(--text);
     background: rgba(24, 199, 188, 0.13);
@@ -564,6 +612,7 @@
 
   .demo-proof-panel {
     padding: 16px;
+    animation: panel-in 260ms ease both;
   }
 
   .demo-proof-copy {
@@ -601,8 +650,131 @@
   }
 
   .demo-proof-copy strong,
-  .use-case-proof-card strong {
+  .loop-record-card strong {
     color: var(--text);
+  }
+
+  .review-loop-section {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 48%);
+  }
+
+  .loop-step-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .loop-step-list button {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 0 15px;
+    color: var(--text-2);
+    background: rgba(255, 255, 255, 0.045);
+    font-size: 13.5px;
+    font-weight: 880;
+    text-align: left;
+    transition:
+      transform 190ms ease,
+      border-color 190ms ease,
+      color 190ms ease,
+      background 190ms ease;
+  }
+
+  .loop-step-list button svg {
+    color: var(--accent-strong);
+  }
+
+  .loop-step-list button:hover,
+  .loop-step-list button.is-active {
+    transform: translateX(4px);
+    border-color: rgba(104, 248, 237, 0.34);
+    color: var(--text);
+    background: rgba(24, 199, 188, 0.11);
+  }
+
+  .loop-proof-panel {
+    min-height: 390px;
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    background:
+      radial-gradient(circle at 84% 12%, rgba(24, 199, 188, 0.16), transparent 30%),
+      rgba(255, 255, 255, 0.055);
+    box-shadow:
+      0 36px 90px rgba(0, 0, 0, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    animation: panel-in 260ms ease both;
+  }
+
+  .loop-proof-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--accent-strong);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .loop-proof-panel h3 {
+    font-size: clamp(34px, 4.8vw, 58px);
+  }
+
+  .loop-proof-panel p {
+    max-width: 48ch;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 16px;
+  }
+
+  .loop-meter {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 8px 0 2px;
+  }
+
+  .loop-meter span {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.11);
+    transition:
+      background 220ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .loop-meter span.is-lit {
+    background: var(--accent);
+    box-shadow: 0 0 20px rgba(24, 199, 188, 0.38);
+  }
+
+  .loop-record-card {
+    margin-top: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .loop-record-card span {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-3);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .loop-record-card strong {
+    display: block;
+    font-size: 18px;
+    line-height: 1.4;
   }
 
   .workflow-card {
@@ -656,36 +828,6 @@
     color: var(--accent-strong);
   }
 
-  .trust-list {
-    grid-template-columns: 1fr;
-  }
-
-  .use-case-selector {
-    margin-bottom: 18px;
-  }
-
-  .use-case-proof-card {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 18px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 28px;
-    background: rgba(255, 255, 255, 0.055);
-  }
-
-  .use-case-proof-card span {
-    color: var(--text-3);
-    font-size: 12px;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-
-  .use-case-proof-card h3 {
-    margin-top: 8px;
-    font-size: 30px;
-  }
-
   .case-study-card {
     padding: 28px;
   }
@@ -726,6 +868,15 @@
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.055);
+    transition:
+      border-color 180ms ease,
+      background 180ms ease;
+  }
+
+  .faq-item:hover,
+  .faq-item.is-open {
+    border-color: rgba(104, 248, 237, 0.24);
+    background: rgba(255, 255, 255, 0.07);
   }
 
   .faq-item button {
@@ -745,6 +896,10 @@
 
   .faq-item.is-open button svg {
     transform: rotate(90deg);
+  }
+
+  .faq-item button svg {
+    transition: transform 180ms ease;
   }
 
   .faq-item p {
@@ -786,6 +941,31 @@
     color: var(--text-3);
     font-size: 12px;
   }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 420ms ease,
+      transform 420ms ease;
+  }
+
+  .reveal.vis {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -799,6 +979,19 @@
 
   .proof-video img {
     display: block;
+  }
+
+  .reveal,
+  .demo-proof-panel,
+  .loop-proof-panel,
+  .site-button,
+  .btn,
+  .feature-card,
+  .fit-card,
+  .workflow-card {
+    transition: none;
+    animation: none;
+    transform: none;
   }
 }
 
@@ -823,12 +1016,12 @@
   }
 
   .proof-hotspots,
-  .problem-grid,
+  .signal-grid,
   .fit-check-grid,
   .workflow-grid,
   .product-demo-grid,
+  .review-loop-grid,
   .comparison-grid,
-  .trust-grid,
   .credibility-grid,
   .faq-grid,
   .request-grid {
@@ -836,11 +1029,41 @@
   }
 
   .comparison-table {
-    overflow-x: auto;
+    overflow: visible;
   }
 
   .comparison-row {
-    min-width: 760px;
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 14px;
+  }
+
+  .comparison-head {
+    display: none;
+  }
+
+  .comparison-row span:first-child {
+    color: var(--text);
+    font-weight: 900;
+  }
+
+  .comparison-row span:nth-child(2)::before {
+    content: "Generic AI: ";
+    color: var(--text-3);
+    font-weight: 800;
+  }
+
+  .comparison-row span:nth-child(3)::before {
+    content: "Manual: ";
+    color: var(--text-3);
+    font-weight: 800;
+  }
+
+  .comparison-row strong::before {
+    content: "Rulix: ";
+    color: var(--text-3);
+    font-weight: 800;
   }
 
   .case-study-columns {
@@ -880,7 +1103,7 @@
   }
 
   .site-section {
-    padding: 70px 0;
+    padding: 58px 0;
   }
 
   .section-header h2 {

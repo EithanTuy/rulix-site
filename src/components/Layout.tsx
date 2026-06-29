@@ -18,9 +18,8 @@ export function Brand({ size = 28 }: { size?: number }) {
 
 const NAV = [
   { to: "/#product-demo", label: "Product" },
+  { to: "/#review-loop", label: "Review loop" },
   { to: "/#fit-check", label: "Fit check" },
-  { to: "/#trust", label: "Trust" },
-  { to: "/#use-cases", label: "Use cases" },
 ];
 
 export function Layout() {
@@ -81,7 +80,8 @@ export function Layout() {
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Product</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
               <li><Link to="/#product-demo" className="hover:text-text-1">Product in action</Link></li>
-              <li><Link to="/#use-cases" className="hover:text-text-1">Use cases</Link></li>
+              <li><Link to="/#review-loop" className="hover:text-text-1">Review loop</Link></li>
+              <li><Link to="/#fit-check" className="hover:text-text-1">Fit check</Link></li>
               <li><Link to="/security" className="hover:text-text-1">Security and data handling</Link></li>
               <li><a href="https://app.rulix.cloud" className="hover:text-text-1">Hosted app</a></li>
             </ul>
