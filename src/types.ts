@@ -115,6 +115,13 @@ export interface AnalysisProviderStatus {
   latencyMs?: number;
 }
 
+export interface FormatCheck {
+  key: string;
+  label: string;
+  pass: boolean;
+  note?: string;
+}
+
 export interface ReviewResult {
   memoId: string;
   generatedAt: string;
@@ -127,6 +134,7 @@ export interface ReviewResult {
   findings: EvidenceFinding[];
   infoRequests: string[];
   agents: CouncilAgentRun[];
+  formatChecks?: FormatCheck[];
 }
 
 export interface ReviewerDecision {

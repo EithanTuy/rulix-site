@@ -4,10 +4,72 @@ import type {
   ClassificationCandidate,
   CouncilAgentRun,
   EvidenceFinding,
+  FormatCheck,
   JurisdictionFinding,
   MemoRecord,
   ReviewResult
 } from "../types";
+
+export function detectFormatChecks(memoText: string): FormatCheck[] {
+  const t = memoText;
+  return [
+    {
+      key: "has-header",
+      label: "Analysis header",
+      pass: /export control analysis for/i.test(t)
+    },
+    {
+      key: "has-date-issued",
+      label: "Date issued",
+      pass: /date issued\s*[:\*]/i.test(t)
+    },
+    {
+      key: "has-scope",
+      label: "Scope analyzed",
+      pass: /scope analyzed\s*[:\*]/i.test(t)
+    },
+    {
+      key: "has-eccns-section",
+      label: "ECCNs/ITAR considered section",
+      pass: /##\s*eccns?\/itar considered|##\s*eccns? considered/i.test(t)
+    },
+    {
+      key: "has-descriptions",
+      label: "Description from ECCN/ITAR section",
+      pass: /##\s*description from (eccn|itar)/i.test(t)
+    },
+    {
+      key: "has-verbatim-quotes",
+      label: "Verbatim regulation quotation",
+      pass: /^>\s*[""]/m.test(t) || /^>\s*\[/m.test(t) || (/^>/m.test(t) && t.includes("as of"))
+    },
+    {
+      key: "has-quote-dates",
+      label: "Regulation version date on quotes",
+      pass: /as of \d{4}|as of [A-Za-z]+ \d{4}/i.test(t)
+    },
+    {
+      key: "has-analysis",
+      label: "Analysis section",
+      pass: /##\s*analysis/i.test(t)
+    },
+    {
+      key: "has-per-entry-analysis",
+      label: "Per-entry subcategory breakdown",
+      pass: /###\s*(eccn|itar|ear99)|not subject|subject to (eccn|itar)/i.test(t)
+    },
+    {
+      key: "has-revision-history",
+      label: "Revision history",
+      pass: /##\s*revision history/i.test(t)
+    },
+    {
+      key: "has-reference-docs",
+      label: "Reference documents",
+      pass: /##\s*reference documents/i.test(t)
+    }
+  ];
+}
 
 type RuleMatch = {
   pattern: RegExp;
@@ -271,7 +333,8 @@ export function analyzeMemo(memo: MemoRecord): ReviewResult {
     alternatives,
     findings: findings.sort(sortFindings),
     infoRequests,
-    agents: buildAgentRuns(findings, recommended)
+    agents: buildAgentRuns(findings, recommended),
+    formatChecks: detectFormatChecks(text)
   };
 }
 

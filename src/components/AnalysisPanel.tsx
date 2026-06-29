@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Check,
+  CheckSquare,
   Cloud,
   Cpu,
   ExternalLink,
@@ -10,7 +11,8 @@ import {
   ShieldCheck,
   UserRound,
   WifiOff,
-  X
+  X,
+  XSquare
 } from "lucide-react";
 import { getSourceChunk } from "../data/corpus";
 import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
@@ -234,6 +236,23 @@ export function AnalysisPanel({
               tone={result.recommended.risk === "high" ? "review" : "pass"}
             />
           </section>
+
+          {result.formatChecks && result.formatChecks.length > 0 && (
+            <section className="format-compliance">
+              <h3>Documentation Format</h3>
+              <div className="format-check-list">
+                {result.formatChecks.map((fc) => (
+                  <div key={fc.key} className={`format-check-row ${fc.pass ? "pass" : "fail"}`}>
+                    {fc.pass
+                      ? <CheckSquare size={14} className="fc-icon pass" />
+                      : <XSquare size={14} className="fc-icon fail" />}
+                    <span className="fc-label">{fc.label}</span>
+                    {fc.note && <span className="fc-note">{fc.note}</span>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="jurisdiction-box">
         <div className="box-heading">

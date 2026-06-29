@@ -102,13 +102,14 @@ Each subagent must be represented in the agents array exactly once with either c
 Prefer useful, reviewer-actionable blockers over vague caution. Do not block ready memos unless a concrete source-backed gap remains.
 Treat the deterministic baseline as a broad-category guardrail. Do not move to a different ECCN family unless the memo text itself contains source-supported facts for that family. Quantum/RF control pulses are not laser pulses.
 Role rubrics:
-- memo-parser extracts item identity, performance parameters, software/firmware facts, data class, use, end use, and explicit omissions from the memo only.
+- memo-parser extracts item identity, performance parameters, software/firmware facts, data class, use, end use, and explicit omissions from the memo only. Also audit structure: does the memo have the required header ("Export control analysis for..."), date issued, scope analyzed, ECCNs/ITAR considered section, description section with verbatim regulation quotes, analysis section with per-entry subcategory breakdown, revision history table, and reference documents section?
 - jurisdiction-gate evaluates EAR/ITAR posture and order-of-review issues without treating end use as classification proof.
 - eccn-candidate proposes the best supported ECCN family and alternatives, and lowers confidence when facts are incomplete.
 - evidence-mapper links memo claims and omissions to exact sourceChunkIds from the supplied official corpus.
-- citation-verifier rejects unsupported sourceChunkIds and identifies claims that are not grounded in corpus excerpts.
-- risk-reviewer produces only actionable blockers tied to missing facts, conflicts, or jurisdiction risk.
+- citation-verifier rejects unsupported sourceChunkIds and identifies claims not grounded in corpus excerpts. Also verify any verbatim ECCN/ITAR description quotes in the memo against the supplied corpus: flag if quoted text appears paraphrased rather than verbatim, and flag if regulation version dates cited in the memo are missing or appear outdated compared to corpus dates.
+- risk-reviewer produces only actionable blockers tied to missing facts, conflicts, or jurisdiction risk. Additionally flag these as escalate-severity blockers: missing verbatim ECCN/ITAR description quotes, missing regulation version dates on any quote, any considered ECCN/ITAR entry that lacks subcategory-by-subcategory analysis explaining why the item is or is not subject, missing revision history, missing reference documents section.
 - report-writer summarizes only the structured outputs from the prior agents and must not invent new facts.
+Populate formatChecks: for each of the 11 format elements (has-header, has-date-issued, has-scope, has-eccns-section, has-descriptions, has-verbatim-quotes, has-quote-dates, has-analysis, has-per-entry-analysis, has-revision-history, has-reference-docs) set pass=true/false and add a note for any that fail.
 Use the record_eccn_review tool to return structured results.`;
 
 const AI_REVIEW_SCHEMA = {
@@ -176,6 +177,20 @@ const AI_REVIEW_SCHEMA = {
       }
     },
     infoRequests: { type: "array", items: { type: "string" } },
+    formatChecks: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "label", "pass"],
+        properties: {
+          key: { type: "string" },
+          label: { type: "string" },
+          pass: { type: "boolean" },
+          note: { type: "string" }
+        }
+      }
+    },
     agents: {
       type: "array",
       items: {

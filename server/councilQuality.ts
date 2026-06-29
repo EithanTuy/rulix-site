@@ -1,10 +1,12 @@
 import { officialCorpus } from "../src/data/corpus";
+import { detectFormatChecks } from "../src/lib/eccnReview";
 import type {
   AgentRole,
   ClassificationCandidate,
   CouncilAgentRun,
   EvidenceFinding,
   EvidenceStatus,
+  FormatCheck,
   JurisdictionFinding,
   MemoRecord,
   ReviewResult
@@ -15,7 +17,7 @@ export type CouncilDepth = NonNullable<ReviewResult["provider"]["depth"]>;
 export type AiCouncilPayload = Partial<
   Pick<
     ReviewResult,
-    "jurisdiction" | "recommended" | "alternatives" | "findings" | "infoRequests" | "agents"
+    "jurisdiction" | "recommended" | "alternatives" | "findings" | "infoRequests" | "agents" | "formatChecks"
   >
 >;
 
@@ -72,7 +74,8 @@ export function mergeCouncilPayload(
       : localResult.alternatives,
     findings: mergedFindings,
     infoRequests: mergedInfoRequests,
-    agents: normalizeAgents(payload.agents, localResult.agents, mergedFindings)
+    agents: normalizeAgents(payload.agents, localResult.agents, mergedFindings),
+    formatChecks: mergeFormatChecks(memo.memoText, payload.formatChecks)
   };
 }
 
@@ -365,4 +368,15 @@ function asConfidence(value: unknown, fallback: number) {
   const numberValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numberValue)) return fallback;
   return Math.max(0, Math.min(1, numberValue));
+}
+
+function mergeFormatChecks(memoText: string, aiChecks: FormatCheck[] | undefined): FormatCheck[] {
+  const deterministic = detectFormatChecks(memoText);
+  if (!Array.isArray(aiChecks) || aiChecks.length === 0) return deterministic;
+  const aiMap = new Map(aiChecks.map((c) => [c.key, c]));
+  const merged = deterministic.map((det) => aiMap.get(det.key) ?? det);
+  for (const aiCheck of aiChecks) {
+    if (!deterministic.some((d) => d.key === aiCheck.key)) merged.push(aiCheck);
+  }
+  return merged;
 }
