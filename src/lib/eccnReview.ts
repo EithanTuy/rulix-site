@@ -34,7 +34,7 @@ export function detectFormatChecks(memoText: string): FormatCheck[] {
     },
     {
       key: "has-analysis",
-      label: "Analysis present (not just a conclusion)",
+      label: "Analysis present",
       pass: hasAnalysis,
       note: hasAnalysis ? undefined : "Include reasoning, not only a final determination."
     },
