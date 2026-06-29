@@ -335,6 +335,14 @@ export interface MemoBuilderSession {
   updatedAt: string;
   starterPrompt?: string;
   contextMemoId?: string;
+  pendingInput?: string;
+  pendingAttachments?: Array<{
+    id: string;
+    name: string;
+    content: string;
+    status: "ready" | "warning";
+    detail: string;
+  }>;
   draft?: {
     title: string;
     itemFamily: string;

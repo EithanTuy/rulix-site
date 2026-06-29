@@ -103,6 +103,39 @@ export function MemoDraftChatPanel({
     }
   }, [draft?.memoText]);
 
+  // Restore pending input and attachments when switching sessions
+  useEffect(() => {
+    setInput(activeSession?.pendingInput ?? "");
+    setAttachments(
+      (activeSession?.pendingAttachments ?? []).map((a) => ({ ...a }))
+    );
+  // Only run when the session ID changes, not on every session update
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.id]);
+
+  // Debounced save of draft input text to the session
+  useEffect(() => {
+    if (!activeSession) return;
+    if (input === (activeSession.pendingInput ?? "")) return;
+    const t = setTimeout(() => updateActiveSession({ pendingInput: input }), 600);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input]);
+
+  // Save ready/warning attachments to the session whenever they change
+  useEffect(() => {
+    if (!activeSession) return;
+    const persistable = attachments
+      .filter((a): a is BuilderAttachment & { status: "ready" | "warning" } =>
+        a.status === "ready" || a.status === "warning"
+      );
+    const saved = activeSession.pendingAttachments ?? [];
+    const sameIds = persistable.length === saved.length && persistable.every((a, i) => a.id === saved[i]?.id);
+    if (sameIds) return;
+    updateActiveSession({ pendingAttachments: persistable });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments]);
+
   const updateActiveSession = (patch: Partial<MemoBuilderSession>) => {
     const session = activeSession ?? createBlankSession();
     const nextSession: MemoBuilderSession = {
