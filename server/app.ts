@@ -861,8 +861,8 @@ export function createApp(options: CreateAppOptions = {}) {
     const messages: MemoBuildChatMessage[] = raw
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
-    if (messages.length === 0 || messages[0].role !== "user") {
-      res.status(400).json({ error: "First message must be from the user." });
+    if (messages.length === 0) {
+      res.status(400).json({ error: "messages array is required." });
       return;
     }
     try {

@@ -529,7 +529,7 @@ export function MemoDraftChatPanel({
                 {draftSections.map((section, index) => (
                   <section key={`${section.title}-${index}`} data-section-index={index}>
                     {section.title !== "Memo draft" && <h3>{section.title}</h3>}
-                    <div>{section.body}</div>
+                    <div dangerouslySetInnerHTML={{ __html: renderMarkdownBody(section.body) }} />
                   </section>
                 ))}
               </article>
@@ -698,6 +698,39 @@ function attachmentMethodLabel(method: string) {
   if (method === "bedrock-image") return "Image text extracted.";
   if (method === "bedrock-document") return "Document text extracted.";
   return "Text extracted.";
+}
+
+function escHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function inlineMd(s: string) {
+  return escHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>");
+}
+
+export function renderMarkdownBody(text: string): string {
+  const blocks = text.split(/\n{2,}/);
+  const html: string[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split("\n").filter((l) => l.trim() !== "");
+    if (!lines.length) continue;
+
+    if (lines.every((l) => /^[-*]\s/.test(l.trim()))) {
+      html.push(`<ul>${lines.map((l) => `<li>${inlineMd(l.replace(/^[-*]\s/, ""))}</li>`).join("")}</ul>`);
+    } else if (lines.every((l) => /^\d+\.\s/.test(l.trim()))) {
+      html.push(`<ol>${lines.map((l) => `<li>${inlineMd(l.replace(/^\d+\.\s/, ""))}</li>`).join("")}</ol>`);
+    } else if (lines.every((l) => /^>\s?/.test(l))) {
+      html.push(`<blockquote>${lines.map((l) => inlineMd(l.replace(/^>\s?/, ""))).join("<br>")}</blockquote>`);
+    } else {
+      html.push(`<p>${inlineMd(lines.join(" "))}</p>`);
+    }
+  }
+
+  return html.join("\n");
 }
 
 function parseDraftSections(memoText: string): DraftSection[] {
