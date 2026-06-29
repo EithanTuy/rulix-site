@@ -2062,10 +2062,62 @@ button {
   background: #ffffff;
   border: 1px solid #e2e8ef;
   box-shadow: var(--shadow);
-  white-space: pre-wrap;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 16px;
   line-height: 1.62;
+}
+
+.memo-document h2,
+.memo-document h3,
+.memo-document h4 {
+  margin: 22px 0 8px;
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 750;
+  line-height: 1.25;
+  color: var(--navy-950);
+}
+
+.memo-document h2 { font-size: 20px; }
+.memo-document h3 { font-size: 17px; }
+.memo-document h4 { font-size: 15px; }
+
+.memo-document p {
+  margin: 0 0 10px;
+}
+
+.memo-document ul,
+.memo-document ol {
+  margin: 0 0 10px;
+  padding-left: 24px;
+}
+
+.memo-document li {
+  margin-bottom: 4px;
+}
+
+.memo-document blockquote {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--teal);
+  color: #3a4e63;
+  font-style: italic;
+  background: #f5fbfa;
+}
+
+.memo-document hr {
+  margin: 18px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+}
+
+.memo-document strong { font-weight: 750; }
+.memo-document em { font-style: italic; }
+.memo-document code {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  background: #f0f3f6;
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 .highlight {

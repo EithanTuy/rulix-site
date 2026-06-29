@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { CSSProperties, MutableRefObject } from "react";
 import {
   Archive,
@@ -263,6 +263,61 @@ export function MemoWorkspace({
   );
 }
 
+// A segment after splitting on newlines — belongs to one line only.
+interface LineSegment {
+  text: string;
+  finding?: EvidenceFinding;
+}
+
+function renderLineSegments(
+  segs: LineSegment[],
+  findings: ReviewResult["findings"],
+  selectedFindingId: string | undefined,
+  selectedFindingRef: MutableRefObject<HTMLElement | null>,
+  keyPrefix: string
+) {
+  return segs.map((seg, si) => {
+    const html = renderInlineText(seg.text);
+    if (!seg.finding) {
+      return <span key={`${keyPrefix}-${si}`} dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+    const isSelected = seg.finding.id === selectedFindingId;
+    return (
+      <mark
+        key={`${keyPrefix}-${si}`}
+        className={isSelected ? `highlight ${seg.finding.status} selected` : `highlight ${seg.finding.status}`}
+        title={seg.finding.title}
+        ref={(el) => { if (isSelected) selectedFindingRef.current = el; }}
+      >
+        <span dangerouslySetInnerHTML={{ __html: html }} />
+        <span className={`finding-badge ${seg.finding.status}`}>
+          {indexBadge(findings, seg.finding.id)}
+        </span>
+      </mark>
+    );
+  });
+}
+
+function renderInlineText(text: string): string {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function stripLeadingChars(segs: LineSegment[], count: number): LineSegment[] {
+  let remaining = count;
+  return segs
+    .map((seg) => {
+      if (remaining <= 0) return seg;
+      const skip = Math.min(remaining, seg.text.length);
+      remaining -= skip;
+      return { ...seg, text: seg.text.slice(skip) };
+    })
+    .filter((seg) => seg.text.length > 0);
+}
+
 function MemoDocumentView({
   memoText,
   findings,
@@ -278,56 +333,115 @@ function MemoDocumentView({
   className?: string;
   style?: CSSProperties;
 }) {
-  const segments = createHighlightSegments(memoText, findings);
+  // 1. Get character-level segments, then split each on '\n' so every sub-segment
+  //    stays within a single line.
+  const rawSegments = createHighlightSegments(memoText, findings);
+  type MaybeNewline = LineSegment & { isNewline?: boolean };
+  const flat: MaybeNewline[] = [];
+  for (const seg of rawSegments) {
+    const parts = seg.text.split("\n");
+    parts.forEach((part, i) => {
+      flat.push({ text: part, finding: seg.finding });
+      if (i < parts.length - 1) flat.push({ text: "", isNewline: true });
+    });
+  }
+
+  // 2. Group into lines
+  const lines: LineSegment[][] = [[]];
+  for (const item of flat) {
+    if (item.isNewline) {
+      lines.push([]);
+    } else if (item.text.length > 0) {
+      lines[lines.length - 1].push({ text: item.text, finding: item.finding });
+    }
+  }
+
+  // 3. Render line by line with markdown structure
+  const nodes: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+  let listKey = 0;
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    nodes.push(<ul key={`ul-${listKey++}`}>{listItems}</ul>);
+    listItems = [];
+  };
+
+  lines.forEach((lineSegs, li) => {
+    const lineText = lineSegs.map((s) => s.text).join("");
+    const trimmed = lineText.trim();
+
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,3})\s+/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const Tag = (level === 1 ? "h2" : level === 2 ? "h3" : "h4") as "h2" | "h3" | "h4";
+      const stripped = stripLeadingChars(lineSegs, lineText.indexOf(trimmed) + headingMatch[0].length);
+      nodes.push(
+        <Tag key={`h-${li}`}>
+          {renderLineSegments(stripped, findings, selectedFindingId, selectedFindingRef, `h-${li}`)}
+        </Tag>
+      );
+      return;
+    }
+
+    const bulletMatch = trimmed.match(/^[-*]\s+/);
+    if (bulletMatch) {
+      const stripped = stripLeadingChars(lineSegs, lineText.indexOf(trimmed) + bulletMatch[0].length);
+      listItems.push(
+        <li key={`li-${li}`}>
+          {renderLineSegments(stripped, findings, selectedFindingId, selectedFindingRef, `li-${li}`)}
+        </li>
+      );
+      return;
+    }
+
+    if (/^>\s?/.test(trimmed)) {
+      flushList();
+      const markerLen = lineText.match(/^(\s*>\s?)/)![1].length;
+      const stripped = stripLeadingChars(lineSegs, markerLen);
+      nodes.push(
+        <blockquote key={`bq-${li}`}>
+          {renderLineSegments(stripped, findings, selectedFindingId, selectedFindingRef, `bq-${li}`)}
+        </blockquote>
+      );
+      return;
+    }
+
+    if (/^[-*_]{3,}$/.test(trimmed)) {
+      flushList();
+      nodes.push(<hr key={`hr-${li}`} />);
+      return;
+    }
+
+    flushList();
+    nodes.push(
+      <p key={`p-${li}`}>
+        {renderLineSegments(lineSegs, findings, selectedFindingId, selectedFindingRef, `p-${li}`)}
+      </p>
+    );
+  });
+
+  flushList();
 
   return (
     <article className={className} style={style}>
-      {segments.map((segment, index) =>
-        segment.finding ? (
-          <mark
-            className={
-              segment.finding.id === selectedFindingId
-                ? `highlight ${segment.finding.status} selected`
-                : `highlight ${segment.finding.status}`
-            }
-            title={segment.finding.title}
-            key={`${segment.finding.id}-${index}`}
-            ref={(element) => {
-              if (segment.finding?.id === selectedFindingId) selectedFindingRef.current = element;
-            }}
-          >
-            {segment.text}
-            <span className={`finding-badge ${segment.finding.status}`}>
-              {indexBadge(findings, segment.finding.id)}
-            </span>
-          </mark>
-        ) : (
-          <span key={`text-${index}`}>{segment.text}</span>
-        )
-      )}
+      {nodes}
       {findings
-        .filter(
-          (finding) =>
-            finding.status === "missing" &&
-            typeof finding.start !== "number" &&
-            typeof finding.end !== "number"
-        )
+        .filter((f) => f.status === "missing" && typeof f.start !== "number")
         .map((finding) => (
           <p
-            className={
-              finding.id === selectedFindingId
-                ? "missing-inline selected"
-                : "missing-inline"
-            }
+            className={finding.id === selectedFindingId ? "missing-inline selected" : "missing-inline"}
             key={finding.id}
-            ref={(element) => {
-              if (finding.id === selectedFindingId) selectedFindingRef.current = element;
-            }}
+            ref={(el) => { if (finding.id === selectedFindingId) selectedFindingRef.current = el; }}
           >
             [Add: {finding.claim}]
-            <span className="finding-badge missing">
-              {indexBadge(findings, finding.id)}
-            </span>
+            <span className="finding-badge missing">{indexBadge(findings, finding.id)}</span>
           </p>
         ))}
     </article>
