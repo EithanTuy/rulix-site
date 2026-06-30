@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+// Home.tsx - public marketing landing page.
+
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  CheckCircle2,
-  ClipboardCheck,
-  FileCheck2,
-  GitBranch,
-  LockKeyhole,
+  ChevronDown,
+  FileSearch,
+  FlaskConical,
+  GraduationCap,
+  Landmark,
   Mail,
-  SearchCheck,
-  UploadCloud,
-  UsersRound,
-  type LucideIcon,
+  Phone,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { CONTACT_EMAIL_DISPLAY, createContactMailto } from "../lib/contact";
 
 export type LandingVariant =
   | "default"
@@ -24,20 +24,11 @@ export type LandingVariant =
   | "university"
   | "manufacturer";
 
-type DemoKey = "findMissingReasoning" | "resolveReviewGaps" | "exportReviewRecord";
-
-interface PageMeta {
-  title: string;
-  description: string;
-  h1: string;
-  body: string;
-}
-
-const META: Record<LandingVariant, PageMeta> = {
+const META: Record<LandingVariant, { title: string; description: string; h1: string; body: string }> = {
   default: {
-    title: "Rulix - Export-control memo review",
+    title: "Rulix — Export-control memo review",
     description:
-      "Rulix helps export-control, legal, and compliance teams review memo reasoning, surface gaps, and prepare clear decision records.",
+      "Rulix helps reviewers find gaps, ask better evidence questions, and prepare a clean record before final signoff.",
     h1: "Export-control memo review, organized.",
     body:
       "Rulix helps reviewers find gaps, ask better evidence questions, and prepare a clean record before final signoff.",
@@ -45,250 +36,165 @@ const META: Record<LandingVariant, PageMeta> = {
   "memo-review": {
     title: "Export-control memo review software | Rulix",
     description:
-      "Review classification memos for weak reasoning, evidence gaps, reviewer questions, and signoff.",
-    h1: "Review export-control memos with a clear trail.",
+      "Find gaps in export-control memos before your reviewer does. Missing thresholds, weak evidence, and audit-ready signoff.",
+    h1: "Find the gaps in your export-control memos.",
     body:
-      "Test classification logic, spot unsupported claims, and document the evidence behind each decision.",
+      "Paste a memo, get a prioritized list of missing facts, weak claims, and the questions your reviewer needs answered.",
   },
   "eccn-assistant": {
-    title: "ECCN classification assistant for reviewers | Rulix",
+    title: "ECCN review support for export-control teams | Rulix",
     description:
-      "Structure ECCN review, evidence gaps, and human signoff without replacing expert judgment.",
-    h1: "ECCN review support for human reviewers.",
+      "Rulix helps export-control teams separate what the memo actually proves from what it just asserts.",
+    h1: "ECCN review support for export-control teams.",
     body:
-      "Turn draft classification memos into structured work: claims, assumptions, missing evidence, and signoff notes.",
+      "Rulix separates what the memo actually proves from what it just asserts, then builds the question list your reviewer needs.",
   },
   "ai-review": {
-    title: "AI export compliance review with human signoff | Rulix",
+    title: "AI export-control review with human signoff | Rulix",
     description:
-      "Use AI support to spot memo gaps while keeping final determinations with trained reviewers.",
-    h1: "AI-assisted export review, kept in human hands.",
+      "AI spots the gaps in your classification memo. Your licensed reviewer makes the final call.",
+    h1: "AI spots the gaps. Your reviewer makes the call.",
     body:
-      "Pressure-test reasoning, surface questions, and organize evidence while expert reviewers stay in charge.",
+      "Upload a classification memo. Rulix flags the weak evidence and missing thresholds. Your licensed reviewer decides.",
   },
   university: {
     title: "University export-control memo review | Rulix",
     description:
-      "Help universities and research teams triage public or sanitized memo drafts before final reviewer time.",
-    h1: "Memo triage for research teams.",
+      "Screen public or sanitized memos before they reach your licensed reviewer.",
+    h1: "Export-control review support for university teams.",
     body:
-      "Prepare cleaner drafts, isolate missing technical facts, and keep reviewer questions organized.",
+      "Screen public or sanitized memos before they reach your licensed reviewer. Keep the workload manageable without relaxing your data rules.",
   },
   manufacturer: {
-    title: "Manufacturer ECCN review support | Rulix",
+    title: "ECCN memo review for manufacturers and labs | Rulix",
     description:
-      "Help manufacturers and labs reduce back-and-forth on ECCN evidence, product specs, and reviewer questions.",
-    h1: "ECCN review packets for manufacturers and labs.",
+      "Stop back-and-forth on product specs. Rulix turns vague blockers into specific questions your team can answer.",
+    h1: "Get your ECCN memo ready before it reaches legal review.",
     body:
-      "Catch missing specs and unsupported claims before final classification review.",
+      "Stop the back-and-forth on product specs. Rulix turns vague blockers into specific questions your team can actually answer.",
   },
 };
 
-const proofChips = [
-  { label: "Find missing evidence", icon: SearchCheck },
-  { label: "Keep reviewers in control", icon: UsersRound },
-  { label: "Export a clean record", icon: ClipboardCheck },
-];
-
-const reviewSignals = [
+const WHAT_YOU_GET = [
   {
-    title: "Unsupported claim",
-    copy: "Highlighted beside the memo section that needs support.",
-    icon: SearchCheck,
+    title: "Unsupported claims flagged",
+    body: "Highlighted beside the memo section that needs support — so your reviewer knows exactly where to look.",
   },
   {
-    title: "Missing evidence",
-    copy: "Grouped by what the reviewer needs before signoff.",
-    icon: FileCheck2,
+    title: "Missing evidence surfaced",
+    body: "Grouped by what the reviewer needs before signoff, not scattered across comments and email threads.",
   },
   {
-    title: "Decision trail",
-    copy: "Actions, notes, and export state stay in one record.",
-    icon: ClipboardCheck,
+    title: "Decision trail kept",
+    body: "Actions, notes, and export state stay in one record. The whole review is auditable and exportable.",
   },
 ];
 
-const demoMedia: Record<"hero" | DemoKey, { title: string; duration: string; poster: string; video: string; still: string; prompt: string }> = {
-  hero: {
-    title: "Rulix review loop",
-    duration: "10s",
-    poster: "/marketing/demos/hero-rulix-review-loop.webp",
-    video: "/marketing/demos/hero-rulix-review-loop.mp4",
-    still: "/marketing/demos/hero-rulix-review-loop.png",
-    prompt: "How does a memo move from draft to review record?",
-  },
-  findMissingReasoning: {
-    title: "Find missing reasoning",
-    duration: "6s",
-    poster: "/marketing/demos/demo-find-missing-reasoning.webp",
-    video: "/marketing/demos/demo-find-missing-reasoning.mp4",
-    still: "/marketing/demos/demo-find-missing-reasoning.png",
-    prompt: "Where is the memo reasoning weak?",
-  },
-  resolveReviewGaps: {
-    title: "Resolve review gaps",
-    duration: "6s",
-    poster: "/marketing/demos/demo-resolve-review-gaps.webp",
-    video: "/marketing/demos/demo-resolve-review-gaps.mp4",
-    still: "/marketing/demos/demo-resolve-review-gaps.png",
-    prompt: "Can teams close gaps without losing context?",
-  },
-  exportReviewRecord: {
-    title: "Export a clear record",
-    duration: "6s",
-    poster: "/marketing/demos/demo-export-review-record.webp",
-    video: "/marketing/demos/demo-export-review-record.mp4",
-    still: "/marketing/demos/demo-export-review-record.png",
-    prompt: "Can the team export the review trail?",
-  },
-};
-
-const demoModules: Array<{
-  key: DemoKey;
-  title: string;
-  shortTitle: string;
-  copy: string;
-  proof: string[];
-  outcome: string;
-}> = [
+const HOW_IT_WORKS = [
   {
-    key: "findMissingReasoning",
-    title: "Find missing reasoning",
-    shortTitle: "Find gaps",
-    copy: "Analysis and Evidence Map show unsupported jurisdiction, ECCN, and end-use reasoning beside the memo.",
-    proof: ["Analysis panel", "Evidence Map", "Memo highlights"],
-    outcome: "Reviewers see the weak link before signoff.",
+    step: "01",
+    title: "Add the memo",
+    body: "Upload or paste memo content, support docs, classifications, and context. Public, sanitized, or approved samples only.",
   },
   {
-    key: "resolveReviewGaps",
-    title: "Resolve review gaps",
-    shortTitle: "Resolve gaps",
-    copy: "Highlighted findings become actions: accept, request more information, or override with notes.",
-    proof: ["Finding selection", "Decision tab", "Reviewer checklist"],
-    outcome: "Fits workflows that need a human decision trail.",
+    step: "02",
+    title: "Map the reasoning",
+    body: "Rulix identifies claims, assumptions, missing evidence, and decision logic tied to the memo text.",
   },
   {
-    key: "exportReviewRecord",
-    title: "Export a clear record",
-    shortTitle: "Export record",
-    copy: "The export view preserves intake, analysis, reviewer decisions, and report generation.",
-    proof: ["Audit tab", "Decision note", "Report export"],
-    outcome: "Teams get an internal record they can explain.",
+    step: "03",
+    title: "Flag review risk",
+    body: "Gaps are grouped by what a reviewer actually needs to inspect — not a generic checklist.",
+  },
+  {
+    step: "04",
+    title: "Generate the record",
+    body: "Export the summary, checklist, and full review trail for final human signoff.",
   },
 ];
 
-const workflowSteps = [
-  { title: "Add the memo", copy: "Upload or paste memo content, support docs, classifications, and context.", panel: "Memo, attachments, item facts" },
-  { title: "Map the reasoning", copy: "Rulix identifies claims, assumptions, missing evidence, and decision logic.", panel: "Claims, sources, assumptions" },
-  { title: "Flag review risk", copy: "Gaps are grouped by what a reviewer needs to inspect.", panel: "Jurisdiction, ECCN, end use" },
-  { title: "Generate the record", copy: "Export the summary, checklist, and review trail for final signoff.", panel: "Findings, responses, audit trail" },
-];
-
-const reviewLoopSteps = [
+const USE_CASES = [
   {
-    title: "Draft enters",
-    signal: "Memo, item facts, parties, and known assumptions",
-    result: "The workspace knows what the reviewer is looking at.",
-    icon: UploadCloud,
+    icon: Landmark,
+    title: "Export-control officers",
+    body: "Spot the weak claims before you sign off. Every decision stays on the record.",
   },
   {
-    title: "Gaps surface",
-    signal: "Unsupported claims, missing facts, weak rationale",
-    result: "Reviewers see the exact spots that need attention.",
-    icon: SearchCheck,
+    icon: FlaskConical,
+    title: "Manufacturers and labs",
+    body: "Stop the back-and-forth. Turn vague requests into specific questions your engineering team can answer.",
   },
   {
-    title: "Reviewer resolves",
-    signal: "Accept, request info, override, or add notes",
-    result: "Human judgment is captured instead of buried in comments.",
-    icon: UsersRound,
-  },
-  {
-    title: "Record exports",
-    signal: "Findings, responses, checklist, and trail",
-    result: "The team leaves with a review-ready internal record.",
-    icon: ClipboardCheck,
+    icon: GraduationCap,
+    title: "Universities and research offices",
+    body: "Pre-screen public or sanitized memos before they reach your licensed reviewer.",
   },
 ];
 
-const comparisonRows = [
-  ["Workflow shape", "Unstructured conversation", "Scattered comments", "Structured memo review"],
-  ["Traceability", "Hard to audit", "Depends on reviewer notes", "Findings tied to reasoning"],
-  ["Context retention", "Easy to lose", "Split across tools", "Memo, evidence, and trail together"],
-  ["Review output", "Free-form answer", "Variable quality", "Reviewer-ready record"],
+const FIT_CHECK = [
+  {
+    fits: true,
+    icon: ShieldCheck,
+    title: "Rulix fits when",
+    body: "Your team reviews memo drafts, needs evidence-aware gap finding, and keeps final judgment with qualified people.",
+  },
+  {
+    fits: null,
+    icon: FileSearch,
+    title: "Data boundary",
+    body: "Use only public, sanitized, or approved data in the hosted workspace unless your policy allows more.",
+  },
+  {
+    fits: false,
+    icon: XCircle,
+    title: "Rulix is not a fit when",
+    body: "You need guaranteed classifications, autonomous legal decisions, or a place for unmanaged sensitive data.",
+  },
 ];
 
-const fitCards = [
-  { title: "Rulix fits when", copy: "Your team reviews memo drafts, needs evidence-aware gap finding, and keeps final judgment with people.", icon: CheckCircle2, tone: "fit" },
-  { title: "Data boundary", copy: "Use only public, sanitized, or approved data in the hosted workspace unless your policy allows more.", icon: LockKeyhole, tone: "boundary" },
-  { title: "Rulix is not a fit when", copy: "You need guaranteed classifications, autonomous legal decisions, or a place for unmanaged sensitive data.", icon: AlertTriangle, tone: "not-fit" },
+const FAQS = [
+  {
+    q: "How should we use Rulix for regulatory work?",
+    a: "Treat Rulix as review support, not a final authority. Use it to find gaps and prepare your reviewer's question list. Your licensed reviewer or counsel makes the final determination.",
+  },
+  {
+    q: "What if the AI gets something wrong?",
+    a: "Model output is a finding to review, not final truth. Every analysis stays tied to memo passages and source context so your reviewer can accept, override, or request more information.",
+  },
+  {
+    q: "How is this different from a general AI assistant?",
+    a: "Generic chat is free-form. Rulix keeps intake, evidence gaps, decisions, audit trail, and export records in one structured workflow built around export-control memo work.",
+  },
+  {
+    q: "Does Rulix replace counsel or compliance reviewers?",
+    a: "No. Rulix assists expert review — it doesn't make legal guarantees or regulatory determinations. Your reviewer of record signs off.",
+  },
+  {
+    q: "What data can we put into it?",
+    a: "The hosted version is for public, sanitized, sample, or explicitly approved text only. Do not submit CUI, ITAR technical data, controlled information, or proprietary specs without an approved deployment boundary.",
+  },
 ];
 
-const faqItems = [
-  { question: "How should we use Rulix for regulatory work?", answer: "Use it as review support. Rulix surfaces gaps, evidence needs, and decision history so qualified humans can document the final call." },
-  { question: "What if AI gets something wrong?", answer: "Model output is treated as a finding to review, not final truth. Analysis stays tied to memo passages, source context, and human signoff." },
-  { question: "How is this different from generic AI?", answer: "Generic chat is free-form. Rulix keeps intake, evidence gaps, decisions, audit trail, and export records in one workflow." },
-  { question: "Does Rulix replace counsel or compliance reviewers?", answer: "No. Rulix assists expert review; it does not make legal guarantees or regulatory determinations." },
-  { question: "What data can we put into it?", answer: "Use public, sanitized, or approved data in the hosted app unless your organization has approved a different boundary." },
-];
+const EMAIL = "tuyilin2@msu.edu";
+const PHONE_DISPLAY = "+1 517 490 4177";
+const PHONE_TEL = "+15174904177";
+const MAIL_HREF =
+  `mailto:${EMAIL}?subject=Rulix%20memo%20audit%20request` +
+  `&body=Organization%3A%0ARole%3A%0AApprox.%20memo%20volume%20per%20month%3A%0ASample%20memo%20available%3F%20Yes%20%2F%20No%0A%0AWhat%20review%20workflow%20are%20you%20trying%20to%20speed%20up%3F%0A`;
 
 export function Home({ variant = "default" }: { variant?: LandingVariant }) {
   const meta = META[variant];
-  const [activeDemo, setActiveDemo] = useState<DemoKey>("findMissingReasoning");
-  const [demoRotationPaused, setDemoRotationPaused] = useState(false);
-  const [activeLoopStep, setActiveLoopStep] = useState(1);
-  const [loopRotationPaused, setLoopRotationPaused] = useState(false);
-  const [activeFaq, setActiveFaq] = useState(1);
-
   usePageMeta(meta.title, meta.description);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mediaQuery.matches || demoRotationPaused) return;
-
-    const rotation = window.setInterval(() => {
-      setActiveDemo((currentDemo) => {
-        const currentIndex = demoModules.findIndex((demo) => demo.key === currentDemo);
-        return demoModules[(currentIndex + 1) % demoModules.length].key;
-      });
-    }, 6200);
-
-    return () => window.clearInterval(rotation);
-  }, [demoRotationPaused]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mediaQuery.matches || loopRotationPaused) return;
-
-    const rotation = window.setInterval(() => {
-      setActiveLoopStep((currentStep) => (currentStep + 1) % reviewLoopSteps.length);
-    }, 5200);
-
-    return () => window.clearInterval(rotation);
-  }, [loopRotationPaused]);
-
-  const handleDemoChange = (demo: DemoKey) => {
-    setDemoRotationPaused(true);
-    setActiveDemo(demo);
-  };
-
-  const handleLoopStepChange = (step: number) => {
-    setLoopRotationPaused(true);
-    setActiveLoopStep(step);
-  };
-
   return (
     <>
       <Hero meta={meta} />
-      <ProductDemo activeDemo={activeDemo} onDemoChange={handleDemoChange} />
-      <SignalStrip />
-      <ReviewLoop activeStep={activeLoopStep} onStepChange={handleLoopStepChange} />
-      <FitCheck />
+      <ProductDemo />
+      <WhatYouGet />
       <HowItWorks />
-      <ComparisonSection />
-      <CredibilitySection />
-      <FaqSection activeFaq={activeFaq} onFaqChange={setActiveFaq} />
-      <RequestAccessSection />
+      <UseCases />
+      <FitCheck />
+      <Faq />
+      <LeadSection />
     </>
   );
 }
@@ -296,176 +202,92 @@ export function Home({ variant = "default" }: { variant?: LandingVariant }) {
 function usePageMeta(title: string, description: string) {
   useEffect(() => {
     document.title = title;
-    const descriptionMeta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if (descriptionMeta) descriptionMeta.content = description;
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (meta) meta.content = description;
   }, [title, description]);
 }
 
-function Hero({ meta }: { meta: PageMeta }) {
+function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
   return (
-    <section className="site-hero" id="top">
-      <div className="site-wrap site-hero-grid">
-        <div className="site-hero-copy">
-          <p className="site-eyebrow"><span aria-hidden="true" />For export-control, legal, and compliance teams</p>
-          <h1>{meta.h1}</h1>
-          <p className="site-hero-subcopy">{meta.body}</p>
-          <div className="site-actions">
-            <Link to="/contact" className="site-button site-button-primary">Request access<ArrowRight size={18} aria-hidden="true" /></Link>
-            <a href="#product-demo" className="site-button site-button-text">See how it works<ArrowRight size={16} aria-hidden="true" /></a>
-          </div>
-          <div className="site-proof-row" aria-label="Rulix review strengths">
-            {proofChips.map((chip) => <span key={chip.label}><chip.icon size={17} aria-hidden="true" />{chip.label}</span>)}
-          </div>
-          <p className="site-hero-note">Review support only. Final judgment stays with qualified people.</p>
-        </div>
-        <HeroProductProof />
-      </div>
-    </section>
-  );
-}
-
-function HeroProductProof() {
-  const media = demoMedia.hero;
-
-  return (
-    <div className="product-proof-frame hero-product-proof" aria-label="Rulix product proof video">
-      <div className="product-proof-top"><span>Product in action</span><strong>{media.duration}</strong></div>
-      <ProductVideo media={media} />
-      <div className="proof-hotspots" aria-label="What the product preview shows">
-        <span><SearchCheck size={16} aria-hidden="true" />Unsupported claim flagged</span>
-        <span><GitBranch size={16} aria-hidden="true" />Evidence trail mapped</span>
-        <span><ClipboardCheck size={16} aria-hidden="true" />Review record prepared</span>
-      </div>
-      <div className="proof-caption"><strong>{media.title}</strong><span>{media.prompt}</span></div>
-    </div>
-  );
-}
-
-function SignalStrip() {
-  return (
-    <section className="signal-strip reveal" aria-label="What Rulix surfaces during review">
-      <div className="site-wrap signal-grid">
-        {reviewSignals.map((signal) => (
-          <FeatureCard key={signal.title} {...signal} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ProductDemo({ activeDemo, onDemoChange }: { activeDemo: DemoKey; onDemoChange: (demo: DemoKey) => void }) {
-  const active = demoModules.find((demo) => demo.key === activeDemo) ?? demoModules[0];
-  const media = demoMedia[active.key];
-
-  return (
-    <section className="site-section product-demo-section reveal" id="product-demo">
-      <div className="site-wrap product-demo-grid">
+    <section className="hero-bg border-b border-line-soft">
+      <div className="wrap grid items-center gap-12 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:py-20">
         <div>
-          <SectionHeader label="Product in action" title="See what Rulix helps reviewers catch." copy="The product stays close to the memo: analysis, evidence gaps, reviewer actions, audit trail, and export state." />
-          <div className="demo-stepper" role="tablist" aria-label="Rulix product demos">
-            {demoModules.map((demo) => (
-              <button type="button" role="tab" aria-selected={activeDemo === demo.key} className={activeDemo === demo.key ? "is-active" : ""} id={`demo-tab-${demo.key}`} key={demo.key} onClick={() => onDemoChange(demo.key)}>
-                <span>{demoMedia[demo.key].duration}</span>{demo.shortTitle}
-              </button>
-            ))}
+          <h1 className="max-w-[14ch] text-[clamp(38px,5.5vw,68px)] leading-[0.96] tracking-[-0.02em]">
+            {meta.h1}
+          </h1>
+          <p className="mt-6 max-w-[52ch] text-[17px] leading-8 text-text-2">
+            {meta.body}
+          </p>
+          <div className="mt-8">
+            <Link to="/contact" className="btn primary lg">
+              Book a memo audit
+              <ArrowRight size={17} />
+            </Link>
           </div>
+          <p className="footnote mt-5 flex max-w-[52ch] items-start gap-2">
+            <ShieldCheck size={15} className="mt-0.5 flex-none text-ok" />
+            AI helps. Your reviewer decides. Hosted version is for public or sanitized memos only.
+          </p>
         </div>
-        <div className="demo-proof-panel" id={`demo-panel-${active.key}`} role="tabpanel" aria-labelledby={`demo-tab-${active.key}`}>
-          <ProductVideo media={media} />
-          <div className="demo-proof-copy">
-            <span>{media.prompt}</span>
-            <h3>{active.title}</h3>
-            <p>{active.copy}</p>
-            <div className="demo-proof-pills">{active.proof.map((item) => <span key={item}>{item}</span>)}</div>
-            <strong>{active.outcome}</strong>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProductVideo({ media }: { media: (typeof demoMedia)["hero"] }) {
-  return (
-    <div className="proof-video">
-      <video muted loop playsInline autoPlay preload="metadata" poster={media.poster} aria-label={`${media.title} product demo video`}>
-        <source src={media.video} type="video/mp4" />
-      </video>
-      <img src={media.still} alt={`${media.title} still`} loading="lazy" />
-    </div>
-  );
-}
-
-function ReviewLoop({ activeStep, onStepChange }: { activeStep: number; onStepChange: (step: number) => void }) {
-  const active = reviewLoopSteps[activeStep] ?? reviewLoopSteps[0];
-  const ActiveIcon = active.icon;
-
-  return (
-    <section className="site-section review-loop-section reveal" id="review-loop">
-      <div className="site-wrap review-loop-grid">
         <div>
-          <SectionHeader
-            label="Review loop"
-            title="Follow one memo from draft to record."
-            copy="Click through the loop. Each step keeps the memo, reviewer action, and record close together."
+          <img
+            src="/marketing/rulix-audit-product.png"
+            alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
+            className="panel block w-full shadow-lg"
           />
-          <div className="loop-step-list" role="tablist" aria-label="Rulix review loop">
-            {reviewLoopSteps.map((step, index) => {
-              const StepIcon = step.icon;
-              const selected = activeStep === index;
-              return (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls="review-loop-panel"
-                  className={selected ? "is-active" : ""}
-                  key={step.title}
-                  onClick={() => onStepChange(index)}
-                  onFocus={() => onStepChange(index)}
-                  onMouseEnter={() => onStepChange(index)}
-                >
-                  <StepIcon size={18} aria-hidden="true" />
-                  <span>{step.title}</span>
-                </button>
-              );
-            })}
-          </div>
         </div>
-        <article className="loop-proof-panel" id="review-loop-panel" role="tabpanel" aria-live="polite">
-          <div className="loop-proof-header">
-            <span>Step {String(activeStep + 1).padStart(2, "0")}</span>
-            <ActiveIcon size={22} aria-hidden="true" />
-          </div>
-          <h3>{active.title}</h3>
-          <p>{active.signal}</p>
-          <div className="loop-meter" aria-hidden="true">
-            {reviewLoopSteps.map((step, index) => (
-              <span className={index <= activeStep ? "is-lit" : ""} key={step.title} />
-            ))}
-          </div>
-          <div className="loop-record-card">
-            <span>Current output</span>
-            <strong>{active.result}</strong>
-          </div>
-        </article>
       </div>
     </section>
   );
 }
 
-function FitCheck() {
+function ProductDemo() {
   return (
-    <section className="site-section fit-check-section reveal" id="fit-check">
-      <div className="site-wrap">
-        <SectionHeader label="Fit check" title="Know when Rulix belongs in the workflow." copy="Rulix supports memo review. It is not autopilot legal judgment, guaranteed classification, or a place for unmanaged sensitive data." />
-        <div className="fit-check-grid">
-          {fitCards.map((card) => (
-            <article className={`fit-card ${card.tone}`} key={card.title}>
-              <card.icon size={22} aria-hidden="true" />
-              <h3>{card.title}</h3>
-              <p>{card.copy}</p>
-            </article>
+    <section id="product" className="border-b border-line-soft">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">
+            A memo enters the review queue.
+          </h2>
+          <p className="mt-4 text-[15.5px] text-text-2">
+            Rulix starts from a real memo workspace — not a loose prompt thread. The team sees what's being reviewed before AI analysis starts.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_1fr]">
+          <div className="panel p-6">
+            <h3 className="text-[17px]">Reviewer sees the gaps</h3>
+            <p className="mt-2 text-[14px] text-text-2">
+              Unsupported claims are highlighted inline. The reviewer clicks through to see what's missing and what question to ask.
+            </p>
+          </div>
+          <div className="panel p-6">
+            <h3 className="text-[17px]">Analysis runs only when ready</h3>
+            <p className="mt-2 text-[14px] text-text-2">
+              The analysis button is explicit. Review doesn't happen behind automation — you control when it runs.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WhatYouGet() {
+  return (
+    <section className="border-b border-line-soft bg-panel">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">What comes out of a Rulix review.</h2>
+          <p className="mt-4 text-[15.5px] text-text-2">
+            Every review produces structured output your team can act on and your reviewer can inspect.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          {WHAT_YOU_GET.map((item) => (
+            <div key={item.title} className="panel p-6">
+              <h3 className="text-[16px]">{item.title}</h3>
+              <p className="mt-3 text-[14px] text-text-2">{item.body}</p>
+            </div>
           ))}
         </div>
       </div>
@@ -475,17 +297,21 @@ function FitCheck() {
 
 function HowItWorks() {
   return (
-    <section className="site-section reveal" id="how-it-works">
-      <div className="site-wrap">
-        <SectionHeader label="How it works" title="From draft memo to review-ready record." copy="The workflow turns scattered draft analysis into a record reviewers can inspect, revise, and approve." />
-        <div className="workflow-grid">
-          {workflowSteps.map((step, index) => (
-            <article className="workflow-card" key={step.title}>
-              <span className="step-number">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{step.title}</h3>
-              <p>{step.copy}</p>
-              <div>{step.panel}</div>
-            </article>
+    <section id="how" className="border-b border-line-soft">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">From draft memo to review-ready record.</h2>
+          <p className="mt-4 text-[15.5px] text-text-2">
+            The workflow turns scattered draft analysis into a record your reviewer can inspect, revise, and approve.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {HOW_IT_WORKS.map((item) => (
+            <div key={item.step} className="border border-line-soft bg-panel p-6">
+              <span className="font-mono text-[13px] font-bold text-accent">{item.step}</span>
+              <h3 className="mt-3 text-[17px]">{item.title}</h3>
+              <p className="mt-2 text-[13.5px] text-text-2">{item.body}</p>
+            </div>
           ))}
         </div>
       </div>
@@ -493,15 +319,105 @@ function HowItWorks() {
   );
 }
 
-function ComparisonSection() {
+function UseCases() {
   return (
-    <section className="site-section comparison-section reveal">
-      <div className="site-wrap comparison-grid">
-        <SectionHeader label="Why Rulix" title="Built for structured review, not generic chat." copy="Rulix is built around export-control memo work: findings, evidence requests, reviewer resolution, and record export." />
-        <div className="comparison-table" role="table" aria-label="Rulix comparison">
-          <div className="comparison-row comparison-head" role="row"><span>Need</span><span>Generic AI chatbot</span><span>Manual review</span><span>Rulix</span></div>
-          {comparisonRows.map(([dimension, chatbot, manual, rulix]) => (
-            <div className="comparison-row" role="row" key={dimension}><span>{dimension}</span><span>{chatbot}</span><span>{manual}</span><strong>{rulix}</strong></div>
+    <section id="use-cases" className="border-b border-line-soft bg-panel">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">Built for teams that need to show their work.</h2>
+        </div>
+        <div className="mt-10 divide-y divide-line-soft border-y border-line-soft">
+          {USE_CASES.map((item) => (
+            <div key={item.title} className="grid gap-5 py-8 md:grid-cols-[70px_1fr] md:items-center">
+              <span className="grid size-12 place-items-center bg-accent-soft text-accent">
+                <item.icon size={22} />
+              </span>
+              <div>
+                <h3 className="text-[20px]">{item.title}</h3>
+                <p className="m-0 mt-2 max-w-[60ch] text-[14.5px] text-text-2">{item.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-10 text-center">
+          <Link to="/contact" className="btn lg">
+            Talk to us about your workflow
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FitCheck() {
+  return (
+    <section className="border-b border-line-soft bg-ink text-white">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)] text-white">
+            Know when Rulix belongs in the workflow.
+          </h2>
+          <p className="mt-4 max-w-[54ch] text-[15px] text-white/70">
+            Rulix supports memo review. It is not autopilot legal judgment, guaranteed classification, or a place for unmanaged sensitive data.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          {FIT_CHECK.map((item) => (
+            <div key={item.title} className="grid grid-cols-[auto_1fr] gap-3 border border-white/15 bg-white/5 p-5">
+              <item.icon
+                size={18}
+                className={
+                  item.fits === true ? "mt-0.5 text-ok" :
+                  item.fits === false ? "mt-0.5 text-block" :
+                  "mt-0.5 text-white/50"
+                }
+              />
+              <div>
+                <strong className="text-[15px] text-white">{item.title}</strong>
+                <p className="m-0 mt-1 text-[13.5px] text-white/70">{item.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-10">
+          <Link to="/security" className="btn !border-white/25 !bg-transparent !text-white hover:!border-white/60">
+            Security and data policy
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Faq() {
+  const [open, setOpen] = useState<number | null>(null);
+
+  return (
+    <section className="border-b border-line-soft">
+      <div className="wrap py-20">
+        <div className="max-w-[68ch]">
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">Common questions.</h2>
+        </div>
+        <div className="mt-10 max-w-[72ch] divide-y divide-line-soft border-y border-line-soft">
+          {FAQS.map((item, i) => (
+            <div key={item.q}>
+              <button
+                className="flex w-full items-center justify-between gap-4 py-5 text-left text-[15.5px] font-[560]"
+                onClick={() => setOpen(open === i ? null : i)}
+                aria-expanded={open === i}
+              >
+                {item.q}
+                <ChevronDown
+                  size={17}
+                  className="flex-none text-text-3 transition-transform"
+                  style={{ transform: open === i ? "rotate(180deg)" : "none" }}
+                />
+              </button>
+              {open === i && (
+                <p className="pb-5 text-[14.5px] text-text-2">{item.a}</p>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -509,93 +425,42 @@ function ComparisonSection() {
   );
 }
 
-function CredibilitySection() {
+function LeadSection() {
   return (
-    <section className="site-section credibility-section reveal" id="sample-review">
-      <div className="site-wrap credibility-grid">
+    <section id="lead" className="border-b border-line-soft bg-panel">
+      <div className="wrap grid gap-10 py-20 lg:grid-cols-[1fr_0.7fr] lg:items-start">
         <div>
-          <SectionHeader label="Credibility" title="Designed for technical trade decisions." copy="Built around where reviews get stuck: scattered comments, missing facts, unresolved assumptions, and the final trail." />
-          <div className="credibility-proof-list" aria-label="Rulix proof points"><span>Memo reasoning</span><span>Evidence gaps</span><span>Reviewer signoff</span></div>
-        </div>
-        <article className="case-study-card">
-          <span>Illustrative use case</span>
-          <h3>A cleaner path before final memo approval</h3>
-          <div className="case-study-columns">
-            <div><strong>Before</strong><p>Three reviewers, scattered comments, unresolved evidence requests, and an unclear decision trail.</p></div>
-            <div><strong>After</strong><p>Structured findings, resolved gaps, and an exportable review record ready for final human signoff.</p></div>
+          <h2 className="text-[clamp(26px,3.5vw,40px)]">Bring a memo. Walk away with the gaps.</h2>
+          <p className="mt-4 max-w-[56ch] text-[15.5px] text-text-2">
+            The easiest way to see Rulix in action is a short audit on one of your own public or sanitized memos. We'll show you the readiness score, the gaps, and the questions your reviewer would ask.
+          </p>
+          <div className="mt-6 flex max-w-[56ch] gap-3 border border-warn/40 bg-warn-soft p-4 text-[13px] text-text-2">
+            <AlertTriangle size={18} className="mt-0.5 flex-none text-warn" />
+            Don't send controlled technical data, CUI, ITAR material, or classified information unless you have an approved setup in place.
           </div>
-          <small>Illustrative only. Not a customer reference.</small>
-        </article>
-      </div>
-    </section>
-  );
-}
+        </div>
 
-function FaqSection({ activeFaq, onFaqChange }: { activeFaq: number; onFaqChange: (faq: number) => void }) {
-  return (
-    <section className="site-section faq-section reveal" id="faq">
-      <div className="site-wrap faq-grid">
-        <SectionHeader label="FAQ" title="Plain answers for careful buyers." copy="Rulix helps reviewers work faster and explain decisions better. It does not replace qualified judgment." />
-        <div className="faq-list">
-          {faqItems.map((item, index) => {
-            const expanded = activeFaq === index;
-            return (
-              <article className={expanded ? "faq-item is-open" : "faq-item"} key={item.question}>
-                <button type="button" aria-expanded={expanded} onClick={() => onFaqChange(expanded ? -1 : index)}><span>{item.question}</span><ArrowRight size={17} aria-hidden="true" /></button>
-                {expanded && <p>{item.answer}</p>}
-              </article>
-            );
-          })}
+        <div className="grid gap-4 pt-2">
+          <a href={MAIL_HREF} className="panel flex items-center gap-4 p-5 transition-colors hover:border-accent">
+            <span className="grid size-11 flex-none place-items-center bg-accent-soft text-accent">
+              <Mail size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11.5px] uppercase tracking-[0.1em] text-text-3">Email</span>
+              <span className="block truncate text-[15px] font-semibold">{EMAIL}</span>
+            </span>
+          </a>
+          <a href={`tel:${PHONE_TEL}`} className="panel flex items-center gap-4 p-5 transition-colors hover:border-accent">
+            <span className="grid size-11 flex-none place-items-center bg-accent-soft text-accent">
+              <Phone size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[11.5px] uppercase tracking-[0.1em] text-text-3">Phone</span>
+              <span className="block text-[15px] font-semibold">{PHONE_DISPLAY}</span>
+            </span>
+          </a>
         </div>
       </div>
     </section>
-  );
-}
-
-function RequestAccessSection() {
-  const mailHref = useMemo(
-    () =>
-      createContactMailto(
-        "Rulix access request",
-        "I'd like to request access to Rulix.\n\nWork email:\nOrganization:\nRole:\nExpected review volume:\nRedacted memo sample ready: yes / not yet\n\nWorkflow notes:\n",
-      ),
-    [],
-  );
-
-  return (
-    <section className="site-section request-section reveal" id="request-access">
-      <div className="site-wrap request-grid">
-        <div>
-          <SectionHeader label="Request access" title="See if Rulix fits your review workflow." copy="Send a few details. We'll use them to understand fit and suggest a sensible next step." />
-          <a className="sample-link" href="#sample-review">See sample review<ArrowRight size={16} aria-hidden="true" /></a>
-        </div>
-        <div className="access-form">
-          <div className="request-field"><Mail size={18} aria-hidden="true" /><span>Work email, organization, role, and review volume</span></div>
-          <div className="request-field"><UploadCloud size={18} aria-hidden="true" /><span>Redacted memo sample if you have one ready</span></div>
-          <a className="site-button site-button-primary site-button-full" href={mailHref}><Mail size={18} aria-hidden="true" />Request access</a>
-          <p className="form-confirmation">Opens an email to {CONTACT_EMAIL_DISPLAY}. Attach only public, sanitized, or approved samples.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionHeader({ label, title, copy }: { label: string; title: string; copy: string }) {
-  return (
-    <div className="section-header">
-      <span>{label}</span>
-      <h2>{title}</h2>
-      <p>{copy}</p>
-    </div>
-  );
-}
-
-function FeatureCard({ title, copy, icon: Icon }: { title: string; copy: string; icon: LucideIcon }) {
-  return (
-    <article className="feature-card">
-      <Icon size={22} aria-hidden="true" />
-      <h3>{title}</h3>
-      <p>{copy}</p>
-    </article>
   );
 }
