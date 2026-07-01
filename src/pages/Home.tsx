@@ -207,23 +207,25 @@ function usePageMeta(title: string, description: string) {
   }, [title, description]);
 }
 
+type VideoCrop = { left: string; top: string; width: string; height: string };
+
 function ProductShot({
   src,
   poster,
   alt,
   className = "",
   videoKey,
-  objectPosition,
+  crop,
 }: {
   src: string;
   poster: string;
   alt: string;
   className?: string;
   videoKey?: string;
-  objectPosition: string;
+  crop: VideoCrop;
 }) {
   return (
-    <div className={`panel overflow-hidden ${className}`}>
+    <div className={`panel relative overflow-hidden ${className}`}>
       <video
         key={videoKey}
         muted
@@ -232,8 +234,7 @@ function ProductShot({
         autoPlay
         preload="metadata"
         poster={poster}
-        style={{ objectPosition }}
-        className="h-full w-full object-cover"
+        style={{ position: "absolute", maxWidth: "none", ...crop }}
         aria-label={alt}
       >
         <source src={src} type="video/mp4" />
@@ -269,8 +270,8 @@ function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
             src="/marketing/demos/hero-rulix-review-loop.mp4"
             poster="/marketing/demos/hero-rulix-review-loop.webp"
             alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
-            className="aspect-[1121/1080] shadow-lg"
-            objectPosition="88.4% center"
+            className="aspect-[1121/799] shadow-lg"
+            crop={{ left: "-62.98%", top: "-18.52%", width: "171.28%", height: "135.17%" }}
           />
         </div>
       </div>
@@ -338,7 +339,7 @@ function ProductDemo() {
         </div>
 
         <div className="mt-6 max-w-[640px]">
-          <div className="panel relative aspect-[1191/1080] overflow-hidden">
+          <div className="panel relative aspect-[1191/791] overflow-hidden">
             {DEMOS.map((d, i) => (
               <video
                 key={d.key}
@@ -350,8 +351,15 @@ function ProductDemo() {
                 poster={d.poster}
                 aria-label={d.title}
                 aria-hidden={i !== active}
-                style={{ objectPosition: "87.8% center" }}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+                style={{
+                  position: "absolute",
+                  maxWidth: "none",
+                  left: "-53.74%",
+                  top: "-18.96%",
+                  width: "161.21%",
+                  height: "136.54%",
+                }}
+                className={`transition-opacity duration-200 ${
                   i === active ? "opacity-100" : "opacity-0"
                 }`}
               >
