@@ -1,6 +1,6 @@
 // Home.tsx - public marketing landing page.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -230,18 +230,63 @@ function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
           </p>
         </div>
         <div>
-          <img
-            src="/marketing/rulix-audit-product.png"
-            alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
+          <video
+            muted loop playsInline autoPlay preload="metadata"
+            poster="/marketing/demos/hero-rulix-review-loop.webp"
             className="panel block w-full shadow-lg"
-          />
+            aria-label="Rulix audit in action"
+          >
+            <source src="/marketing/demos/hero-rulix-review-loop.mp4" type="video/mp4" />
+            <img
+              src="/marketing/rulix-audit-product.png"
+              alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
+            />
+          </video>
         </div>
       </div>
     </section>
   );
 }
 
+const DEMOS = [
+  {
+    key: "find",
+    label: "Find gaps",
+    title: "Reviewer sees the gaps",
+    body: "Unsupported claims are highlighted inline. The reviewer clicks through to see what's missing and what question to ask.",
+    video: "/marketing/demos/demo-find-missing-reasoning.mp4",
+    poster: "/marketing/demos/demo-find-missing-reasoning.webp",
+  },
+  {
+    key: "resolve",
+    label: "Resolve gaps",
+    title: "Analysis runs only when ready",
+    body: "The analysis button is explicit. Review doesn't happen behind automation — you control when it runs.",
+    video: "/marketing/demos/demo-resolve-review-gaps.mp4",
+    poster: "/marketing/demos/demo-resolve-review-gaps.webp",
+  },
+  {
+    key: "export",
+    label: "Export record",
+    title: "Export a clean review record",
+    body: "Export the summary, checklist, and full review trail for final human signoff.",
+    video: "/marketing/demos/demo-export-review-record.mp4",
+    poster: "/marketing/demos/demo-export-review-record.webp",
+  },
+] as const;
+
 function ProductDemo() {
+  const [active, setActive] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const demo = DEMOS[active];
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current.play().catch(() => {});
+    }
+  }, [active]);
+
   return (
     <section id="product" className="border-b border-line-soft">
       <div className="wrap py-20">
@@ -253,18 +298,37 @@ function ProductDemo() {
             Rulix starts from a real memo workspace — not a loose prompt thread. The team sees what's being reviewed before AI analysis starts.
           </p>
         </div>
-        <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_1fr]">
-          <div className="panel p-6">
-            <h3 className="text-[17px]">Reviewer sees the gaps</h3>
-            <p className="mt-2 text-[14px] text-text-2">
-              Unsupported claims are highlighted inline. The reviewer clicks through to see what's missing and what question to ask.
-            </p>
-          </div>
-          <div className="panel p-6">
-            <h3 className="text-[17px]">Analysis runs only when ready</h3>
-            <p className="mt-2 text-[14px] text-text-2">
-              The analysis button is explicit. Review doesn't happen behind automation — you control when it runs.
-            </p>
+
+        <div className="mt-10 flex gap-2">
+          {DEMOS.map((d, i) => (
+            <button
+              key={d.key}
+              onClick={() => setActive(i)}
+              className={`border px-4 py-2 text-[13.5px] font-[530] transition-colors ${
+                i === active
+                  ? "border-accent bg-accent text-white"
+                  : "border-line-soft bg-panel text-text-2 hover:border-accent hover:text-text-1"
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
+          <video
+            ref={videoRef}
+            key={demo.key}
+            muted loop playsInline autoPlay preload="metadata"
+            poster={demo.poster}
+            className="panel block w-full"
+            aria-label={demo.title}
+          >
+            <source src={demo.video} type="video/mp4" />
+          </video>
+          <div className="pt-2">
+            <h3 className="text-[20px]">{demo.title}</h3>
+            <p className="mt-3 text-[14.5px] text-text-2">{demo.body}</p>
           </div>
         </div>
       </div>
