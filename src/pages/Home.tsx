@@ -213,15 +213,17 @@ function ProductShot({
   alt,
   className = "",
   videoKey,
+  objectPosition,
 }: {
   src: string;
   poster: string;
   alt: string;
   className?: string;
   videoKey?: string;
+  objectPosition: string;
 }) {
   return (
-    <div className={`panel aspect-[1229/1080] overflow-hidden ${className}`}>
+    <div className={`panel overflow-hidden ${className}`}>
       <video
         key={videoKey}
         muted
@@ -230,7 +232,8 @@ function ProductShot({
         autoPlay
         preload="metadata"
         poster={poster}
-        className="h-full w-full object-cover object-right"
+        style={{ objectPosition }}
+        className="h-full w-full object-cover"
         aria-label={alt}
       >
         <source src={src} type="video/mp4" />
@@ -266,7 +269,8 @@ function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
             src="/marketing/demos/hero-rulix-review-loop.mp4"
             poster="/marketing/demos/hero-rulix-review-loop.webp"
             alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
-            className="shadow-lg"
+            className="aspect-[1121/1080] shadow-lg"
+            objectPosition="88.4% center"
           />
         </div>
       </div>
@@ -334,7 +338,7 @@ function ProductDemo() {
         </div>
 
         <div className="mt-6 max-w-[640px]">
-          <div className="panel relative aspect-[1229/1080] overflow-hidden">
+          <div className="panel relative aspect-[1191/1080] overflow-hidden">
             {DEMOS.map((d, i) => (
               <video
                 key={d.key}
@@ -346,7 +350,8 @@ function ProductDemo() {
                 poster={d.poster}
                 aria-label={d.title}
                 aria-hidden={i !== active}
-                className={`absolute inset-0 h-full w-full object-cover object-right transition-opacity duration-200 ${
+                style={{ objectPosition: "87.8% center" }}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
                   i === active ? "opacity-100" : "opacity-0"
                 }`}
               >
