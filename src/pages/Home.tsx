@@ -1,6 +1,6 @@
 // Home.tsx - public marketing landing page.
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -207,6 +207,38 @@ function usePageMeta(title: string, description: string) {
   }, [title, description]);
 }
 
+function ProductShot({
+  src,
+  poster,
+  alt,
+  className = "",
+  videoKey,
+}: {
+  src: string;
+  poster: string;
+  alt: string;
+  className?: string;
+  videoKey?: string;
+}) {
+  return (
+    <div className={`panel aspect-[1229/1080] overflow-hidden ${className}`}>
+      <video
+        key={videoKey}
+        muted
+        loop
+        playsInline
+        autoPlay
+        preload="metadata"
+        poster={poster}
+        className="h-full w-full object-cover object-right"
+        aria-label={alt}
+      >
+        <source src={src} type="video/mp4" />
+      </video>
+    </div>
+  );
+}
+
 function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
   return (
     <section className="hero-bg border-b border-line-soft">
@@ -230,18 +262,12 @@ function Hero({ meta }: { meta: (typeof META)[LandingVariant] }) {
           </p>
         </div>
         <div>
-          <video
-            muted loop playsInline autoPlay preload="metadata"
+          <ProductShot
+            src="/marketing/demos/hero-rulix-review-loop.mp4"
             poster="/marketing/demos/hero-rulix-review-loop.webp"
-            className="panel block w-full shadow-lg"
-            aria-label="Rulix audit in action"
-          >
-            <source src="/marketing/demos/hero-rulix-review-loop.mp4" type="video/mp4" />
-            <img
-              src="/marketing/rulix-audit-product.png"
-              alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
-            />
-          </video>
+            alt="Rulix audit output showing a readiness score, evidence gaps, and reviewer questions"
+            className="shadow-lg"
+          />
         </div>
       </div>
     </section>
@@ -277,15 +303,7 @@ const DEMOS = [
 
 function ProductDemo() {
   const [active, setActive] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const demo = DEMOS[active];
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
-    }
-  }, [active]);
 
   return (
     <section id="product" className="border-b border-line-soft">
@@ -299,15 +317,15 @@ function ProductDemo() {
           </p>
         </div>
 
-        <div className="mt-10 flex gap-2">
+        <div className="mt-10 inline-flex gap-1 border border-line-soft bg-panel p-1">
           {DEMOS.map((d, i) => (
             <button
               key={d.key}
               onClick={() => setActive(i)}
-              className={`border px-4 py-2 text-[13.5px] font-[530] transition-colors ${
+              className={`px-4 py-1.5 text-[13.5px] font-[530] transition-colors ${
                 i === active
-                  ? "border-accent bg-accent text-white"
-                  : "border-line-soft bg-panel text-text-2 hover:border-accent hover:text-text-1"
+                  ? "bg-accent text-white"
+                  : "text-text-2 hover:text-text-1"
               }`}
             >
               {d.label}
@@ -315,20 +333,30 @@ function ProductDemo() {
           ))}
         </div>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr] lg:items-start">
-          <video
-            ref={videoRef}
-            key={demo.key}
-            muted loop playsInline autoPlay preload="metadata"
-            poster={demo.poster}
-            className="panel block w-full"
-            aria-label={demo.title}
-          >
-            <source src={demo.video} type="video/mp4" />
-          </video>
-          <div className="pt-2">
-            <h3 className="text-[20px]">{demo.title}</h3>
-            <p className="mt-3 text-[14.5px] text-text-2">{demo.body}</p>
+        <div className="mt-6 max-w-[640px]">
+          <div className="panel relative aspect-[1229/1080] overflow-hidden">
+            {DEMOS.map((d, i) => (
+              <video
+                key={d.key}
+                muted
+                loop
+                playsInline
+                autoPlay
+                preload="auto"
+                poster={d.poster}
+                aria-label={d.title}
+                aria-hidden={i !== active}
+                className={`absolute inset-0 h-full w-full object-cover object-right transition-opacity duration-200 ${
+                  i === active ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <source src={d.video} type="video/mp4" />
+              </video>
+            ))}
+          </div>
+          <div className="mt-5">
+            <h3 className="text-[18px]">{demo.title}</h3>
+            <p className="mt-2 max-w-[56ch] text-[14.5px] text-text-2">{demo.body}</p>
           </div>
         </div>
       </div>
