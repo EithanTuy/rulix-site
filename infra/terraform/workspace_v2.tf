@@ -278,6 +278,39 @@ data "aws_iam_policy_document" "workspace_migration" {
     resources = [aws_dynamodb_table.account_state.arn]
   }
 
+  # DynamoDB decrypts the legacy table key on behalf of the migration role.
+  # Bind that forward-access-session permission to this account, service, and
+  # exact source table so the role cannot use the tenant key directly.
+  statement {
+    sid       = "DecryptLegacyAccountStateViaDynamoDB"
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.tenant.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.${var.aws_region}.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:CallerAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:EncryptionContext:aws:dynamodb:tableName"
+      values   = [aws_dynamodb_table.account_state.name]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:EncryptionContext:aws:dynamodb:subscriberId"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
   statement {
     sid = "MigrateNormalizedWorkspace"
     actions = [
