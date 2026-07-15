@@ -333,6 +333,7 @@ describe("Terraform security invariants", () => {
     expect(appPolicy).not.toContain('"s3:DeleteObjectVersion"');
     expect(appPolicy).toContain('actions   = ["s3:GetObject", "s3:PutObject"]');
     expect(migrationPolicy).toContain('actions   = ["dynamodb:GetItem", "dynamodb:Scan"]');
+    expect(migrationPolicy).toContain('"dynamodb:ConditionCheckItem"');
     expect(migrationPolicy).toContain('sid       = "DecryptLegacyAccountStateViaDynamoDB"');
     expect(migrationPolicy).toContain('actions   = ["kms:Decrypt"]');
     expect(migrationPolicy).toContain("resources = [aws_kms_key.tenant.arn]");

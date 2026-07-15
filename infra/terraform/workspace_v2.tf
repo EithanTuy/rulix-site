@@ -306,6 +306,7 @@ data "aws_iam_policy_document" "workspace_migration" {
   statement {
     sid = "MigrateNormalizedWorkspace"
     actions = [
+      "dynamodb:ConditionCheckItem",
       "dynamodb:DeleteItem",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
