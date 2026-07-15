@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { App } from "./App";
+import { App, consumeAuthLinkFragment } from "./App";
 import { DashboardApp } from "./components/DashboardApp";
 import { MarketingSite, isMarketingPath } from "./components/MarketingSite";
 import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
@@ -44,14 +44,20 @@ function isMarketingSurface() {
 
 const dashboardSurface = isDashboardSurface();
 const appSurface = isAppSurface();
-const Root = dashboardSurface ? DashboardApp : appSurface ? App : isMarketingSurface() ? MarketingSite : MarketingSite;
-
 document.title = dashboardSurface ? "Rulix Dash" : appSurface ? "Rulix ECCN" : "Rulix";
 applyTheme(getInitialTheme());
 
+const root = dashboardSurface
+  ? <DashboardApp />
+  : appSurface
+    ? <App authLink={consumeAuthLinkFragment()} />
+    : isMarketingSurface()
+      ? <MarketingSite />
+      : <MarketingSite />;
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Root />
+    {root}
   </React.StrictMode>
 );
 

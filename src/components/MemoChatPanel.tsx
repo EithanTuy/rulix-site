@@ -5,9 +5,14 @@ import {
   MessageSquare,
   Send
 } from "lucide-react";
-import type { MemoChatMessage, MemoRecord } from "../types";
+import type { MemoChatMessage, MemoRecord, UserProfile } from "../types";
 import type { ReactNode } from "react";
 import { renderMarkdown } from "../lib/markdown";
+import {
+  MEMO_CHAT_CHARACTER_LIMIT,
+  truncateUnicodeCharacters,
+  unicodeCharacterLength
+} from "../shared/aiLimits";
 import { MemoDiffPreview } from "./MemoDiffPreview";
 
 interface MemoChatPanelProps {
@@ -15,8 +20,11 @@ interface MemoChatPanelProps {
   chatMessages: MemoChatMessage[];
   analysisLocked: boolean;
   memoDraftDirty: boolean;
-  onSendChat: (memoId: string, message: string) => Promise<void>;
-  onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
+  onSendChat: (memoId: string, message: string) => Promise<"sent" | "queued">;
+  onApplyChatSuggestion: (memoId: string, messageId: string) => Promise<void>;
+  hasMore: boolean;
+  onLoadMore: (memoId: string) => Promise<void>;
+  userRole: UserProfile["role"];
 }
 
 export function MemoChatPanel({
@@ -25,11 +33,16 @@ export function MemoChatPanel({
   analysisLocked,
   memoDraftDirty,
   onSendChat,
-  onApplyChatSuggestion
+  onApplyChatSuggestion,
+  hasMore,
+  onLoadMore,
+  userRole
 }: MemoChatPanelProps) {
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatNotice, setChatNotice] = useState("");
+  const [applyBusyId, setApplyBusyId] = useState<string | undefined>();
   const [animatedMessageId, setAnimatedMessageId] = useState<string | undefined>();
   const previousMessageCount = useRef(chatMessages.length);
 
@@ -47,13 +60,31 @@ export function MemoChatPanel({
     setChatDraft("");
     setChatBusy(true);
     setChatError("");
+    setChatNotice("");
     try {
-      await onSendChat(memo.id, message);
+      const outcome = await onSendChat(memo.id, message);
+      if (outcome === "queued") {
+        setChatDraft(message);
+        setChatNotice("Approval requested. Keep this exact message unchanged; send it again after an officer approves it.");
+      }
     } catch (error) {
       setChatDraft(message);
       setChatError(error instanceof Error ? error.message : "Chat failed. Your draft was kept.");
     } finally {
       setChatBusy(false);
+    }
+  };
+
+  const applySuggestion = async (messageId: string) => {
+    if (!memo || applyBusyId) return;
+    setApplyBusyId(messageId);
+    setChatError("");
+    try {
+      await onApplyChatSuggestion(memo.id, messageId);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "The suggestion was not applied.");
+    } finally {
+      setApplyBusyId(undefined);
     }
   };
 
@@ -88,9 +119,9 @@ export function MemoChatPanel({
                   <button
                     type="button"
                     className={message.applied ? "button small applied" : "button primary small"}
-                    disabled={message.applied || analysisLocked || memoDraftDirty}
+                    disabled={message.applied || analysisLocked || memoDraftDirty || Boolean(applyBusyId)}
                     title={memoDraftDirty ? "Save or discard memo edits before applying chat suggestions." : undefined}
-                    onClick={() => onApplyChatSuggestion(memo.id, message.id, message.proposedMemoText!)}
+                    onClick={() => void applySuggestion(message.id)}
                   >
                     {message.applied ? <CheckCircle2 size={16} /> : <Edit3 size={16} />}
                     {message.applied ? "Applied" : "Apply"}
@@ -99,6 +130,11 @@ export function MemoChatPanel({
               )}
             </div>
           ))}
+        {memo && hasMore && (
+          <button type="button" className="button small full" onClick={() => void onLoadMore(memo.id)}>
+            Load more chat messages
+          </button>
+        )}
         {chatBusy && (
           <div className="chat-message assistant thinking">
             <span className="thinking-dots" aria-hidden="true">
@@ -113,9 +149,13 @@ export function MemoChatPanel({
       <div className="memo-chat-input">
         <textarea
           value={chatDraft}
-          onChange={(event) => setChatDraft(event.target.value)}
+          onChange={(event) => setChatDraft(
+            truncateUnicodeCharacters(event.target.value, MEMO_CHAT_CHARACTER_LIMIT)
+          )}
           placeholder="Ask about or revise this memo..."
           rows={3}
+          maxLength={MEMO_CHAT_CHARACTER_LIMIT * 2}
+          aria-describedby="memo-chat-character-count"
           disabled={!memo || analysisLocked || memoDraftDirty}
         />
         <button
@@ -126,11 +166,20 @@ export function MemoChatPanel({
           title={memoDraftDirty ? "Save or discard memo edits before using memo chat." : undefined}
         >
           <Send size={16} />
-          Send
+          {userRole === "export-control-officer" ? "Approve & Send" : "Request Approval"}
         </button>
       </div>
+      <p id="memo-chat-character-count" className="memo-chat-note">
+        {unicodeCharacterLength(chatDraft).toLocaleString()} / {MEMO_CHAT_CHARACTER_LIMIT.toLocaleString()} characters
+      </p>
+      <p className="memo-chat-note">
+        {userRole === "export-control-officer"
+          ? "Approval binds this exact message, memo revision, and server-loaded chat history to one provider request."
+          : "Your exact message and current memo revision must be approved by an export-control officer before provider use."}
+      </p>
       {analysisLocked && <p className="memo-chat-note">Memo edits are locked until analysis finishes.</p>}
       {memoDraftDirty && <p className="memo-chat-note">Save or discard memo edits before using chat.</p>}
+      {chatNotice && <p className="memo-chat-note success">{chatNotice}</p>}
       {chatError && <p className="memo-chat-error">{chatError}</p>}
     </section>
   );

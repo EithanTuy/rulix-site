@@ -5,48 +5,84 @@ on:
   push:
     branches: [main]
 
+# No job can mint a cloud token unless it opts in explicitly below.
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: rulix-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment: production
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=moderate
       - run: npm test -- --run
       - run: npm run build:lambda
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with:
           terraform_version: 1.15.6
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Validate infrastructure
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Package immutable deployment artifacts
+        run: |
+          (cd lambda-build && zip -X -q -r ../rulix-app.zip .)
+          (cd audit-lambda-build && zip -X -q -r ../rulix-audit-writer.zip .)
+          sha256sum rulix-app.zip rulix-audit-writer.zip > rulix-production.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rulix-production-${{ github.sha }}
+          path: |
+            rulix-app.zip
+            rulix-audit-writer.zip
+            rulix-production.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      # The credentialed job never checks out or executes repository source.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rulix-production-${{ github.sha }}
+      - name: Verify deployment artifact integrity
+        run: sha256sum -c rulix-production.sha256
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::431445330783:role/rulix-github-actions-deploy
           aws-region: us-east-1
-      - name: Build deployment archive
-        working-directory: infra/terraform
-        env:
-          TF_VAR_tenant_slug: prod
-          TF_VAR_aws_region: us-east-1
-        run: |
-          terraform init -input=false
-          terraform plan -refresh=false -input=false >/dev/null
-      - name: Deploy Lambda bundle
+          allowed-account-ids: "431445330783"
+          mask-aws-account-id: true
+      - name: Deploy verified Lambda bundles
         run: |
           aws lambda update-function-code \
             --function-name rulix-prod-app \
-            --zip-file fileb://infra/terraform/function.zip >/dev/null
+            --zip-file fileb://rulix-app.zip >/dev/null
           aws lambda wait function-updated --function-name rulix-prod-app
+          aws lambda update-function-code \
+            --function-name rulix-prod-audit-writer \
+            --zip-file fileb://rulix-audit-writer.zip >/dev/null
+          aws lambda wait function-updated --function-name rulix-prod-audit-writer
       - name: Smoke test
         run: |
           curl --fail --retry 6 --retry-delay 5 https://app.rulix.cloud/api/health

@@ -107,7 +107,10 @@ function canonicalize(value: unknown, ancestors: WeakSet<object>, inArray: boole
       throw new TypeError("Canonical JSON can only hash plain objects, arrays, and Dates.");
     }
 
-    const output: Record<string, unknown> = {};
+    // A normal object would interpret an own `__proto__` assignment through
+    // the legacy prototype setter, silently dropping that key and creating a
+    // canonical-hash collision with an object that never contained it.
+    const output: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(value as Record<string, unknown>).sort()) {
       const normalized = canonicalize(
         (value as Record<string, unknown>)[key],

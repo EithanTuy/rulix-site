@@ -30,12 +30,34 @@ output "account_state_table" {
   value = aws_dynamodb_table.account_state.name
 }
 
-output "worker_policy_arn" {
-  value = aws_iam_policy.worker.arn
+output "analysis_worker_policy_arn" {
+  description = "Least-privilege analysis capability with read-only account state and no auth or audit-table access."
+  value       = aws_iam_policy.analysis_worker.arn
+}
+
+output "workspace_table" {
+  value = aws_dynamodb_table.workspace.name
+}
+
+output "workspace_content_bucket" {
+  value = aws_s3_bucket.workspace_content.bucket
+}
+
+output "workspace_migration_role_arn" {
+  value = aws_iam_role.workspace_migration.arn
+}
+
+output "workspace_content_gc_role_arn" {
+  description = "Isolated role for reference-aware, exact-VersionId orphan garbage collection."
+  value       = aws_iam_role.workspace_content_gc.arn
+}
+
+output "workspace_migration_receipt_secret_arn" {
+  value = aws_secretsmanager_secret.migration_receipt_hmac.arn
 }
 
 output "app_function_url" {
-  description = "Lambda Function URL. With custom_domain set, direct browser access is rejected unless the CloudFront origin secret header is present."
+  description = "Lambda Function URL. AWS_IAM rejects direct anonymous requests unless the explicit temporary no-domain bootstrap override is enabled."
   value       = aws_lambda_function_url.app.function_url
 }
 

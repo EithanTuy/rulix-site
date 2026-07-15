@@ -1,4 +1,5 @@
 import { ApiError, isApiError } from "./apiErrors";
+import { withCloudFrontPayloadHash } from "../../lib/cloudfrontPayloadHash";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MIN_TIMEOUT_MS = 25;
@@ -210,14 +211,14 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
 
         let response: Response;
         try {
-          response = await fetchImpl(url, {
+          response = await fetchImpl(url, await withCloudFrontPayloadHash({
             ...fetchOptions,
             method,
             body,
             credentials: fetchOptions.credentials ?? "include",
             headers,
             signal: deadline.signal
-          });
+          }));
         } catch (error) {
           const apiError = requestFailure(error, deadline, method, url);
           if (attempt < retryLimit && apiError.code === "NETWORK_ERROR") {
@@ -483,8 +484,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function defaultIdempotencyKey() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `rulix-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  if (!globalThis.crypto?.randomUUID) {
+    throw new Error("Secure random UUID generation is unavailable.");
+  }
+  return globalThis.crypto.randomUUID();
 }
 
 function abortableSleep(milliseconds: number, signal: AbortSignal) {

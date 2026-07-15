@@ -7,18 +7,23 @@ import {
   DEFAULT_DEEP_BEDROCK_MODEL,
   type CouncilProviderClient,
   councilModelForDepth,
+  createLocalPublicMemoTemplate,
   getBedrockRuntime,
-  runCouncilAnalysis
+  runCouncilAnalysis,
+  runMemoBuildChat,
+  runMemoChatWithHaiku
 } from "./bedrockCouncil";
+import { setAiDispatchAdmissionHook, setAiDispatchAuthorizationHook } from "./aiEgressGateway";
 
-const originalEnabled = process.env.BEDROCK_ENABLED;
-const originalModel = process.env.BEDROCK_MODEL;
-const originalDeepModel = process.env.BEDROCK_DEEP_MODEL;
+const originalEnv = { ...process.env };
 
 afterEach(() => {
-  restore("BEDROCK_ENABLED", originalEnabled);
-  restore("BEDROCK_MODEL", originalModel);
-  restore("BEDROCK_DEEP_MODEL", originalDeepModel);
+  setAiDispatchAdmissionHook(undefined);
+  setAiDispatchAuthorizationHook(undefined);
+  for (const key of Object.keys(process.env)) {
+    if (!(key in originalEnv)) delete process.env[key];
+  }
+  Object.assign(process.env, originalEnv);
 });
 
 describe("Bedrock model routing", () => {
@@ -50,7 +55,7 @@ describe("Bedrock model routing", () => {
   });
 
   it("runs a mocked standard provider response through the live council path", async () => {
-    process.env.BEDROCK_ENABLED = "true";
+    enableApprovedBedrock();
     delete process.env.BEDROCK_MODEL;
     delete process.env.BEDROCK_DEEP_MODEL;
     const { client, create } = mockCouncilClient({
@@ -81,7 +86,8 @@ describe("Bedrock model routing", () => {
     const result = await runCouncilAnalysis(reviewFixtures[0], {
       depth: "standard",
       providerClient: client,
-      onUsage
+      onUsage,
+      egress: testEgress()
     });
     const body = create.mock.calls[0][0] as { model: string; system: string };
 
@@ -99,7 +105,7 @@ describe("Bedrock model routing", () => {
   });
 
   it("routes deep mocked analysis to Sonnet and keeps deterministic blockers", async () => {
-    process.env.BEDROCK_ENABLED = "true";
+    enableApprovedBedrock();
     delete process.env.BEDROCK_MODEL;
     delete process.env.BEDROCK_DEEP_MODEL;
     const cameraMemo = reviewFixtures.find((memo) => memo.id === "fixture-camera-2026-0412")!;
@@ -130,7 +136,8 @@ describe("Bedrock model routing", () => {
     const result = await runCouncilAnalysis(cameraMemo, {
       depth: "deep",
       maxTokens: 3600,
-      providerClient: client
+      providerClient: client,
+      egress: testEgress()
     });
     const body = create.mock.calls[0][0] as { model: string; max_tokens: number };
 
@@ -143,8 +150,64 @@ describe("Bedrock model routing", () => {
     )).toBe(true);
   });
 
+  it("does not call the council provider when a caller label is below the server floor", async () => {
+    enableApprovedBedrock();
+    process.env.RULIX_AI_DATA_CLASS = "cui";
+    process.env.RULIX_CONTROLLED_DATA_MODE = "approved";
+    const { client, create } = mockCouncilClient({});
+
+    await expect(runCouncilAnalysis(reviewFixtures[0], {
+      providerClient: client,
+      egress: { accountId: "test-account", dataClass: "public", dispatchId: "denied-council" }
+    })).rejects.toMatchObject({ code: "ai_data_class_below_floor" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("keeps denied chat and builder egress at zero calls and public templates local-only", async () => {
+    enableApprovedBedrock();
+    process.env.RULIX_AI_DATA_CLASS = "cui";
+    process.env.RULIX_CONTROLLED_DATA_MODE = "approved";
+    const chat = mockCouncilClient({});
+    const builder = mockCouncilClient({});
+    const draft = mockCouncilClient({});
+
+    await expect(runMemoChatWithHaiku(
+      reviewFixtures[0],
+      "Explain the evidence",
+      [],
+      { providerClient: chat.client, egress: { accountId: "account", dataClass: "public", dispatchId: "denied-chat" } }
+    )).rejects.toMatchObject({ code: "ai_data_class_below_floor" });
+    await expect(runMemoBuildChat(
+      [{ role: "user", content: "Build a memo" }],
+      { providerClient: builder.client, egress: { accountId: "account", dataClass: "public", dispatchId: "denied-builder" } }
+    )).rejects.toMatchObject({ code: "ai_data_class_below_floor" });
+    const localDraft = await createLocalPublicMemoTemplate(
+      "RLX-200 controller",
+      { providerClient: draft.client, egress: { accountId: "account", dataClass: "public", dispatchId: "local-draft" } }
+    );
+
+    expect(chat.create).not.toHaveBeenCalled();
+    expect(builder.create).not.toHaveBeenCalled();
+    expect(draft.create).not.toHaveBeenCalled();
+    expect(localDraft.provider).toMatchObject({ configured: false, live: false, model: "local-template" });
+  });
+
+  it("rechecks the current region before stored memo chat dispatch", async () => {
+    enableApprovedBedrock();
+    process.env.RULIX_APPROVED_REGION = "us-west-2";
+    const { client, create } = mockCouncilClient({});
+
+    await expect(runMemoChatWithHaiku(
+      reviewFixtures[0],
+      "Explain the evidence",
+      [],
+      { providerClient: client, egress: testEgress() }
+    )).rejects.toMatchObject({ code: "ai_egress_lane_mismatch" });
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("fails closed instead of returning fallback analysis when the provider errors", async () => {
-    process.env.BEDROCK_ENABLED = "true";
+    enableApprovedBedrock();
     const create = vi.fn(async (_body: unknown, _options?: unknown) => {
       throw new Error("provider timeout");
     });
@@ -152,19 +215,14 @@ describe("Bedrock model routing", () => {
       messages: { create }
     };
 
-    await expect(runCouncilAnalysis(reviewFixtures[0], { providerClient: client })).rejects.toThrow(
+    await expect(runCouncilAnalysis(reviewFixtures[0], {
+      providerClient: client,
+      egress: testEgress()
+    })).rejects.toThrow(
       "Live AI analysis failed (provider timeout). No deterministic analysis was recorded."
     );
   });
 });
-
-function restore(name: string, value: string | undefined) {
-  if (value === undefined) {
-    delete process.env[name];
-  } else {
-    process.env[name] = value;
-  }
-}
 
 function mockCouncilClient(input: unknown) {
   const create = vi.fn(async (_body: unknown, _options?: unknown) => ({
@@ -186,4 +244,34 @@ function mockCouncilClient(input: unknown) {
     messages: { create }
   };
   return { client, create };
+}
+
+function enableApprovedBedrock() {
+  process.env.BEDROCK_ENABLED = "true";
+  process.env.AWS_REGION = "us-east-1";
+  process.env.RULIX_APPROVED_PROVIDER = "amazon-bedrock";
+  process.env.RULIX_APPROVED_REGION = "us-east-1";
+  process.env.RULIX_AI_DATA_CLASS = "proprietary";
+  setAiDispatchAdmissionHook(async () => ({ settle: async () => undefined }));
+  setAiDispatchAuthorizationHook(async () => ({
+    replayed: false,
+    markProviderStarted: async () => undefined,
+    settle: async () => undefined
+  }));
+}
+
+function testEgress() {
+  return {
+    accountId: "test-account",
+    dataClass: "proprietary" as const,
+    approvalId: "approval-test",
+    dispatchId: "dispatch-test",
+    subject: {
+      kind: "review" as const,
+      id: "review-test",
+      revision: 1,
+      version: 1,
+      contentHash: "b".repeat(64)
+    }
+  };
 }

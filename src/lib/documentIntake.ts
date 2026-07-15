@@ -1,4 +1,4 @@
-import type { MemoRecord } from "../types";
+import type { DataClass, MemoRecord } from "../types";
 import { extractDocument, type DocumentExtraction } from "./apiClient";
 
 export interface IntakeResult {
@@ -6,13 +6,13 @@ export interface IntakeResult {
   warning?: string;
 }
 
-export async function memoFromFile(file: File): Promise<IntakeResult> {
+export async function memoFromFile(file: File, dataClass: DataClass): Promise<IntakeResult> {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   const supportedText = ["txt", "md", "csv", "json"].includes(extension) || file.type.startsWith("text/");
   const now = new Date().toISOString().slice(0, 10);
 
   if (!supportedText) {
-    const extraction = await extractFileText(file);
+    const extraction = await extractFileText(file, dataClass);
     const extractedText = extraction.text.trim();
     return {
       memo: {
@@ -24,6 +24,7 @@ export async function memoFromFile(file: File): Promise<IntakeResult> {
         documentCode: `UPLOAD-${now.replaceAll("-", "")}`,
         status: "draft",
         attachments: [file.name],
+        dataClass,
         memoText: extractedText
           ? formatExtractedAttachment(file.name, extraction)
           : `Uploaded attachment: ${file.name}
@@ -48,12 +49,13 @@ Add memo text manually or upload a clearer document before AI review.`
       documentCode: `UPLOAD-${now.replaceAll("-", "")}`,
       status: "draft",
       attachments: [file.name],
+      dataClass,
       memoText: text.trim() || "No text content found."
     }
   };
 }
 
-export async function extractFileText(file: File): Promise<DocumentExtraction> {
+export async function extractFileText(file: File, dataClass: DataClass): Promise<DocumentExtraction> {
   if (file.type.startsWith("text/") || /\.(txt|md|csv|json)$/i.test(file.name)) {
     return {
       fileName: file.name,
@@ -65,7 +67,8 @@ export async function extractFileText(file: File): Promise<DocumentExtraction> {
   return extractDocument({
     fileName: file.name,
     mediaType: file.type || mediaTypeFromName(file.name),
-    dataBase64: await fileToBase64(file)
+    dataBase64: await fileToBase64(file),
+    dataClass
   });
 }
 

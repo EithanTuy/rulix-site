@@ -1,34 +1,55 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 import { officialCorpus } from "./data/corpus";
 import {
   ANALYSIS_MODE_CONFIG,
+  ApiError,
   type AnalysisMode,
   type BackendHealth,
   type MemoBuildDraft,
+  applyMemoChatSuggestion,
+  approveCouncilAnalysis,
   acceptInvite,
   analyzeMemoWithBackend,
   completePasswordReset,
+  createReview,
+  deleteMemoBuilderSession,
   getBackendHealth,
+  getCouncilApproval,
   getCurrentUser,
-  loadAccountState,
+  getReviewDetail,
+  listMemoBuilderSessions,
+  listReviewAuditEvents,
+  listReviewChatMessages,
+  listReviews,
+  loadWorkspacePreferences,
+  recordReviewDecision,
+  requestCouncilApproval,
+  requestMemoChatApproval,
   requestPasswordReset,
-  saveAccountState,
+  revokeAiApproval,
   sendMemoChat,
+  setReviewArchived,
   signIn,
   signOut,
+  updateReviewMemo,
+  updateWorkspacePreferences,
+  upsertMemoBuilderSession,
+  sanitizeMemoBuilderSessionForStorage,
   validateInvite,
   validatePasswordReset,
   type InvitePublicInfo,
+  type CouncilApprovalView,
   type PasswordResetPublicInfo
 } from "./lib/apiClient";
+import type { ReviewSummary } from "./lib/apiClient";
 import { memoFromFile } from "./lib/documentIntake";
+import { mergeChatPage } from "./lib/chatOrdering";
 import { buildReviewReport } from "./lib/report";
-import { createAuditEvent, deriveReviewStatus } from "./lib/reviewLifecycle";
 import type {
-  AccountReviewState,
   AppView,
   AuditEvent,
+  DataClass,
   MemoBuilderSession,
   MemoChatMessage,
   MemoRecord,
@@ -46,6 +67,7 @@ import { NewReviewModal } from "./components/NewReviewModal";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { ReviewList } from "./components/ReviewList";
 import { SidebarRail } from "./components/SidebarRail";
+import { HelpCenter } from "./components/HelpCenter";
 import { TopBar } from "./components/TopBar";
 
 type AnalysisRunState =
@@ -59,19 +81,54 @@ type AuthState =
   | { status: "signed-out"; error?: string }
   | { status: "signed-in"; user: UserProfile };
 
-const emptyAccountState = (): AccountReviewState => ({
-  memos: [],
-  decisions: {},
-  auditEvents: [],
-  analysisResults: {},
-  chatMessages: {},
-  memoBuilder: { messages: [], sessions: [] }
-});
+export interface AuthLinkBootstrap {
+  mode?: Extract<AuthMode, "invite" | "reset-complete">;
+  token: string;
+}
 
-export function App() {
+export function consumeAuthLinkFragment(): AuthLinkBootstrap {
+  if (typeof window === "undefined") return { token: "" };
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const invite = fragment.get("invite");
+  const reset = fragment.get("reset");
+  const containsAuthSecret = invite !== null || reset !== null;
+
+  fragment.delete("invite");
+  fragment.delete("reset");
+  const query = new URLSearchParams(window.location.search);
+  const containedLegacyQuerySecret = query.has("invite") || query.has("reset");
+  query.delete("invite");
+  query.delete("reset");
+
+  if (containsAuthSecret || containedLegacyQuerySecret) {
+    const cleanQuery = query.toString();
+    const cleanFragment = fragment.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${cleanFragment ? `#${cleanFragment}` : ""}`
+    );
+  }
+
+  if ((invite === null) === (reset === null)) return { token: "" };
+  const token = (invite ?? reset ?? "").trim();
+  if (token.length < 32 || token.length > 128 || !/^[A-Za-z0-9_-]+$/.test(token)) {
+    return { mode: invite !== null ? "invite" : "reset-complete", token: "invalid" };
+  }
+  return { mode: invite !== null ? "invite" : "reset-complete", token };
+}
+
+export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthLinkBootstrap }) {
   const [auth, setAuth] = useState<AuthState>({ status: "checking" });
   const [stateReady, setStateReady] = useState(false);
   const [memos, setMemos] = useState<MemoRecord[]>([]);
+  const [reviewCursor, setReviewCursor] = useState<string | undefined>();
+  const [reviewsLoadingMore, setReviewsLoadingMore] = useState(false);
+  const [builderCursor, setBuilderCursor] = useState<string | undefined>();
+  const [builderLoadingMore, setBuilderLoadingMore] = useState(false);
+  const [auditCursors, setAuditCursors] = useState<Record<string, string | undefined>>({});
+  const [chatCursors, setChatCursors] = useState<Record<string, string | undefined>>({});
+  const [detailLoadingId, setDetailLoadingId] = useState<string | undefined>();
   const [selectedMemoId, setSelectedMemoId] = useState<string | undefined>();
   const [search, setSearch] = useState("");
   const [intakeWarning, setIntakeWarning] = useState<string | undefined>();
@@ -84,21 +141,32 @@ export function App() {
   const [activeMemoBuilderSessionId, setActiveMemoBuilderSessionId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<AppView>("reviews");
   const [newReviewOpen, setNewReviewOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState("");
-  const [syncNotice, setSyncNotice] = useState("Saved to account");
+  const [syncNotice, setSyncNotice] = useState("Account loaded");
   const [backendHealth, setBackendHealth] = useState<BackendHealth | undefined>();
   const [backendNotice, setBackendNotice] = useState("Checking analysis service...");
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("standard");
+  const [councilApproval, setCouncilApproval] = useState<CouncilApprovalView | undefined>();
+  const [approvalBusy, setApprovalBusy] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | undefined>();
   const [memoDraftDirty, setMemoDraftDirty] = useState(false);
   const [panelSizes, setPanelSizes] = useState({ reviewList: 400, analysis: 456 });
   const memosRef = useRef<MemoRecord[]>([]);
+  const preferenceVersionRef = useRef(0);
+  const preferenceFingerprintRef = useRef("");
+  const builderVersionsRef = useRef(new Map<string, number>());
+  const builderFingerprintsRef = useRef(new Map<string, string>());
+  const persistedBuilderIdsRef = useRef(new Set<string>());
+  const workspaceSaveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const loadedReviewDetailsRef = useRef(new Set<string>());
+  const detailRequestsRef = useRef(new Map<string, Promise<void>>());
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   const activeMemos = useMemo(() => memos.filter((memo) => !memo.archivedAt), [memos]);
-  const selectedMemo = selectedMemoId
+  const selectedMemo = selectedMemoId && loadedReviewDetailsRef.current.has(selectedMemoId)
     ? activeMemos.find((memo) => memo.id === selectedMemoId)
-    : activeMemos[0];
+    : undefined;
   const reviewResult = selectedMemo ? analysisResults[selectedMemo.id] : undefined;
   const analysisState = selectedMemo
     ? analysisStates[selectedMemo.id] ?? {
@@ -117,24 +185,105 @@ export function App() {
     memosRef.current = memos;
   }, [memos]);
 
+  const persistWorkspaceSnapshot = async (snapshot: {
+    selectedMemoId?: string;
+    activeMemoBuilderSessionId?: string;
+    sessions: MemoBuilderSession[];
+  }) => {
+    const preferenceFingerprint = JSON.stringify({
+      selectedMemoId: snapshot.selectedMemoId ?? null,
+      activeMemoBuilderSessionId: snapshot.activeMemoBuilderSessionId ?? null
+    });
+    let changed = false;
+
+    if (preferenceFingerprint !== preferenceFingerprintRef.current) {
+      changed = true;
+      let expectedVersion = preferenceVersionRef.current;
+      let response;
+      try {
+        response = await updateWorkspacePreferences(expectedVersion, {
+          selectedMemoId: snapshot.selectedMemoId ?? null,
+          activeMemoBuilderSessionId: snapshot.activeMemoBuilderSessionId ?? null
+        });
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 409) throw error;
+        const latest = await loadWorkspacePreferences();
+        expectedVersion = latest.version;
+        response = await updateWorkspacePreferences(expectedVersion, {
+          selectedMemoId: snapshot.selectedMemoId ?? null,
+          activeMemoBuilderSessionId: snapshot.activeMemoBuilderSessionId ?? null
+        });
+      }
+      preferenceVersionRef.current = response.version;
+      preferenceFingerprintRef.current = preferenceFingerprint;
+    }
+
+    const currentIds = new Set(snapshot.sessions.map((session) => session.id));
+    for (const session of snapshot.sessions) {
+      const sanitized = sanitizeMemoBuilderSessionForStorage(session);
+      const fingerprint = JSON.stringify(sanitized);
+      if (builderFingerprintsRef.current.get(session.id) === fingerprint) continue;
+      changed = true;
+      let expectedVersion = builderVersionsRef.current.get(session.id) ?? 0;
+      let stored;
+      try {
+        stored = await upsertMemoBuilderSession(sanitized, expectedVersion);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 409) throw error;
+        const latest = await listMemoBuilderSessions({ limit: 50 });
+        expectedVersion = latest.items.find((item) => item.session.id === session.id)?.version ?? 0;
+        stored = await upsertMemoBuilderSession(sanitized, expectedVersion);
+      }
+      builderVersionsRef.current.set(session.id, stored.version);
+      builderFingerprintsRef.current.set(session.id, JSON.stringify(stored.session));
+      persistedBuilderIdsRef.current.add(session.id);
+    }
+
+    for (const sessionId of [...persistedBuilderIdsRef.current]) {
+      if (currentIds.has(sessionId)) continue;
+      changed = true;
+      let expectedVersion = builderVersionsRef.current.get(sessionId) ?? 0;
+      try {
+        await deleteMemoBuilderSession(sessionId, expectedVersion);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 409) throw error;
+        const latest = await listMemoBuilderSessions({ limit: 50 });
+        const stored = latest.items.find((item) => item.session.id === sessionId);
+        if (stored) {
+          expectedVersion = stored.version;
+          await deleteMemoBuilderSession(sessionId, expectedVersion);
+        }
+      }
+      builderVersionsRef.current.delete(sessionId);
+      builderFingerprintsRef.current.delete(sessionId);
+      persistedBuilderIdsRef.current.delete(sessionId);
+    }
+
+    if (changed) setSyncNotice("Workspace preferences saved");
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     getCurrentUser(controller.signal)
       .then(async ({ user }) => {
         if (!user) {
-          hydrateAccountState(emptyAccountState());
+          resetWorkspace();
           setAuth({ status: "signed-out" });
           setStateReady(false);
           return;
         }
-        const state = await loadAccountState(controller.signal);
-        hydrateAccountState(state);
+        const [reviewPage, preferences, builderPage] = await Promise.all([
+          listReviews({ limit: 25, state: "active" }, controller.signal),
+          loadWorkspacePreferences(controller.signal),
+          listMemoBuilderSessions({ limit: 25 }, controller.signal)
+        ]);
+        hydratePagedWorkspace(reviewPage, preferences, builderPage);
         setAuth({ status: "signed-in", user });
         setStateReady(true);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          hydrateAccountState(emptyAccountState());
+          resetWorkspace();
           setAuth({ status: "signed-out" });
           setStateReady(false);
         }
@@ -163,31 +312,25 @@ export function App() {
 
   useEffect(() => {
     if (auth.status !== "signed-in" || !stateReady) return;
-    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      setSyncNotice("Saving...");
-      saveAccountState(buildCurrentAccountState(), controller.signal)
-        .then(() => setSyncNotice("Saved to account"))
+      const snapshot = {
+        selectedMemoId,
+        activeMemoBuilderSessionId,
+        sessions: memoBuilderSessions
+      };
+      workspaceSaveChainRef.current = workspaceSaveChainRef.current
+        .catch(() => undefined)
+        .then(() => persistWorkspaceSnapshot(snapshot))
         .catch((error) => {
-          if (!controller.signal.aborted) {
-            setSyncNotice(readableApiError(error instanceof Error ? error.message : "Save failed"));
-          }
+          setSyncNotice(readableApiError(error instanceof Error ? error.message : "Preference save failed"));
         });
     }, 450);
 
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
+    return () => window.clearTimeout(timer);
   }, [
     auth.status,
     stateReady,
-    memos,
     selectedMemoId,
-    decisions,
-    auditEvents,
-    analysisResults,
-    chatMessages,
     memoBuilderSessions,
     activeMemoBuilderSessionId
   ]);
@@ -206,11 +349,146 @@ export function App() {
   }, [activeMemos, selectedMemoId]);
   useEffect(() => setSelectedFindingId(undefined), [selectedMemo?.id]);
 
+  useEffect(() => {
+    if (!selectedMemo || auth.status !== "signed-in") {
+      setCouncilApproval(undefined);
+      return;
+    }
+    const controller = new AbortController();
+    setCouncilApproval(undefined);
+    getCouncilApproval(selectedMemo.id, analysisMode, controller.signal)
+      .then(setCouncilApproval)
+      .catch(() => {
+        if (!controller.signal.aborted) setCouncilApproval(undefined);
+      });
+    return () => controller.abort();
+  }, [
+    selectedMemo?.id,
+    selectedMemo?.version,
+    selectedMemo?.revision,
+    selectedMemo?.contentHash,
+    analysisMode,
+    auth.status
+  ]);
+
   const filteredMemos = activeMemos.filter((memo) =>
     `${memo.title} ${memo.documentCode} ${memo.itemFamily}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  const loadReviewDetail = (memoId: string, force = false) => {
+    if (!force && loadedReviewDetailsRef.current.has(memoId)) return Promise.resolve();
+    const inFlight = detailRequestsRef.current.get(memoId);
+    if (inFlight) return inFlight;
+
+    const request = (async () => {
+      setDetailLoadingId(memoId);
+      const [detail, auditPage, chatPage] = await Promise.all([
+        getReviewDetail(memoId),
+        listReviewAuditEvents(memoId, { limit: 25 }),
+        listReviewChatMessages(memoId, { limit: 25 })
+      ]);
+      startTransition(() => {
+        setMemos((current) => [detail.review, ...current.filter((memo) => memo.id !== memoId)]);
+        setAnalysisResults((current) => {
+          const next = { ...current };
+          if (detail.result?.provider.live) next[memoId] = detail.result;
+          else delete next[memoId];
+          return next;
+        });
+        setAnalysisStates((current) => ({
+          ...current,
+          [memoId]: detail.result?.provider.live
+            ? { status: "live", message: "Authoritative AI analysis loaded." }
+            : { status: "unanalyzed", message: "This memo has not been analyzed yet." }
+        }));
+        setDecisions((current) => {
+          const next = { ...current };
+          if (detail.decision) next[memoId] = detail.decision;
+          else delete next[memoId];
+          return next;
+        });
+        setAuditEvents((current) => mergePagedAuditEvents(current, auditPage.items, memoId, true));
+        setChatMessages((current) => ({ ...current, [memoId]: mergeChatPage([], chatPage.items) }));
+        setAuditCursors((current) => ({ ...current, [memoId]: auditPage.nextCursor }));
+        setChatCursors((current) => ({ ...current, [memoId]: chatPage.nextCursor }));
+      });
+      loadedReviewDetailsRef.current.add(memoId);
+    })()
+      .catch((error) => {
+        setSyncNotice(readableApiError(error instanceof Error ? error.message : "Review load failed"));
+        throw error;
+      })
+      .finally(() => {
+        detailRequestsRef.current.delete(memoId);
+        setDetailLoadingId((current) => current === memoId ? undefined : current);
+      });
+    detailRequestsRef.current.set(memoId, request);
+    return request;
+  };
+
+  useEffect(() => {
+    if (!selectedMemoId || auth.status !== "signed-in" || !stateReady) return;
+    void loadReviewDetail(selectedMemoId).catch(() => undefined);
+    // Detail reads are keyed only by the selected review ID and deduped by ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMemoId, auth.status, stateReady]);
+
+  const loadMoreReviews = async () => {
+    if (!reviewCursor || reviewsLoadingMore) return;
+    setReviewsLoadingMore(true);
+    try {
+      const page = await listReviews({ limit: 25, cursor: reviewCursor, state: "active" });
+      startTransition(() => {
+        setMemos((current) => mergeReviewSummaries(current, page.items));
+        setReviewCursor(page.nextCursor);
+      });
+    } finally {
+      setReviewsLoadingMore(false);
+    }
+  };
+
+  const loadMoreBuilderSessions = async () => {
+    if (!builderCursor || builderLoadingMore) return;
+    setBuilderLoadingMore(true);
+    try {
+      const page = await listMemoBuilderSessions({ limit: 25, cursor: builderCursor });
+      for (const stored of page.items) {
+        builderVersionsRef.current.set(stored.session.id, stored.version);
+        builderFingerprintsRef.current.set(
+          stored.session.id,
+          JSON.stringify(sanitizeMemoBuilderSessionForStorage(stored.session))
+        );
+        persistedBuilderIdsRef.current.add(stored.session.id);
+      }
+      startTransition(() => {
+        setMemoBuilderSessions((current) => mergeBuilderSessions(current, page.items.map((item) => item.session)));
+        setBuilderCursor(page.nextCursor);
+      });
+    } finally {
+      setBuilderLoadingMore(false);
+    }
+  };
+
+  const loadMoreAuditEvents = async (memoId: string) => {
+    const cursor = auditCursors[memoId];
+    if (!cursor) return;
+    const page = await listReviewAuditEvents(memoId, { limit: 25, cursor });
+    setAuditEvents((current) => mergePagedAuditEvents(current, page.items, memoId, false));
+    setAuditCursors((current) => ({ ...current, [memoId]: page.nextCursor }));
+  };
+
+  const loadMoreChatMessages = async (memoId: string) => {
+    const cursor = chatCursors[memoId];
+    if (!cursor) return;
+    const page = await listReviewChatMessages(memoId, { limit: 25, cursor });
+    setChatMessages((current) => ({
+      ...current,
+      [memoId]: mergeChatPage(current[memoId] ?? [], page.items)
+    }));
+    setChatCursors((current) => ({ ...current, [memoId]: page.nextCursor }));
+  };
 
   const blockDirtyDraft = (action: string) => {
     if (!memoDraftDirty) return false;
@@ -253,7 +531,8 @@ export function App() {
     const session = createSeededBuilderSession(
       `Improve ${selectedMemo.title}`.slice(0, 60),
       buildReviewImprovementPrompt(selectedMemo, reviewResult),
-      selectedMemo.id
+      selectedMemo.id,
+      selectedMemo.dataClass ?? "proprietary"
     );
     setMemoBuilderSessions((current) => [session, ...current]);
     setActiveMemoBuilderSessionId(session.id);
@@ -322,8 +601,12 @@ export function App() {
 
   const completeAuthentication = async (response: { user: UserProfile | null }) => {
     if (!response.user) throw new Error("Sign in failed.");
-    const state = await loadAccountState();
-    hydrateAccountState(state);
+    const [reviewPage, preferences, builderPage] = await Promise.all([
+      listReviews({ limit: 25, state: "active" }),
+      loadWorkspacePreferences(),
+      listMemoBuilderSessions({ limit: 25 })
+    ]);
+    hydratePagedWorkspace(reviewPage, preferences, builderPage);
     setAuth({ status: "signed-in", user: response.user });
     setStateReady(true);
     window.history.replaceState(null, "", window.location.pathname);
@@ -368,29 +651,79 @@ export function App() {
   const handleSignOut = async () => {
     if (blockDirtyDraft("signing out")) return;
     await signOut().catch(() => undefined);
-    hydrateAccountState(emptyAccountState());
+    resetWorkspace();
     setStateReady(false);
     setAuth({ status: "signed-out" });
   };
 
-  const handleFile = async (file: File) => {
+  const refreshReviewState = async (notice: string, memoId: string | null = selectedMemoId ?? null) => {
+    if (memoId) {
+      loadedReviewDetailsRef.current.delete(memoId);
+      await loadReviewDetail(memoId, true);
+    } else {
+      const page = await listReviews({ limit: 25, state: "active" });
+      setMemos((current) => mergeReviewSummaries(current, page.items, true));
+      setReviewCursor(page.nextCursor);
+    }
+    setSyncNotice(notice);
+  };
+
+  const acceptReviewCommand = (response: {
+    review: MemoRecord;
+    auditEvents?: AuditEvent[];
+  }) => {
+    loadedReviewDetailsRef.current.add(response.review.id);
+    setMemos((current) => [
+      response.review,
+      ...current.filter((memo) => memo.id !== response.review.id)
+    ]);
+    if (response.auditEvents?.length) mergeAuditEvents(response.auditEvents);
+  };
+
+  const persistNewReview = async (input: NewReviewInput, pendingMessage: string) => {
+    setSyncNotice(pendingMessage);
+    try {
+      const response = await createReview({
+        ...input,
+        title: input.title.trim() || "New ECCN Classification Memo",
+        itemFamily: input.itemFamily.trim() || "Research equipment",
+        memoText: input.memoText.trim()
+      });
+      acceptReviewCommand(response);
+      setSelectedMemoId(response.review.id);
+      setAnalysisStates((current) => ({
+        ...current,
+        [response.review.id]: {
+          status: "unanalyzed",
+          message: "This review is waiting for reviewer-initiated AI analysis."
+        }
+      }));
+      setActiveView("reviews");
+      setIntakeWarning(undefined);
+      setSyncNotice(response.replayed ? "Existing review restored after a safe retry" : "Review created");
+      return response.review;
+    } catch (error) {
+      await refreshReviewState("Review creation failed; authoritative review list reloaded", null).catch(() => undefined);
+      throw error;
+    }
+  };
+
+  const handleFile = async (file: File, dataClass: DataClass) => {
     if (blockDirtyDraft("uploading another memo")) return;
     try {
       setIntakeWarning(`Reading ${file.name}...`);
-      const result = await memoFromFile(file);
-      const reviewedMemo = {
-        ...result.memo,
-        owner: currentUser?.name ?? "You",
-        status: "draft" as const
-      };
+      const result = await memoFromFile(file, dataClass);
+      const reviewedMemo = await persistNewReview({
+        title: result.memo.title,
+        itemFamily: result.memo.itemFamily,
+        manufacturer: result.memo.manufacturer ?? "",
+        intendedUse: result.memo.intendedUse ?? "",
+        dataClass: result.memo.dataClass ?? dataClass,
+        sourcePath: result.memo.sourcePath ?? "unknown",
+        attachments: result.memo.attachments,
+        memoText: result.memo.memoText
+      }, `Creating review from ${file.name}...`);
       setIntakeWarning(result.warning);
-      addMemo(reviewedMemo);
-      addAuditEvent(
-        reviewedMemo.id,
-        "Document intake",
-        result.warning ?? `Uploaded ${file.name}. Analysis has not been run yet.`,
-        result.warning ? "review" : "info"
-      );
       setAnalysisStates((current) => ({
         ...current,
         [reviewedMemo.id]: {
@@ -404,24 +737,18 @@ export function App() {
     }
   };
 
-  const handlePasteMemo = (title: string, text: string) => {
+  const handlePasteMemo = async (title: string, text: string) => {
     if (blockDirtyDraft("pasting another memo")) return;
-    const now = new Date().toISOString().slice(0, 10);
-    const memo: MemoRecord = {
-      id: `paste-${Date.now()}`,
+    const memo = await persistNewReview({
       title: title.trim() || "Pasted ECCN Memo",
       itemFamily: "Pasted memo",
-      owner: currentUser?.name ?? "You",
-      updatedAt: now,
-      documentCode: `PASTE-${now.replaceAll("-", "")}`,
-      status: "draft",
+      manufacturer: "",
+      intendedUse: "",
       dataClass: "proprietary",
       sourcePath: "self-classification",
       attachments: [],
       memoText: text
-    };
-    addMemo(memo);
-    addAuditEvent(memo.id, "Memo pasted", "Pasted memo text. Analysis has not been run yet.", "info");
+    }, "Creating pasted review...");
     setAnalysisStates((current) => ({
       ...current,
       [memo.id]: {
@@ -433,29 +760,18 @@ export function App() {
     setActiveView("reviews");
   };
 
-  const handleCreatePublicDraftMemo = (title: string, memoText: string) => {
+  const handleCreatePublicDraftMemo = async (title: string, memoText: string) => {
     if (blockDirtyDraft("creating a public draft")) return;
-    const now = new Date().toISOString().slice(0, 10);
-    const memo: MemoRecord = {
-      id: `public-draft-${Date.now()}`,
+    const memo = await persistNewReview({
       title: title.trim() || "Public-source ECCN memo draft",
       itemFamily: "Public-source draft",
-      owner: currentUser?.name ?? "You",
-      updatedAt: now,
-      documentCode: `PUB-${now.replaceAll("-", "")}-${memos.length + 1}`,
-      status: "draft",
+      manufacturer: "",
+      intendedUse: "",
       dataClass: "public",
       sourcePath: "self-classification",
       attachments: [],
       memoText
-    };
-    addMemo(memo);
-    addAuditEvent(
-      memo.id,
-      "Public-source draft created",
-      "Draft memo generated from Bedrock model knowledge. Public manufacturer and official-source verification is required before signoff.",
-      "review"
-    );
+    }, "Creating public-source review...");
     setAnalysisStates((current) => ({
       ...current,
       [memo.id]: {
@@ -466,31 +782,40 @@ export function App() {
     setActiveView("reviews");
   };
 
-  const handleCreateBuilderMemo = (draft: MemoBuildDraft) => {
-    if (blockDirtyDraft("creating another memo")) return;
-    const now = new Date().toISOString().slice(0, 10);
-    const memo: MemoRecord = {
-      id: `ai-draft-${Date.now()}`,
+  const prepareBuilderSessionForAi = async (session: MemoBuilderSession) => {
+    const sanitized = sanitizeMemoBuilderSessionForStorage(session);
+    let expectedVersion = builderVersionsRef.current.get(session.id) ?? 0;
+    let stored;
+    try {
+      stored = await upsertMemoBuilderSession(sanitized, expectedVersion);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) throw error;
+      const latest = await listMemoBuilderSessions({ limit: 50 });
+      expectedVersion = latest.items.find((item) => item.session.id === session.id)?.version ?? 0;
+      stored = await upsertMemoBuilderSession(sanitized, expectedVersion);
+    }
+    builderVersionsRef.current.set(session.id, stored.version);
+    builderFingerprintsRef.current.set(session.id, JSON.stringify(stored.session));
+    persistedBuilderIdsRef.current.add(session.id);
+    setMemoBuilderSessions((current) => [
+      stored.session,
+      ...current.filter((item) => item.id !== stored.session.id)
+    ]);
+    return stored.session;
+  };
+
+  const handleCreateBuilderMemo = async (draft: MemoBuildDraft) => {
+    if (blockDirtyDraft("creating another memo")) throw new Error("Save or discard memo edits first.");
+    const memo = await persistNewReview({
       title: draft.title || "AI-drafted ECCN Memo",
       itemFamily: draft.itemFamily || "AI-drafted item",
-      owner: currentUser?.name ?? "You",
-      updatedAt: now,
-      documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
-      status: "draft",
       memoText: draft.memoText,
       attachments: draft.attachments ?? [],
       dataClass: draft.dataClass ?? "proprietary",
       sourcePath: "self-classification",
-      manufacturer: draft.manufacturer,
-      intendedUse: draft.intendedUse
-    };
-    addMemo(memo);
-    addAuditEvent(
-      memo.id,
-      "AI-assisted memo created",
-      builderAuditDetail(draft, "Analysis has not been run."),
-      "info"
-    );
+      manufacturer: draft.manufacturer ?? "",
+      intendedUse: draft.intendedUse ?? ""
+    }, "Creating AI-assisted review...");
     setAnalysisStates((current) => ({
       ...current,
       [memo.id]: {
@@ -500,127 +825,43 @@ export function App() {
     }));
     setActiveView("reviews");
     setIntakeWarning(undefined);
-    setSyncNotice("AI draft added to Reviews.");
+    setSyncNotice("AI draft added to Reviews");
     return memo.id;
   };
 
-  const handleCreateAndAnalyzeBuilderMemo = (draft: MemoBuildDraft) => {
-    if (blockDirtyDraft("creating and analyzing another memo")) return;
-    const now = new Date().toISOString().slice(0, 10);
-    const memo: MemoRecord = {
-      id: `ai-draft-${Date.now()}`,
+  const handleCreateAndAnalyzeBuilderMemo = async (draft: MemoBuildDraft) => {
+    if (blockDirtyDraft("creating and analyzing another memo")) {
+      throw new Error("Save or discard memo edits first.");
+    }
+    const memo = await persistNewReview({
       title: draft.title || "AI-drafted ECCN Memo",
       itemFamily: draft.itemFamily || "AI-drafted item",
-      owner: currentUser?.name ?? "You",
-      updatedAt: now,
-      documentCode: `AI-${now.replaceAll("-", "")}-${memos.length + 1}`,
-      status: "draft",
       memoText: draft.memoText,
       attachments: draft.attachments ?? [],
       dataClass: draft.dataClass ?? "proprietary",
       sourcePath: "self-classification",
-      manufacturer: draft.manufacturer,
-      intendedUse: draft.intendedUse
-    };
-
-    // Build the state with the new memo so saveAccountState has it before analysis runs.
-    const stateWithMemo: AccountReviewState = {
-      ...buildCurrentAccountState(),
-      memos: [memo, ...memos],
-      selectedMemoId: memo.id
-    };
-
-    addMemo(memo);
-    addAuditEvent(
-      memo.id,
-      "AI-assisted memo created",
-      builderAuditDetail(draft, "Auto-analysis queued."),
-      "info"
-    );
-    setAnalysisStates((current) => ({
-      ...current,
-      [memo.id]: {
-        status: "running",
-        message: backendHealth?.provider.configured
-          ? "AI Council is analyzing this Memo Builder draft..."
-          : "Live AI is unavailable. Analysis will not run until the provider is configured."
-      }
-    }));
-    setActiveView("reviews");
-    setIntakeWarning(undefined);
-    setSyncNotice("AI draft added to Reviews; analysis queued.");
-
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 180000);
-
-    void saveAccountState(stateWithMemo)
-      .then(() => analyzeMemoWithBackend(memo, analysisMode, controller.signal))
-      .then(({ review, result, auditEvents: serverAuditEvents }) => {
-        window.clearTimeout(timeoutId);
-        setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
-        if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
-        setAnalysisStates((current) => ({
-          ...current,
-          [memo.id]: { status: "live", message: "Live AI analysis completed. Reviewer signoff is still required." }
-        }));
-        setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
-      })
-      .catch((error) => {
-        window.clearTimeout(timeoutId);
-        const message = readableApiError(error instanceof Error ? error.message : "AI analysis failed.");
-        setAnalysisStates((current) => ({
-          ...current,
-          [memo.id]: {
-            status: "failed",
-            message: `${message} Retry when the backend is available.`
-          }
-        }));
-        addAuditEvent(memo.id, "AI analysis failed", "Analysis failed after Memo Builder creation.", "review");
-      });
+      manufacturer: draft.manufacturer ?? "",
+      intendedUse: draft.intendedUse ?? ""
+    }, "Creating AI-assisted review...");
+    await runAnalysisForMemo(memo);
     return memo.id;
   };
 
-  const handleCreateReview = (input: NewReviewInput) => {
+  const handleCreateReview = async (input: NewReviewInput) => {
     if (blockDirtyDraft("creating a new review")) return;
-    const now = new Date().toISOString().slice(0, 10);
-    const memo: MemoRecord = {
-      id: `review-${Date.now()}`,
-      title: input.title.trim() || "New ECCN Classification Memo",
-      itemFamily: input.itemFamily.trim() || "Research equipment",
-      owner: currentUser?.name ?? "You",
-      updatedAt: now,
-      documentCode: `REV-${now.replaceAll("-", "")}-${memos.length + 1}`,
-      status: "draft",
-      memoText: input.memoText,
-      attachments: input.attachments,
-      dataClass: input.dataClass,
-      sourcePath: input.sourcePath,
-      manufacturer: input.manufacturer,
-      intendedUse: input.intendedUse
-    };
-    addMemo(memo);
-    addAuditEvent(
-      memo.id,
-      "Review created",
-      `New ${input.sourcePath ?? "classification"} review created with ${input.dataClass} data marking. Analysis has not been run yet.`,
-      input.dataClass === "itar-risk" || input.dataClass === "cui" ? "escalate" : "info"
-    );
-    setAnalysisStates((current) => ({
-      ...current,
-      [memo.id]: {
-        status: "unanalyzed",
-        message: "New review is waiting for reviewer-initiated AI analysis."
-      }
-    }));
-    setActiveView("reviews");
-    setIntakeWarning(undefined);
+    await persistNewReview(input, "Creating review...");
   };
 
-  const updateMemoText = (memoId: string, memoText: string, detail = "Memo text changed; prior signoff was cleared.") => {
+  const updateMemoText = async (memoId: string, memoText: string) => {
     if (analysisStates[memoId]?.status === "running") {
       setSyncNotice("Wait for the running analysis before editing this memo.");
-      return;
+      throw new Error("Wait for the running analysis before editing this memo.");
     }
+    const previousMemo = memosRef.current.find((memo) => memo.id === memoId);
+    if (!previousMemo || typeof previousMemo.version !== "number") {
+      throw new Error("Reload this review before editing it.");
+    }
+    setSyncNotice("Saving memo changes...");
     setMemos((current) =>
       current.map((memo) =>
         memo.id === memoId
@@ -650,17 +891,29 @@ export function App() {
       delete next[memoId];
       return next;
     });
-    addAuditEvent(memoId, "Memo edited", detail, "review");
-    setMemoDraftDirty(false);
+    try {
+      const response = await updateReviewMemo(previousMemo, memoText);
+      acceptReviewCommand(response);
+      setMemoDraftDirty(false);
+      setSyncNotice("Memo changes saved");
+    } catch (error) {
+      await refreshReviewState("Memo update conflicted; authoritative review reloaded", memoId).catch(() => undefined);
+      throw error;
+    }
   };
 
-  const archiveMemo = (memoId: string) => {
+  const archiveMemo = async (memoId: string) => {
     if (memoId === selectedMemo?.id && blockDirtyDraft("archiving this memo")) return;
     if (analysisStates[memoId]?.status === "running") {
       setSyncNotice("Wait for the running analysis before archiving this memo.");
-      return;
+      throw new Error("Wait for the running analysis before archiving this memo.");
+    }
+    const previousMemo = memosRef.current.find((memo) => memo.id === memoId);
+    if (!previousMemo || typeof previousMemo.version !== "number") {
+      throw new Error("Reload this review before archiving it.");
     }
     const archivedAt = new Date().toISOString();
+    setSyncNotice("Archiving review...");
     setMemos((current) =>
       current.map((memo) =>
         memo.id === memoId
@@ -677,40 +930,29 @@ export function App() {
       if (current !== memoId) return current;
       return activeMemos.find((memo) => memo.id !== memoId)?.id;
     });
-    addAuditEvent(
-      memoId,
-      "Memo archived",
-      "Memo was removed from the active review queue but retained in account history.",
-      "review"
-    );
+    try {
+      const response = await setReviewArchived(previousMemo, true);
+      acceptReviewCommand(response);
+      setSyncNotice("Review archived");
+    } catch (error) {
+      await refreshReviewState("Archive conflicted; authoritative review reloaded", memoId).catch(() => undefined);
+      throw error;
+    }
   };
 
-  const handleDecision = (action: ReviewerDecision["action"], notes: string) => {
+  const handleDecision = async (action: ReviewerDecision["action"], notes: string) => {
     if (blockDirtyDraft("recording a decision")) return;
     if (!selectedMemo || !reviewResult) return;
-    const nextDecision = {
-      action,
-      notes,
-      signedBy: action === "accept" ? currentUser?.name ?? "Reviewer" : undefined,
-      signedAt: action === "accept" ? new Date().toISOString() : undefined
-    };
-    setDecisions((current) => ({
-      ...current,
-      [selectedMemo.id]: nextDecision
-    }));
-    setMemos((current) =>
-      current.map((memo) =>
-        memo.id === selectedMemo.id
-          ? { ...memo, status: deriveReviewStatus(reviewResult, nextDecision) }
-          : memo
-      )
-    );
-    addAuditEvent(
-      selectedMemo.id,
-      `Reviewer decision: ${action}`,
-      notes,
-      action === "override" ? "escalate" : action === "request-info" ? "review" : "info"
-    );
+    setSyncNotice("Recording reviewer decision...");
+    try {
+      const response = await recordReviewDecision(selectedMemo, reviewResult, action, notes);
+      acceptReviewCommand(response);
+      setDecisions((current) => ({ ...current, [selectedMemo.id]: response.decision }));
+      setSyncNotice("Reviewer decision recorded");
+    } catch (error) {
+      await refreshReviewState("Decision was not recorded; authoritative review reloaded").catch(() => undefined);
+      throw error;
+    }
   };
 
   const exportReport = () => {
@@ -742,10 +984,7 @@ export function App() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const runAnalysis = async () => {
-    if (blockDirtyDraft("running analysis")) return;
-    if (!selectedMemo) return;
-    const memo = selectedMemo;
+  const runAnalysisForMemo = async (memo: MemoRecord) => {
     if (backendHealth && !backendHealth.provider.configured) {
       setAnalysisStates((current) => ({
         ...current,
@@ -756,8 +995,43 @@ export function App() {
       }));
       return;
     }
+    setApprovalBusy(true);
+    try {
+      if (currentUser?.role === "export-control-officer") {
+        const approved = await approveCouncilAnalysis(memo, analysisMode);
+        setCouncilApproval((current) => current
+          ? { ...current, approval: approved.approval, usable: approved.usable }
+          : current);
+      } else {
+        const status = await getCouncilApproval(memo.id, analysisMode);
+        setCouncilApproval(status);
+        if (!status.usable) {
+          await requestCouncilApproval(memo, analysisMode);
+          setAnalysisStates((current) => ({
+            ...current,
+            [memo.id]: {
+              status: "unanalyzed",
+              message: "Approval requested for this exact revision and analysis depth. An export-control officer can inspect and approve it in Controls."
+            }
+          }));
+          setSyncNotice("AI approval requested");
+          return;
+        }
+      }
+    } catch (error) {
+      const message = readableApiError(error instanceof Error ? error.message : "AI approval failed.");
+      setAnalysisStates((current) => ({
+        ...current,
+        [memo.id]: { status: "failed", message }
+      }));
+      return;
+    } finally {
+      setApprovalBusy(false);
+    }
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 180000);
+    // End the browser wait before the 120-second CloudFront/Lambda deadline so
+    // users get a deterministic retry state instead of an edge-generated 504.
+    const timeoutId = window.setTimeout(() => controller.abort(), 115000);
     setAnalysisStates((current) => ({
       ...current,
       [memo.id]: {
@@ -769,11 +1043,18 @@ export function App() {
     }));
 
     try {
-      await saveAccountState(buildCurrentAccountState(), controller.signal);
-      const { review, result, auditEvents: serverAuditEvents } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal);
+      const {
+        review,
+        result,
+        decisionInvalidated,
+        auditEvents: serverAuditEvents
+      } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal);
       window.clearTimeout(timeoutId);
       const currentMemo = memosRef.current.find((item) => item.id === memo.id);
-      if (!currentMemo || currentMemo.memoText !== memo.memoText) {
+      if (currentMemo && (
+        currentMemo.version !== memo.version
+        || currentMemo.contentHash !== memo.contentHash
+      )) {
         setAnalysisStates((current) => ({
           ...current,
           [memo.id]: {
@@ -785,6 +1066,13 @@ export function App() {
       }
       setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
       if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
+      if (decisionInvalidated) {
+        setDecisions((current) => {
+          const next = { ...current };
+          delete next[memo.id];
+          return next;
+        });
+      }
       setAnalysisStates((current) => ({
         ...current,
         [memo.id]: {
@@ -793,6 +1081,8 @@ export function App() {
         }
       }));
       setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
+      setSyncNotice("AI analysis saved");
+      void getCouncilApproval(memo.id, analysisMode).then(setCouncilApproval).catch(() => undefined);
     } catch (error) {
       window.clearTimeout(timeoutId);
       const message = readableApiError(error instanceof Error ? error.message : "AI analysis request failed.");
@@ -803,79 +1093,149 @@ export function App() {
           message: `${message} No deterministic analysis was recorded; retry when live AI is available.`
         }
       }));
-      addAuditEvent(memo.id, "AI analysis failed", "Backend AI analysis failed; no new result was recorded.", "review");
+      await refreshReviewState("Analysis failed; authoritative review state reloaded", memo.id).catch(() => undefined);
     }
   };
 
-  const handleSendMemoChat = async (memoId: string, message: string) => {
+  const runAnalysis = async () => {
+    if (blockDirtyDraft("running analysis")) return;
+    if (!selectedMemo) return;
+    await runAnalysisForMemo(selectedMemo);
+  };
+
+  const handleRevokeCouncilApproval = async () => {
+    const approvalId = councilApproval?.approval?.approval.id;
+    if (!approvalId || approvalBusy) return;
+    setApprovalBusy(true);
+    try {
+      const revoked = await revokeAiApproval(
+        approvalId,
+        "Revoked from the review workspace before provider dispatch."
+      );
+      setCouncilApproval((current) => current
+        ? { ...current, approval: revoked.approval, usable: false }
+        : current);
+      setSyncNotice("AI approval revoked");
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  const handleSendMemoChat = async (memoId: string, message: string): Promise<"sent" | "queued"> => {
     if (memoId === selectedMemo?.id && blockDirtyDraft("using memo chat")) {
       throw new Error("Save or discard memo edits before using memo chat.");
     }
     if (analysisStates[memoId]?.status === "running") {
       throw new Error("Wait for the running analysis before changing this memo.");
     }
-    await saveAccountState(buildCurrentAccountState());
-    const { messages, auditEvents: serverAuditEvents } = await sendMemoChat(memoId, message);
+    const memo = memosRef.current.find((item) => item.id === memoId);
+    if (!memo) throw new Error("Review not found. Reload the workspace and try again.");
+    let response;
+    try {
+      response = await sendMemoChat(memo, message);
+    } catch (error) {
+      if (currentUser?.role !== "export-control-officer" &&
+          error instanceof ApiError && error.code === "ai_officer_approval_required") {
+        await requestMemoChatApproval(memo, message);
+        setSyncNotice("Memo chat approval requested");
+        return "queued";
+      }
+      throw error;
+    }
+    const { review, messages, auditEvents: serverAuditEvents } = response;
+    setMemos((current) => current.map((item) => item.id === memoId ? review : item));
     setChatMessages((current) => ({ ...current, [memoId]: messages }));
     if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
+    return "sent";
   };
 
-  const handleApplyChatSuggestion = (memoId: string, messageId: string, proposedMemoText: string) => {
+  const handleApplyChatSuggestion = async (memoId: string, messageId: string) => {
     if (memoId === selectedMemo?.id && blockDirtyDraft("applying a chat edit")) return;
-    updateMemoText(memoId, proposedMemoText, "Memo text updated from a chat-assisted reviewer edit.");
-    setChatMessages((current) => ({
-      ...current,
-      [memoId]: (current[memoId] ?? []).map((message) =>
-        message.id === messageId ? { ...message, applied: true } : message
-      )
-    }));
-  };
-
-  const hydrateAccountState = (state: AccountReviewState) => {
-    setMemoDraftDirty(false);
-    const liveResults = liveOnlyAnalysisResults(state.analysisResults ?? {});
-    setMemos(state.memos ?? []);
-    setSelectedMemoId(state.selectedMemoId ?? state.memos?.[0]?.id);
-    setDecisions(state.decisions ?? {});
-    setAuditEvents(state.auditEvents ?? []);
-    setAnalysisResults(liveResults);
-    setAnalysisStates(deriveAnalysisStates(liveResults));
-    setChatMessages(state.chatMessages ?? {});
-    const builderSessions = normalizeMemoBuilderSessions(state.memoBuilder);
-    setMemoBuilderSessions(builderSessions);
-    setActiveMemoBuilderSessionId(state.memoBuilder?.activeSessionId ?? builderSessions[0]?.id);
-  };
-
-  const buildCurrentAccountState = (): AccountReviewState => ({
-    memos,
-    selectedMemoId: selectedMemo?.id,
-    decisions,
-    auditEvents,
-    analysisResults,
-    chatMessages,
-    memoBuilder: {
-      activeSessionId: activeMemoBuilderSessionId,
-      sessions: memoBuilderSessions,
-      messages: memoBuilderSessions.find((session) => session.id === activeMemoBuilderSessionId)?.messages ?? [],
-      draft: memoBuilderSessions.find((session) => session.id === activeMemoBuilderSessionId)?.draft
+    const memo = memosRef.current.find((item) => item.id === memoId);
+    if (!memo) throw new Error("Review not found. Reload the workspace and try again.");
+    setSyncNotice("Applying verified chat suggestion...");
+    try {
+      const response = await applyMemoChatSuggestion(memo, messageId);
+      acceptReviewCommand(response);
+      setChatMessages((current) => ({ ...current, [memoId]: response.messages }));
+      setAnalysisResults((current) => {
+        const next = { ...current };
+        delete next[memoId];
+        return next;
+      });
+      setDecisions((current) => {
+        const next = { ...current };
+        delete next[memoId];
+        return next;
+      });
+      setAnalysisStates((current) => ({
+        ...current,
+        [memoId]: {
+          status: "unanalyzed",
+          message: "Chat suggestion applied. Run AI Analysis again before recording a decision."
+        }
+      }));
+      setSyncNotice("Chat suggestion applied");
+    } catch (error) {
+      await refreshReviewState("Suggestion was not applied; authoritative review reloaded", memoId).catch(() => undefined);
+      throw error;
     }
-  });
-
-  const addMemo = (memo: MemoRecord) => {
-    setMemos((current) => [memo, ...current]);
-    setSelectedMemoId(memo.id);
   };
 
-  const addAuditEvent = (
-    memoId: string,
-    action: string,
-    detail: string,
-    severity: AuditEvent["severity"] = "info"
+  const resetWorkspace = () => {
+    setMemoDraftDirty(false);
+    preferenceVersionRef.current = 0;
+    preferenceFingerprintRef.current = "";
+    loadedReviewDetailsRef.current.clear();
+    detailRequestsRef.current.clear();
+    builderVersionsRef.current.clear();
+    builderFingerprintsRef.current.clear();
+    persistedBuilderIdsRef.current.clear();
+    setMemos([]);
+    setReviewCursor(undefined);
+    setSelectedMemoId(undefined);
+    setDecisions({});
+    setAuditEvents([]);
+    setAnalysisResults({});
+    setAnalysisStates({});
+    setChatMessages({});
+    setMemoBuilderSessions([]);
+    setActiveMemoBuilderSessionId(undefined);
+    setBuilderCursor(undefined);
+    setAuditCursors({});
+    setChatCursors({});
+  };
+
+  const hydratePagedWorkspace = (
+    reviewPage: Awaited<ReturnType<typeof listReviews>>,
+    preferences: Awaited<ReturnType<typeof loadWorkspacePreferences>>,
+    builderPage: Awaited<ReturnType<typeof listMemoBuilderSessions>>
   ) => {
-    setAuditEvents((current) => [
-      createAuditEvent(memoId, action, detail, severity, currentUser?.name ?? "Reviewer"),
-      ...current
-    ]);
+    resetWorkspace();
+    const storedSessions = builderPage.items;
+    const summaryMemos = mergeReviewSummaries([], reviewPage.items, true);
+    setMemos(summaryMemos);
+    setReviewCursor(reviewPage.nextCursor);
+    preferenceVersionRef.current = preferences.version;
+    preferenceFingerprintRef.current = JSON.stringify({
+      selectedMemoId: preferences.selectedMemoId ?? null,
+      activeMemoBuilderSessionId: preferences.activeMemoBuilderSessionId ?? null
+    });
+    setSelectedMemoId(preferences.selectedMemoId ?? summaryMemos[0]?.id);
+    const builderSessions = storedSessions.map((stored) => stored.session);
+    builderVersionsRef.current = new Map(
+      storedSessions.map((stored) => [stored.session.id, stored.version])
+    );
+    builderFingerprintsRef.current = new Map(
+      storedSessions.map((stored) => [
+        stored.session.id,
+        JSON.stringify(sanitizeMemoBuilderSessionForStorage(stored.session))
+      ])
+    );
+    persistedBuilderIdsRef.current = new Set(storedSessions.map((stored) => stored.session.id));
+    setMemoBuilderSessions(builderSessions);
+    setActiveMemoBuilderSessionId(preferences.activeMemoBuilderSessionId ?? builderSessions[0]?.id);
+    setBuilderCursor(builderPage.nextCursor);
   };
 
   const mergeAuditEvents = (events: AuditEvent[]) => {
@@ -905,6 +1265,7 @@ export function App() {
   if (auth.status === "signed-out") {
     return (
       <AuthScreen
+        authLink={authLink}
         error={auth.error}
         onSignIn={handleSignIn}
         onAcceptInvite={handleAcceptInvite}
@@ -935,12 +1296,12 @@ export function App() {
           "--analysis-panel-width": `${panelSizes.analysis}px`
         } as CSSProperties}
       >
-        <SidebarRail activeView={activeView} onViewChange={changeActiveView} />
+        <SidebarRail activeView={activeView} onViewChange={changeActiveView} onHelp={() => setHelpOpen(true)} />
         {activeView === "reviews" ? (
           <>
             <ReviewList
               memos={filteredMemos}
-              selectedMemoId={selectedMemo?.id ?? ""}
+              selectedMemoId={selectedMemoId ?? ""}
               search={search}
               warning={intakeWarning}
               corpusLabel={officialCorpus.label}
@@ -949,6 +1310,10 @@ export function App() {
               onFile={handleFile}
               onPasteMemo={handlePasteMemo}
               onBuildWithAi={openMemoBuilderForNewDraft}
+              userRole={auth.user.role}
+              hasMore={Boolean(reviewCursor)}
+              loadingMore={reviewsLoadingMore}
+              onLoadMore={loadMoreReviews}
             />
             <PanelResizeHandle
               label="Resize review queue"
@@ -980,6 +1345,10 @@ export function App() {
                   backendNotice={backendNotice}
                   liveAnalysisAvailable={backendHealth?.provider.configured !== false}
                   onRunAnalysis={runAnalysis}
+                  userRole={auth.user.role}
+                  councilApproval={councilApproval}
+                  approvalBusy={approvalBusy}
+                  onRevokeCouncilApproval={handleRevokeCouncilApproval}
                   decision={decision}
                   auditEvents={auditEvents.filter((event) => event.memoId === selectedMemo.id)}
                   chatMessages={chatMessages[selectedMemo.id] ?? []}
@@ -988,6 +1357,10 @@ export function App() {
                   onDecision={handleDecision}
                   onSendChat={handleSendMemoChat}
                   onApplyChatSuggestion={handleApplyChatSuggestion}
+                  chatHasMore={Boolean(chatCursors[selectedMemo.id])}
+                  auditHasMore={Boolean(auditCursors[selectedMemo.id])}
+                  onLoadMoreChat={loadMoreChatMessages}
+                  onLoadMoreAudit={loadMoreAuditEvents}
                   selectedFindingId={selectedFindingId}
                   onFindingSelect={setSelectedFindingId}
                 />
@@ -997,21 +1370,56 @@ export function App() {
                 <main className="memo-workspace empty-workspace">
                   <ThemeToggle className="auth-theme-toggle" />
                   <BrandLogo tone="adaptive" size="auth" />
-                  <h1>No memos yet</h1>
-                  <p>Create, upload, or paste a memo to begin an account-linked ECCN review.</p>
-                  <button className="button primary" type="button" onClick={openNewReview}>
-                    New Review
-                  </button>
+                  {activeMemos.length > 0 && selectedMemoId ? (
+                    <>
+                      <h1>{detailLoadingId === selectedMemoId ? "Loading review details" : "Review details unavailable"}</h1>
+                      <p>
+                        {detailLoadingId === selectedMemoId
+                          ? "Fetching this memo, its analysis, chat, and audit history."
+                          : "The review summary loaded, but its detail request did not finish."}
+                      </p>
+                      {detailLoadingId !== selectedMemoId && (
+                        <button
+                          className="button primary"
+                          type="button"
+                          onClick={() => void loadReviewDetail(selectedMemoId, true)}
+                        >
+                          Retry loading review
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <h1>Start your first review</h1>
+                      <p>Create a review, verify its data classification, inspect the evidence, then record the human decision.</p>
+                      <ol className="empty-workspace-steps">
+                        <li><strong>1</strong><span>Add or draft the memo</span></li>
+                        <li><strong>2</strong><span>Confirm content and classification</span></li>
+                        <li><strong>3</strong><span>Run an exact approved analysis</span></li>
+                        <li><strong>4</strong><span>Resolve findings and sign off</span></li>
+                      </ol>
+                      <div className="empty-workspace-actions">
+                        <button className="button primary" type="button" onClick={openNewReview}>New Review</button>
+                        <button className="button" type="button" onClick={openMemoBuilderForNewDraft}>Build with AI</button>
+                        <button className="button quiet" type="button" onClick={() => setHelpOpen(true)}>Learn the workflow</button>
+                      </div>
+                    </>
+                  )}
                 </main>
                 <PanelResizeHandle
                   label="Resize analysis panel"
                   onPointerDown={(event) => beginPanelResize("analysis", event)}
                 />
                 <aside className="analysis-panel empty-panel">
-                  <h2>Secure Workspace</h2>
+                  <h2>What happens next</h2>
                   <p>
                     Memos, decisions, chat edits, and audit events are stored under {auth.user.email}.
                   </p>
+                  <ul className="empty-panel-list">
+                    <li>AI calls require the exact current content and allowed provider lane.</li>
+                    <li>Editing content invalidates stale approvals automatically.</li>
+                    <li>Only a human reviewer records the final determination.</li>
+                  </ul>
                 </aside>
               </>
             )}
@@ -1024,6 +1432,11 @@ export function App() {
             onActiveSessionChange={setActiveMemoBuilderSessionId}
             onCreateMemo={handleCreateBuilderMemo}
             onCreateAndAnalyze={handleCreateAndAnalyzeBuilderMemo}
+            onPrepareSessionForAi={prepareBuilderSessionForAi}
+            userRole={auth.user.role}
+            hasMoreSessions={Boolean(builderCursor)}
+            loadingMoreSessions={builderLoadingMore}
+            onLoadMoreSessions={loadMoreBuilderSessions}
           />
         ) : (
           <AdminConsole
@@ -1033,6 +1446,7 @@ export function App() {
             auditEvents={auditEvents}
             reviewResults={reviewResults}
             corpus={officialCorpus}
+            userRole={auth.user.role}
             onSelectMemo={(memoId) => {
               if (memoId === selectedMemo?.id) {
                 setActiveView("reviews");
@@ -1050,44 +1464,73 @@ export function App() {
         onClose={() => setNewReviewOpen(false)}
         onCreate={handleCreateReview}
       />
+      <HelpCenter
+        open={helpOpen}
+        userRole={auth.user.role}
+        onClose={() => setHelpOpen(false)}
+        onNewReview={openNewReview}
+        onMemoBuilder={openMemoBuilderForNewDraft}
+      />
     </div>
   );
 }
 
-function normalizeMemoBuilderSessions(builder: AccountReviewState["memoBuilder"]): MemoBuilderSession[] {
-  const sessions = (builder?.sessions ?? [])
-    .filter((session) => session.id && Array.isArray(session.messages))
-    .map((session) => ({
-      ...session,
-      title: session.title?.trim() || session.messages[0]?.content?.replace(/\s+/g, " ").slice(0, 46) || "Memo chat",
-      updatedAt: session.updatedAt || new Date().toISOString()
-    }));
-
-  if (sessions.length) return sessions;
-  if ((builder?.messages?.length ?? 0) || builder?.draft) {
-    return [
-      {
-        id: "builder-migrated",
-        title: builder?.messages?.[0]?.content?.replace(/\s+/g, " ").slice(0, 46) || "Saved memo chat",
-        messages: builder?.messages ?? [],
-        draft: builder?.draft,
-        updatedAt: new Date().toISOString()
-      }
-    ];
-  }
-  return [];
-}
-
-function createSeededBuilderSession(title: string, starterPrompt: string, contextMemoId?: string): MemoBuilderSession {
+function createSeededBuilderSession(
+  title: string,
+  starterPrompt: string,
+  contextMemoId?: string,
+  dataClass: DataClass = "proprietary"
+): MemoBuilderSession {
   const now = new Date().toISOString();
   return {
-    id: `builder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `builder-${crypto.randomUUID()}`,
     title,
+    dataClass,
     messages: [],
     starterPrompt,
     contextMemoId,
     updatedAt: now
   };
+}
+
+function mergeReviewSummaries(
+  current: MemoRecord[],
+  summaries: ReviewSummary[],
+  replace = false
+) {
+  const currentById = new Map(current.map((memo) => [memo.id, memo]));
+  const incoming = summaries.map((summary) => ({
+    ...(currentById.get(summary.id) ?? {
+      memoText: "",
+      attachments: []
+    }),
+    ...summary
+  } as MemoRecord));
+  if (replace) return incoming;
+  const incomingIds = new Set(incoming.map((memo) => memo.id));
+  return [...current.filter((memo) => !incomingIds.has(memo.id)), ...incoming];
+}
+
+function mergeBuilderSessions(current: MemoBuilderSession[], incoming: MemoBuilderSession[]) {
+  const incomingIds = new Set(incoming.map((session) => session.id));
+  return [...current.filter((session) => !incomingIds.has(session.id)), ...incoming];
+}
+
+function mergePagedAuditEvents(
+  current: AuditEvent[],
+  incoming: AuditEvent[],
+  memoId: string,
+  replace: boolean
+) {
+  const otherMemos = current.filter((event) => event.memoId !== memoId);
+  const currentMemo = replace ? [] : current.filter((event) => event.memoId === memoId);
+  const seen = new Set<string>();
+  const mergedMemo = [...currentMemo, ...incoming].filter((event) => {
+    if (seen.has(event.id)) return false;
+    seen.add(event.id);
+    return true;
+  });
+  return [...mergedMemo, ...otherMemos];
 }
 
 function buildReviewImprovementPrompt(memo: MemoRecord, result: ReviewResult | undefined) {
@@ -1172,21 +1615,22 @@ interface AuthFormValues {
 }
 
 function AuthScreen({
+  authLink,
   error,
   onSignIn,
   onAcceptInvite,
   onRequestPasswordReset,
   onCompletePasswordReset
 }: {
+  authLink: AuthLinkBootstrap;
   error?: string;
   onSignIn: (email: string, password: string) => Promise<void>;
   onAcceptInvite: (token: string, password: string, name?: string) => Promise<void>;
   onRequestPasswordReset: (email: string) => Promise<void>;
   onCompletePasswordReset: (token: string, password: string) => Promise<void>;
 }) {
-  const params = new URLSearchParams(window.location.search);
-  const initialInviteToken = params.get("invite") ?? "";
-  const initialResetToken = params.get("reset") ?? "";
+  const initialInviteToken = authLink.mode === "invite" ? authLink.token : "";
+  const initialResetToken = authLink.mode === "reset-complete" ? authLink.token : "";
   const [mode, setMode] = useState<AuthMode>(
     initialInviteToken ? "invite" : initialResetToken ? "reset-complete" : "signin"
   );

@@ -13,18 +13,34 @@ import {
   Search,
   Send,
   ShieldCheck,
+  XCircle,
   UsersRound
 } from "lucide-react";
+import { SafeExternalLink } from "./SafeExternalLink";
 import type {
   AppView,
   AuditEvent,
+  AiApprovalRequestListItem,
+  AiApprovalRequestStatus,
+  AiApprovalRequestStatusKind,
   CorpusSnapshot,
   EvidenceStatus,
   MemoRecord,
   ReviewerDecision,
-  ReviewResult
+  ReviewResult,
+  UserProfile
 } from "../types";
-import { createInvite, listInvites, type InviteSummary } from "../lib/apiClient";
+import {
+  cancelAiApprovalRequest,
+  createInvite,
+  decideAiApprovalRequest,
+  getAiApprovalRequest,
+  listAiApprovalRequests,
+  listInvites,
+  revokeQueuedAiApproval,
+  type AiApprovalRequestOfficerView,
+  type InviteSummary
+} from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
 
 interface AdminConsoleProps {
@@ -34,6 +50,7 @@ interface AdminConsoleProps {
   auditEvents: AuditEvent[];
   reviewResults: Record<string, ReviewResult | undefined>;
   corpus: CorpusSnapshot;
+  userRole: UserProfile["role"];
   onSelectMemo: (memoId: string) => void;
 }
 
@@ -44,6 +61,7 @@ export function AdminConsole({
   auditEvents,
   reviewResults,
   corpus,
+  userRole,
   onSelectMemo
 }: AdminConsoleProps) {
   const title = viewTitle(view);
@@ -78,7 +96,7 @@ export function AdminConsole({
       {view === "evidence" && (
         <EvidencePanel memos={memos} reviewResults={reviewResults} counts={evidenceCounts} onSelectMemo={onSelectMemo} />
       )}
-      {view === "controls" && <ControlsPanel />}
+      {view === "controls" && <ControlsPanel userRole={userRole} />}
       {view === "users" && <UsersPanel />}
       {view === "settings" && <SettingsPanel />}
       {view !== "corpus" && (
@@ -176,11 +194,11 @@ function CorpusPanel({ corpus }: { corpus: CorpusSnapshot }) {
 
       <div className="corpus-grid">
         {filteredDocuments.map((doc) => (
-          <a className="corpus-source" href={doc.url} target="_blank" rel="noreferrer" key={doc.id}>
+          <SafeExternalLink className="corpus-source" href={doc.url} key={doc.id}>
             <strong>{doc.title}</strong>
             <span>{doc.authority} | Snapshot {doc.snapshotDate}</span>
             <ExternalLink size={15} />
-          </a>
+          </SafeExternalLink>
         ))}
         {filteredDocuments.length === 0 && <div className="empty-list">No sources match this filter.</div>}
       </div>
@@ -278,7 +296,7 @@ function EvidencePanel({
   );
 }
 
-function ControlsPanel() {
+function ControlsPanel({ userRole }: { userRole: UserProfile["role"] }) {
   const controls = [
     ["Jurisdiction first", "USML/ITAR risk is reviewed before EAR/CCL reliance.", true],
     ["Human signoff gate", "AI recommendation cannot become final without reviewer action.", true],
@@ -288,17 +306,347 @@ function ControlsPanel() {
   ] as const;
 
   return (
-    <section className="console-section control-grid">
-      {controls.map(([label, detail, complete]) => (
-        <div className="control-card" key={label}>
-          {complete ? <CheckCircle2 size={21} /> : <AlertTriangle size={21} />}
-          <strong>{label}</strong>
-          <p>{detail}</p>
-          <span className={complete ? "control-pass" : "control-review"}>{complete ? "Implemented" : "Requires deployment validation"}</span>
+    <>
+      <AiApprovalQueuePanel isOfficer={userRole === "export-control-officer"} />
+      <section className="console-section control-grid">
+        {controls.map(([label, detail, complete]) => (
+          <div className="control-card" key={label}>
+            {complete ? <CheckCircle2 size={21} /> : <AlertTriangle size={21} />}
+            <strong>{label}</strong>
+            <p>{detail}</p>
+            <span className={complete ? "control-pass" : "control-review"}>{complete ? "Implemented" : "Requires deployment validation"}</span>
+          </div>
+        ))}
+      </section>
+    </>
+  );
+}
+
+function AiApprovalQueuePanel({ isOfficer }: { isOfficer: boolean }) {
+  const [items, setItems] = useState<AiApprovalRequestListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string>();
+  const [selectedId, setSelectedId] = useState<string>();
+  const [detail, setDetail] = useState<AiApprovalRequestStatus | AiApprovalRequestOfficerView>();
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | AiApprovalRequestStatusKind>("pending");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  const loadQueue = async (signal?: AbortSignal, append = false) => {
+    setLoading(true);
+    setError("");
+    try {
+      const page = await listAiApprovalRequests({
+        limit: 50,
+        admin: isOfficer,
+        ...(append && nextCursor ? { cursor: nextCursor } : {}),
+        ...(statusFilter === "all" ? {} : { status: statusFilter })
+      }, signal);
+      setItems((current) => append
+        ? [...new Map([...current, ...page.items].map((item) => [item.id, item])).values()]
+        : page.items);
+      setNextCursor(page.nextCursor);
+      if (!append) {
+        setSelectedId((current) => current && page.items.some((item) => item.id === current)
+          ? current
+          : page.items[0]?.id);
+      }
+    } catch (loadError) {
+      if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
+        setError(readableApiError(loadError instanceof Error ? loadError.message : "Approval queue unavailable."));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setNextCursor(undefined);
+    void loadQueue(controller.signal, false);
+    return () => controller.abort();
+  }, [isOfficer, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(undefined);
+      setDetailLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setDetail(undefined);
+    setDetailLoading(true);
+    setReason("");
+    setError("");
+    const request = isOfficer
+      ? getAiApprovalRequest(selectedId, { admin: true }, controller.signal)
+      : getAiApprovalRequest(selectedId, { admin: false }, controller.signal);
+    void request.then((loaded) => {
+      if (active) setDetail(loaded);
+    }).catch((loadError) => {
+      if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
+        setError(readableApiError(loadError instanceof Error ? loadError.message : "Approval request unavailable."));
+      }
+    }).finally(() => {
+      if (active) setDetailLoading(false);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [isOfficer, selectedId]);
+
+  const loadedStatus = detail && "approvalRequest" in detail ? detail.approvalRequest : detail;
+  const detailMatchesSelection = Boolean(
+    loadedStatus && selectedId && loadedStatus.request.id === selectedId && !detailLoading
+  );
+  const currentStatus = detailMatchesSelection ? loadedStatus : undefined;
+  const officerDetail = detailMatchesSelection && detail && "approvalRequest" in detail ? detail : undefined;
+
+  const selectRequest = (requestId: string) => {
+    if (requestId === selectedId) return;
+    setDetail(undefined);
+    setDetailLoading(true);
+    setReason("");
+    setSelectedId(requestId);
+  };
+
+  const refreshSelected = async () => {
+    await loadQueue(undefined, false);
+    if (!selectedId) return;
+    const refreshed = isOfficer
+      ? await getAiApprovalRequest(selectedId, { admin: true })
+      : await getAiApprovalRequest(selectedId, { admin: false });
+    setDetail(refreshed);
+  };
+
+  const decide = async (action: "approve" | "reject" | "revoke" | "cancel") => {
+    const loadedRequestId = currentStatus?.request.id;
+    if (!loadedRequestId || loadedRequestId !== selectedId || detailLoading || busy) return;
+    if ((action === "reject" || action === "revoke" || action === "cancel") && !reason.trim()) {
+      setError("Add a concise reason before rejecting, revoking, or cancelling.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      if (action === "approve") {
+        await decideAiApprovalRequest(loadedRequestId, "approve");
+        setNotice("Exact AI request approved for one dispatch.");
+      } else if (action === "reject") {
+        await decideAiApprovalRequest(loadedRequestId, "reject", reason);
+        setNotice("AI request rejected.");
+      } else if (action === "revoke") {
+        await revokeQueuedAiApproval(loadedRequestId, reason);
+        setNotice("Queued AI approval revoked before further dispatch.");
+      } else {
+        await cancelAiApprovalRequest(loadedRequestId, reason);
+        setNotice("AI approval request cancelled.");
+      }
+      setReason("");
+      await refreshSelected();
+    } catch (decisionError) {
+      setError(readableApiError(decisionError instanceof Error ? decisionError.message : "Approval action failed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="console-section ai-approval-queue">
+      <div className="console-section-title">
+        <ShieldCheck size={20} />
+        <h2>{isOfficer ? "AI approval queue" : "My AI approval requests"}</h2>
+        <span>{items.length} shown</span>
+        <button className="icon-action" type="button" aria-label="Refresh AI approval queue" onClick={() => void loadQueue(undefined, false)}>
+          <RefreshCw size={16} />
+        </button>
+      </div>
+      <p className="ai-approval-queue-intro">
+        {isOfficer
+          ? "Inspect the exact server-owned content and policy below. Approve is disabled if the target changed or the short-lived preview expired."
+          : "Requests bind one exact revision, conversation, classification, provider, region, and model. Editing the content requires a new request."}
+      </p>
+      <div className="console-filter-row">
+        <label>
+          Status
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as "all" | AiApprovalRequestStatusKind)}
+          >
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="expired">Expired</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+      </div>
+      <div className="ai-approval-queue-layout">
+        <div className="ai-approval-request-list" aria-label="AI approval requests">
+          {items.map((item) => (
+            <button
+              type="button"
+              className={item.id === selectedId ? "ai-approval-request-row selected" : "ai-approval-request-row"}
+              onClick={() => selectRequest(item.id)}
+              key={item.id}
+            >
+              <span>
+                <strong>{approvalPurposeLabel(item.purpose)}</strong>
+                <small>{item.dataClass} · {item.policy.provider} · {item.policy.clientRegion}</small>
+              </span>
+              <span className={`invite-status ${item.status}`}>{item.status}</span>
+              <small>Expires {formatDateTime(item.expiresAt)}</small>
+            </button>
+          ))}
+          {!loading && items.length === 0 && <div className="empty-list">No requests match this status.</div>}
+          {loading && <div className="empty-list">Loading approval requests…</div>}
+          {!loading && nextCursor && (
+            <button className="button small full" type="button" onClick={() => void loadQueue(undefined, true)}>
+              Load more requests
+            </button>
+          )}
         </div>
-      ))}
+
+        <div className="ai-approval-request-detail">
+          {!currentStatus && (
+            <div className="empty-list">{detailLoading ? "Loading exact request content…" : "Select a request to inspect it."}</div>
+          )}
+          {currentStatus && (
+            <>
+              <div className="ai-approval-binding-summary">
+                <strong>{approvalPurposeLabel(currentStatus.request.purpose)}</strong>
+                <span>{currentStatus.request.dataClass} · {currentStatus.request.policy.provider}</span>
+                <small>
+                  Model {currentStatus.request.policy.model} · Region {currentStatus.request.policy.clientRegion}
+                </small>
+                <small>Requested {formatDateTime(currentStatus.request.createdAt)} · expires {formatDateTime(currentStatus.request.expiresAt)}</small>
+                <code>Payload {currentStatus.request.payloadHash.slice(0, 16)}…</code>
+              </div>
+              {officerDetail && <ApprovalInspection detail={officerDetail} />}
+              {isOfficer && currentStatus.status === "pending" && (
+                <>
+                  <label className="ai-approval-reason">
+                    Rejection reason
+                    <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} />
+                  </label>
+                  <div className="ai-approval-actions">
+                    <button
+                      className="button primary small"
+                      type="button"
+                      disabled={busy || !officerDetail?.inspection.current}
+                      onClick={() => void decide("approve")}
+                    >
+                      <CheckCircle2 size={16} /> Approve one dispatch
+                    </button>
+                    <button className="button small" type="button" disabled={busy} onClick={() => void decide("reject")}>
+                      <XCircle size={16} /> Reject
+                    </button>
+                  </div>
+                </>
+              )}
+              {isOfficer && currentStatus.status === "approved" && !currentStatus.approval?.revocation && (
+                <>
+                  <label className="ai-approval-reason">
+                    Revocation reason
+                    <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} />
+                  </label>
+                  <button className="button small" type="button" disabled={busy} onClick={() => void decide("revoke")}>
+                    Revoke queued approval
+                  </button>
+                </>
+              )}
+              {!isOfficer && currentStatus.status === "pending" && (
+                <>
+                  <label className="ai-approval-reason">
+                    Cancellation reason
+                    <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={2} />
+                  </label>
+                  <button className="button small" type="button" disabled={busy} onClick={() => void decide("cancel")}>
+                    Cancel request
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {notice && <div className="admin-notice success">{notice}</div>}
+      {error && <div className="admin-notice error">{error}</div>}
     </section>
   );
+}
+
+function ApprovalInspection({ detail }: { detail: AiApprovalRequestOfficerView }) {
+  const inspection = detail.inspection;
+  return (
+    <div className={inspection.current ? "ai-approval-inspection current" : "ai-approval-inspection stale"}>
+      <div className="ai-approval-inspection-state">
+        {inspection.current ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+        <strong>{inspection.current ? "Exact bindings revalidated" : "Do not approve: content or policy changed"}</strong>
+      </div>
+      {inspection.unavailableReason && <p>{inspection.unavailableReason}</p>}
+      {inspection.kind === "council" && (
+        <>
+          <h3>{inspection.memo.title}</h3>
+          <small>Depth: {inspection.depth} · revision {inspection.memo.revision}</small>
+          <pre>{inspection.memo.memoText}</pre>
+        </>
+      )}
+      {inspection.kind === "memo-chat" && (
+        <>
+          <h3>{inspection.memo.title}</h3>
+          <strong className="ai-approval-pending-label">Exact pending message</strong>
+          <pre>{inspection.pendingMessage ?? "Preview unavailable"}</pre>
+          <details>
+            <summary>Current memo and {inspection.history.length} history messages</summary>
+            <pre>{inspection.memo.memoText}</pre>
+            {inspection.history.map((message) => (
+              <div className={`chat-message ${message.role}`} key={message.id}>
+                <strong>{message.role}</strong>
+                <p>{message.text}</p>
+              </div>
+            ))}
+          </details>
+        </>
+      )}
+      {inspection.kind === "memo-builder" && (
+        <>
+          <h3>{inspection.session?.title ?? "Memo Builder session"}</h3>
+          <strong className="ai-approval-pending-label">Exact saved pending message</strong>
+          <pre>{inspection.pendingMessage ?? "Pending input unavailable"}</pre>
+          <details>
+            <summary>{inspection.messages?.length ?? 0} exact provider conversation messages</summary>
+            {inspection.messages?.map((message, index) => (
+              <div className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
+                <strong>{message.role}</strong>
+                <p>{message.content}</p>
+              </div>
+            ))}
+          </details>
+        </>
+      )}
+      {inspection.providerRequest !== undefined && (
+        <details className="ai-approval-provider-request">
+          <summary>Exact provider request · hash {inspection.providerRequestHash ?? "unavailable"}</summary>
+          <p>Canonical provider body only; credentials, SDK transport headers, and runtime secrets are excluded.</p>
+          <pre>{JSON.stringify(inspection.providerRequest, null, 2)}</pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function approvalPurposeLabel(purpose: AiApprovalRequestListItem["purpose"]) {
+  if (purpose === "council") return "Council analysis";
+  if (purpose === "memo-chat") return "Memo chat";
+  return "Memo Builder";
 }
 
 function statusLabel(status: EvidenceStatus) {

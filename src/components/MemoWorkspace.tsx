@@ -23,9 +23,9 @@ interface MemoWorkspaceProps {
   result?: ReviewResult;
   selectedFindingId?: string;
   analysisLocked: boolean;
-  onMemoTextChange: (memoId: string, memoText: string) => void;
-  onArchiveMemo: (memoId: string) => void;
-  onCreatePublicDraft: (title: string, memoText: string) => void;
+  onMemoTextChange: (memoId: string, memoText: string) => Promise<void>;
+  onArchiveMemo: (memoId: string) => Promise<void>;
+  onCreatePublicDraft: (title: string, memoText: string) => Promise<void>;
   onImproveWithAi: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }
@@ -44,6 +44,8 @@ export function MemoWorkspace({
   const [mode, setMode] = useState<WorkspaceMode>("read");
   const [draft, setDraft] = useState(memo.memoText);
   const [zoom, setZoom] = useState(100);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [mutationError, setMutationError] = useState("");
   const selectedFindingRef = useRef<HTMLElement | null>(null);
   const findings = result?.findings ?? [];
   const selectedFinding = findings.find((finding) => finding.id === selectedFindingId);
@@ -71,13 +73,23 @@ export function MemoWorkspace({
     setMode(nextMode);
   };
 
-  const saveDraft = () => {
-    if (analysisLocked) return;
-    if (draftDirty) {
-      onMemoTextChange(memo.id, draft);
-      onDirtyChange(false);
+  const saveDraft = async () => {
+    if (analysisLocked || mutationBusy) return;
+    if (!draftDirty) {
+      setMode("read");
+      return;
     }
-    setMode("read");
+    setMutationBusy(true);
+    setMutationError("");
+    try {
+      await onMemoTextChange(memo.id, draft);
+      onDirtyChange(false);
+      setMode("read");
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : "Memo changes were not saved.");
+    } finally {
+      setMutationBusy(false);
+    }
   };
 
   const discardDraft = () => {
@@ -168,12 +180,20 @@ export function MemoWorkspace({
         <button
           type="button"
           className="tool danger"
-          disabled={analysisLocked}
-          onClick={() => onArchiveMemo(memo.id)}
+          disabled={analysisLocked || mutationBusy}
+          onClick={() => {
+            setMutationBusy(true);
+            setMutationError("");
+            void onArchiveMemo(memo.id)
+              .catch((error) => setMutationError(error instanceof Error ? error.message : "Review was not archived."))
+              .finally(() => setMutationBusy(false));
+          }}
         >
           <Archive size={17} /> Archive
         </button>
       </div>
+
+      {mutationError && <p className="memo-chat-error">{mutationError}</p>}
 
       <div className={mode === "draft" ? "document-frame draft-document-frame" : "document-frame"}>
         {mode === "draft" ? (
@@ -245,8 +265,8 @@ export function MemoWorkspace({
           <button className="button small" type="button" onClick={discardDraft} disabled={!draftDirty}>
             Discard
           </button>
-          <button className="button primary small" type="button" onClick={saveDraft} disabled={analysisLocked || !draftDirty}>
-            Save changes
+          <button className="button primary small" type="button" onClick={() => void saveDraft()} disabled={analysisLocked || mutationBusy || !draftDirty}>
+            {mutationBusy ? "Saving..." : "Save changes"}
           </button>
         </div>
       )}

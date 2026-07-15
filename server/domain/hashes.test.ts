@@ -27,6 +27,17 @@ describe("domain integrity hashes", () => {
     expect(() => canonicalJson(cyclic)).toThrow("cyclic");
   });
 
+  it("preserves prototype-shaped own keys without canonical hash collisions", () => {
+    const ownProto = JSON.parse('{"__proto__":{"polluted":true}}') as Record<string, unknown>;
+    const nestedProto = JSON.parse('{"nested":{"__proto__":"bound"}}') as Record<string, unknown>;
+    expect(canonicalJson(ownProto)).toBe('{"__proto__":{"polluted":true}}');
+    expect(canonicalJson(nestedProto)).toBe('{"nested":{"__proto__":"bound"}}');
+    expect(sha256Canonical(ownProto)).not.toBe(sha256Canonical({}));
+    expect(sha256Canonical(nestedProto)).not.toBe(sha256Canonical({ nested: {} }));
+    expect(sha256Canonical({ constructor: "a" })).not.toBe(sha256Canonical({ constructor: "b" }));
+    expect(sha256Canonical({ prototype: true })).not.toBe(sha256Canonical({ prototype: false }));
+  });
+
   it("changes the memo content hash for reviewable content but not volatile record fields", () => {
     const memo = memoFixture();
     const sameContentWithDifferentRecordState: MemoRecord = {

@@ -35,7 +35,7 @@ One TypeScript codebase, two runtime halves served from a single origin:
 │   • Auth:    invites · login · me · logout · password reset             │
 │   • Account: /api/account/state  (per-account workspace store)          │
 │   • Reviews: /api/reviews [CRUD] · /:id/analyze · /:id/decision         │
-│   • AI:      /api/ai/review · /api/reviews/:id/chat                      │
+│   • AI:      approval queue · /api/reviews/:id/analyze · /:id/chat      │
 │   • Meta:    /api/health · /api/corpus                                  │
 │   • Static:  serves the built Vite client (dist/) + SPA fallback        │
 └───────────────┬─────────────────────────────────┬──────────────────────┘
@@ -63,6 +63,21 @@ Key design points:
   reviews use Claude Sonnet 4.6.
 - **Human signoff is a hard gate** — status is derived from findings + reviewer
   decision; only an explicit accept stamps signoff.
+- **AI egress has a separate officer gate.** Reviewers and counsel queue an
+  immutable request derived from the current server-owned review, chat history,
+  classification, provider policy, and canonical provider request. An officer
+  inspects that exact content before approving one dispatch. Content or policy
+  drift, expiry, rejection, cancellation, revocation, or a consumed dispatch
+  invalidates the authorization before provider start.
+- **Provider work has an account budget gate.** The AI egress gateway acquires
+  an atomic per-account lease before constructing a provider client. Before
+  admission, it also binds the request to the deployment-owned sensitivity
+  floor and exact approved provider/region. A versioned admission record
+  enforces concurrency, rolling request frequency, UTC-day token/spend budgets,
+  and per-call caps. Success reconciles actual Anthropic usage; unknown outcomes
+  retain the conservative reservation and leases expire after a bounded
+  interval. All provider constructors and message dispatches live behind this
+  gateway.
 - **Single origin.** In production Express serves both the built client and the
   API, so the SPA uses relative `/api/*` paths (no CORS, no second host).
 
@@ -71,12 +86,19 @@ Key design points:
   through one-time links, and public self-registration is disabled.
 - Cookie-based sessions with a **CSRF** check on mutating routes
   (`requireAuth` + `requireCsrf`).
-- Password reset links are one-time tokens; completing a reset revokes old
-  sessions and starts a fresh session.
+- Password reset links are one-time tokens; completing a reset atomically
+  increments `authGeneration`. Sessions carry that generation and are rejected
+  when it no longer matches, independent of asynchronous cleanup deletes.
+- Production login counters and success bookkeeping use strongly consistent
+  reads plus generation/credential/counter-conditioned updates. Session
+  creation and activity refresh use DynamoDB transactions, so stale login
+  writes cannot roll back a reset, concurrent failures cannot collapse the
+  lockout count, and refresh cannot recreate a session deleted by logout.
 - **Per-account workspaces**: each account has its own review/decision/audit
   state behind auth (`/api/account/state`).
-- Production Lambda uses DynamoDB for users, invites, sessions, reset tokens,
-  lockouts, and per-user review state when `RULIX_AUTH_TABLE` and
+- Production Lambda uses DynamoDB for users, invites, generation-bound sessions,
+  reset tokens, lockouts, per-account AI-admission state, and per-user review
+  state when `RULIX_AUTH_TABLE` and
   `RULIX_ACCOUNT_TABLE` are configured. The local JSON store remains a
   development/test fallback.
 - The seed corpus (`src/data/corpus.ts`) and sample memos ship in the bundle.
@@ -100,16 +122,17 @@ original plan but is closed to new AWS accounts as of 2026-04-30 — see
   Lambda Function URL  ◄── rejects requests missing the secret header (403)
       │
       ▼
-  Lambda  rulix-prod-app  (Node 20)
+  Lambda  rulix-prod-app  (Node 24)
       • handler.cjs = esbuild bundle of the Express app (serverless-http)
       • serves UI + /api from RULIX_DIST_DIR=dist
       • env: BEDROCK_ENABLED, BEDROCK_MODEL, DynamoDB auth/account tables,
-             SES sender/base URL/token TTLs, edge secret
+             RULIX_AI_* egress/admission controls, SES/base URL/token TTLs,
+             edge secret
 ```
 
 ### Resources (Terraform, `infra/terraform/`)
 Hosting (`hosting.tf`):
-- `aws_lambda_function.app` — Node 20, 1024 MB, 60 s, runs the bundled Express app.
+- `aws_lambda_function.app` — Node 24, 1024 MB, 120 s, runs the bundled Express app with finite reserved concurrency.
 - `aws_lambda_function_url.app` — public Function URL origin (auth `NONE`, but
   gated by the edge secret when a custom domain is set).
 - `aws_acm_certificate.app` — DNS-validated TLS cert for `app.rulix.cloud`.
@@ -123,7 +146,8 @@ Data layer (`main.tf`):
   public access blocked).
 - `aws_dynamodb_table.audit_events` — audit trail (PITR, KMS).
 - `aws_dynamodb_table.auth` — users, invites, sessions, reset tokens, failed
-  login counters, and lockouts (PITR, KMS, TTL).
+  login counters, lockouts, and hashed per-account AI-admission records (PITR,
+  KMS, TTL for expiring token/session items).
 - `aws_dynamodb_table.account_state` — per-tenant/user review state (PITR, KMS).
 - `aws_cloudwatch_log_group.application`.
 - `aws_iam_policy.worker` — scoped S3 / KMS / DynamoDB / Bedrock access.
@@ -179,10 +203,14 @@ hosting switch, the App Runner attempt, and the UI revamp.
    adding the secret origin header.
 3. Express (in Lambda) checks the edge secret, serves the SPA or handles `/api`.
 4. Authed reviewer submits a memo → the deterministic engine runs only as an
-   internal baseline; if Bedrock is enabled, the Claude **Haiku council** runs
-   and is merged with
-   citation/range validation.
-5. Findings + recommendation render; reviewer records a decision; signoff gates
+   internal baseline. Before any provider client is created, the AI gateway
+   verifies the server-owned classification and exact approved provider/region,
+   then conditionally reserves the account's worst-case tokens, spend, request
+   slot, and expiring concurrency lease. A policy mismatch, denied reservation,
+   or unavailable admission store returns before provider invocation.
+5. If admitted, the Claude **Haiku council** runs and is merged with
+   citation/range validation; provider usage settles the reservation.
+6. Findings + recommendation render; reviewer records a decision; signoff gates
    the final status.
 
 ---
@@ -207,6 +235,17 @@ GoDaddy validation record → CloudFront). Subsequent deploys are a single apply
   user-facing analysis is unavailable.
 - **Edge secret** prevents direct Function URL access in custom-domain deploys.
 - **Auth + CSRF** protect account data and mutating routes.
+- **Credential generation + conditional writes** make reset, login lockout,
+  session issuance, refresh, and revocation authoritative under concurrency.
+- **AI admission** fails closed before provider construction, uses a strongly
+  consistent versioned DynamoDB record, and limits each account by concurrency,
+  request rate, tokens, and spend. The complete `RULIX_AI_*` limit reference is
+  in `docs/security-auth-storage.md`.
+- **AI egress authorization** defaults content to a `proprietary` deployment
+  floor and Amazon Bedrock in the configured AWS region. Controlled content
+  additionally requires explicit provider, region, and
+  `RULIX_CONTROLLED_DATA_MODE=approved`; direct Anthropic is rejected for that
+  lane. Invalid or drifting configuration fails before provider construction.
 - **Compliance:** this public commercial deployment is a sample/redacted-data
   pilot. Real controlled technical data belongs in AWS GovCloud (README + notes).
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { AnalysisPanel } from "./AnalysisPanel";
@@ -81,8 +81,8 @@ beforeEach(() => {
 });
 
 describe("MemoWorkspace", () => {
-  it("edits, compares, and saves draft text with a shared diff preview", () => {
-    const onMemoTextChange = vi.fn();
+  it("edits, compares, and saves draft text with a shared diff preview", async () => {
+    const onMemoTextChange = vi.fn().mockResolvedValue(undefined);
     const onDirtyChange = vi.fn();
     render(
       <MemoWorkspace
@@ -112,7 +112,7 @@ describe("MemoWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     expect(onMemoTextChange).toHaveBeenCalledWith(baseMemo.id, `${baseMemo.memoText}\nAdded license rationale.`);
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
   });
 
   it("discards local draft text without saving it", () => {
@@ -192,7 +192,7 @@ describe("document editing dirty guard", () => {
     expect(screen.getByTestId("guard-notice")).toHaveTextContent("Save or discard memo edits before switching memos.");
     expect(screen.getByRole("heading", { name: "Laser Memo" })).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /run ai analysis/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /approve & analyze/i })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /discard/i }));
     fireEvent.click(screen.getByRole("button", { name: /cryostat memo/i }));
@@ -230,6 +230,7 @@ function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) 
         onFile={async () => undefined}
         onPasteMemo={vi.fn()}
         onBuildWithAi={vi.fn()}
+        userRole="export-control-officer"
       />
       <MemoWorkspace
         memo={selectedMemo}
@@ -252,12 +253,15 @@ function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) 
         backendNotice="Backend ready"
         liveAnalysisAvailable={true}
         onRunAnalysis={onRunAnalysis}
+        userRole="export-control-officer"
+        approvalBusy={false}
+        onRevokeCouncilApproval={vi.fn()}
         auditEvents={[]}
         chatMessages={[]}
         analysisLocked={false}
         memoDraftDirty={memoDraftDirty}
         onDecision={vi.fn()}
-        onSendChat={async () => undefined}
+        onSendChat={async () => "sent"}
         onApplyChatSuggestion={vi.fn()}
         onFindingSelect={vi.fn()}
       />

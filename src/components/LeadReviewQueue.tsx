@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, Save } from "lucide-react";
-import { getOutreachWorkspace, updateLeadWorkflow } from "../lib/apiClient";
+import {
+  getOutreachPage,
+  updateLeadWorkflow,
+  type OutreachLeadRow
+} from "../lib/apiClient";
 import type { LeadWorkflow, OutreachDraft, OutreachLead } from "../types";
+import { SafeExternalLink } from "./SafeExternalLink";
 
 export function LeadReviewQueue() {
   const [leads, setLeads] = useState<OutreachLead[]>([]);
@@ -9,20 +14,46 @@ export function LeadReviewQueue() {
   const [workflows, setWorkflows] = useState<Record<string, LeadWorkflow>>({});
   const [filter, setFilter] = useState<LeadWorkflow["reviewStatus"] | "all">("pending-review");
   const [busyId, setBusyId] = useState("");
+  const [leadCursor, setLeadCursor] = useState<string | undefined>();
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const workspace = await getOutreachWorkspace();
-      setLeads(workspace.leads);
-      setDrafts(workspace.drafts);
-      setWorkflows(workspace.leadWorkflows ?? {});
+      const page = await getOutreachPage<OutreachLeadRow>("lead-rows", { limit: 25 });
+      setLeads(page.items.map((row) => row.lead));
+      setDrafts(Object.fromEntries(page.items.flatMap((row) => row.draft ? [[row.lead.leadId, row.draft]] : [])));
+      setWorkflows(Object.fromEntries(page.items.flatMap((row) => row.workflow ? [[row.lead.leadId, row.workflow]] : [])));
+      setLeadCursor(page.nextCursor);
     } catch (loadError) {
       setError(message(loadError, "Could not load the review queue."));
     }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const loadMore = async () => {
+    if (!leadCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await getOutreachPage<OutreachLeadRow>("lead-rows", { limit: 25, cursor: leadCursor });
+      setLeads((current) => mergeLeads(current, page.items.map((row) => row.lead)));
+      setDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(page.items.flatMap((row) => row.draft ? [[row.lead.leadId, row.draft]] : []))
+      }));
+      setWorkflows((current) => ({
+        ...current,
+        ...Object.fromEntries(page.items.flatMap((row) => row.workflow ? [[row.lead.leadId, row.workflow]] : []))
+      }));
+      setLeadCursor(page.nextCursor);
+    } catch (loadError) {
+      setError(message(loadError, "Could not load more review rows."));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const rows = useMemo(() => leads
     .map((lead) => ({ lead, draft: drafts[lead.leadId], workflow: workflowFor(lead.leadId, workflows[lead.leadId], drafts[lead.leadId]) }))
@@ -61,7 +92,7 @@ export function LeadReviewQueue() {
         <div>
           <span className="dash-eyebrow">Human approval gate</span>
           <h2>Lead review queue</h2>
-          <p>Approve, reject, assign, schedule follow-up, and track the outreach lifecycle.</p>
+          <p>Approve, reject, assign, schedule follow-up, and track the loaded outreach lifecycle.</p>
         </div>
         <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
           <option value="all">All review states</option>
@@ -78,7 +109,7 @@ export function LeadReviewQueue() {
             </div>
             <div className="review-source">
               <span>{draft?.personalizationStatus ?? (draft ? "generic draft" : "no draft")}</span>
-              {draft?.personalizationSourceUrl && <a href={draft.personalizationSourceUrl} target="_blank" rel="noreferrer">Evidence <ExternalLink size={12} /></a>}
+              {draft?.personalizationSourceUrl && <SafeExternalLink href={draft.personalizationSourceUrl}>Evidence <ExternalLink size={12} /></SafeExternalLink>}
             </div>
             <div className="review-fields">
               <label>Review
@@ -103,6 +134,11 @@ export function LeadReviewQueue() {
         ))}
         {!rows.length && <div className="dash-empty">No leads match this review state.</div>}
       </div>
+      {leadCursor && (
+        <button className="dash-secondary" type="button" onClick={() => void loadMore()} disabled={loadingMore}>
+          {loadingMore ? "Loading more reviews..." : "Load 25 more leads"}
+        </button>
+      )}
     </section>
   );
 }
@@ -117,6 +153,9 @@ function workflowFor(leadId: string, existing: LeadWorkflow | undefined, draft: 
     lifecycleStatus: draft?.sentAt ? "sent" : draft?.personalizationStatus === "personalized" ? "personalized" : draft ? "drafted" : "not-contacted",
     updatedAt: new Date().toISOString()
   };
+}
+function mergeLeads(current: OutreachLead[], incoming: OutreachLead[]) {
+  return [...new Map([...current, ...incoming].map((lead) => [lead.leadId, lead])).values()];
 }
 function label(value: string) { return value.replaceAll("-", " ").replace(/\b\w/g, (character) => character.toUpperCase()); }
 function toLocalInput(value?: string) { return value ? new Date(value).toISOString().slice(0, 16) : ""; }
