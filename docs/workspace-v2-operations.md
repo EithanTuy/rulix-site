@@ -158,3 +158,25 @@ not allow a drain below 120 seconds or a delete timeout above 30 seconds.
 After any apply, rerun plan. Expected result is zero aged orphan versions. Check
 the workspace KMS-denial, DynamoDB throttle, audit iterator-age/error, and audit
 DLQ alarms before closing the change.
+
+## Audit outbox replay
+
+The audit consumer accepts both native outbox items and migrated items carrying
+the complete `entityVersion`, `migrationDigest`, and `semanticHash` integrity
+tuple. If a deployment bug quarantines otherwise valid outbox inserts, replay
+the authoritative normalized items through the deployed consumer; never write
+the immutable audit table directly.
+
+```powershell
+$env:RULIX_AUDIT_WRITER_FUNCTION = "rulix-prod-audit-writer"
+npm run replay:audit-outbox -- --mode plan
+npm run replay:audit-outbox -- `
+  --mode apply --confirm-function rulix-prod-audit-writer
+```
+
+Plan validates every selected item locally against the consumer contract. Apply
+then invokes the same deployed Lambda in deterministic batches of ten. Audit
+appends are idempotent, so the command can safely replay the full tenant after
+a partial attempt. Clear the stream DLQ only after apply reports every batch
+successful, the immutable audit-table count matches the normalized `AU#` count,
+and the iterator-age and DLQ alarms have recovered.

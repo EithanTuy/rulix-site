@@ -221,6 +221,9 @@ describe("Terraform security invariants", () => {
     expect(workspace).toContain('resource "aws_lambda_event_source_mapping" "workspace_audit"');
     expect(workspace).toContain("function_name                      = aws_lambda_function.audit_writer.arn");
     expect(workspace).toContain('function_response_types            = ["ReportBatchItemFailures"]');
+    expect(workspace).toContain("filter_criteria {");
+    expect(workspace).toContain('eventName = ["INSERT"]');
+    expect(workspace).toContain('entityType = { S = ["AU"] }');
     expect(audit).not.toContain('resource "aws_lambda_function_url"');
     expect(auditLambda).toMatch(/runtime\s*=\s*"nodejs24\.x"/);
     expect(auditLambda).toContain("reserved_concurrent_executions = var.audit_reserved_concurrency");

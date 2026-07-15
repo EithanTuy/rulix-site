@@ -459,6 +459,19 @@ resource "aws_lambda_event_source_mapping" "workspace_audit" {
   maximum_record_age_in_seconds      = 3600
   function_response_types            = ["ReportBatchItemFailures"]
 
+  filter_criteria {
+    filter {
+      pattern = jsonencode({
+        eventName = ["INSERT"]
+        dynamodb = {
+          NewImage = {
+            entityType = { S = ["AU"] }
+          }
+        }
+      })
+    }
+  }
+
   destination_config {
     on_failure { destination_arn = aws_sqs_queue.audit_stream_dlq.arn }
   }

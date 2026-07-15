@@ -84,6 +84,26 @@ describe("DynamoDB Streams audit consumer", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it("accepts complete migration integrity metadata without weakening the audit payload contract", async () => {
+    const appendAuditEvent = vi.fn(async (_event: unknown) => appendResult);
+    const consume = createAuditLambdaHandler({
+      appendAuditEvent,
+      tenantId,
+      workspaceStreamArn,
+      logger: testLogger()
+    });
+    const migrated = {
+      ...outboxItem(),
+      entityVersion: 1,
+      migrationDigest: "c".repeat(64),
+      semanticHash: "d".repeat(64)
+    };
+
+    await expect(consume(streamEvent(streamRecord(migrated, "migration-1"))))
+      .resolves.toEqual({ batchItemFailures: [] });
+    expect(appendAuditEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("reports a display-name-only record as poison so bounded retries can send it to the DLQ", async () => {
     const displayOnly = { ...validAuditEvent } as Record<string, unknown>;
     delete displayOnly.actorId;
@@ -134,7 +154,16 @@ describe("DynamoDB Streams audit consumer", () => {
     ["cross-tenant partition", { pk: "TENANT#other#USER#org-7" }],
     ["forged writer identity", { writerId: "caller-controlled" }],
     ["wrong schema", { schemaVersion: "rulix.audit-outbox/v2" }],
-    ["mismatched event identity", { eventId: "audit-other" }]
+    ["mismatched event identity", { eventId: "audit-other" }],
+    ["partial migration metadata", {
+      entityVersion: 1,
+      migrationDigest: "c".repeat(64)
+    }],
+    ["invalid migration metadata", {
+      entityVersion: 2,
+      migrationDigest: "c".repeat(64),
+      semanticHash: "d".repeat(64)
+    }]
   ])("rejects %s as a poison image", async (_label, changes) => {
     const appendAuditEvent = vi.fn(async () => appendResult);
     const consume = createAuditLambdaHandler({
@@ -177,7 +206,7 @@ describe("DynamoDB Streams audit consumer", () => {
     expect(appendAuditEvent).not.toHaveBeenCalled();
   });
 
-  it("ignores MODIFY/REMOVE images and requires a sequence number for an INSERT checkpoint", async () => {
+  it("ignores unrelated and non-INSERT images and requires a sequence number for an AU checkpoint", async () => {
     const appendAuditEvent = vi.fn(async () => appendResult);
     const consume = createAuditLambdaHandler({
       appendAuditEvent,
@@ -186,8 +215,13 @@ describe("DynamoDB Streams audit consumer", () => {
       logger: testLogger()
     });
     const modify = streamRecord(outboxItem(), "modify-1", "MODIFY");
+    const unrelated = streamRecord({
+      ...outboxItem(),
+      schemaVersion: "rulix.workspace/v2",
+      entityType: "R"
+    }, "unrelated-1");
 
-    await expect(consume(streamEvent(modify))).resolves.toEqual({ batchItemFailures: [] });
+    await expect(consume(streamEvent(modify, unrelated))).resolves.toEqual({ batchItemFailures: [] });
     expect(appendAuditEvent).not.toHaveBeenCalled();
 
     const missingSequence = streamRecord(outboxItem(), "missing");

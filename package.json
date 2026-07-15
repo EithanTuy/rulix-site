@@ -22,6 +22,7 @@
     "test:ai:deep": "cmd /c scripts\\run-live-test.cmd server/test-live-council.ts",
     "download:corpus": "node scripts/download-official-corpus.mjs",
     "migrate:workspace-v2": "tsx scripts/migrate-workspace-v2.ts",
+    "replay:audit-outbox": "tsx scripts/replay-audit-outbox.ts",
     "gc:workspace-content": "tsx scripts/gc-workspace-content.ts",
     "migrate:admin-aggregates": "tsx scripts/migrate-admin-aggregates.ts"
   },

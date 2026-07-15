@@ -24,12 +24,15 @@ const OUTBOX_KEYS = new Set([
   "accountId",
   "auditEvent",
   "createdAt",
+  "entityVersion",
   "entityType",
   "eventId",
   "idempotencyKey",
+  "migrationDigest",
   "payloadHash",
   "pk",
   "schemaVersion",
+  "semanticHash",
   "sk",
   "updatedAt"
 ]);
@@ -137,6 +140,7 @@ async function consumeAuditStream(
 
   for (const record of event.Records) {
     if (record.eventName !== "INSERT") continue;
+    if (record.dynamodb?.NewImage?.entityType?.S !== "AU") continue;
     const itemIdentifier = record.dynamodb?.SequenceNumber;
     if (!itemIdentifier) {
       // Lambda cannot checkpoint a DynamoDB Streams failure without the
@@ -225,6 +229,7 @@ function parseAuditOutboxItem(value: unknown, trustedTenantId: string): AuditOut
   if (value.schemaVersion !== AUDIT_OUTBOX_SCHEMA || value.entityType !== "AU") {
     throw new AuditOutboxValidationError("Audit outbox schema or entity type is invalid.");
   }
+  validateMigrationMetadata(value);
 
   let canonical;
   try {
@@ -276,6 +281,18 @@ function parseAuditOutboxItem(value: unknown, trustedTenantId: string): AuditOut
     payloadHash,
     auditEvent: event
   };
+}
+
+function validateMigrationMetadata(value: Record<string, unknown>) {
+  const hasMigrationMetadata = value.entityVersion !== undefined
+    || value.migrationDigest !== undefined
+    || value.semanticHash !== undefined;
+  if (!hasMigrationMetadata) return;
+  if (value.entityVersion !== 1) {
+    throw new AuditOutboxValidationError("Migrated audit outbox entityVersion must be 1.");
+  }
+  matchingString(value.migrationDigest, "migrationDigest", 64, SHA256);
+  matchingString(value.semanticHash, "semanticHash", 64, SHA256);
 }
 
 function mapOutboxEvent(item: AuditOutboxItem): AuditAppendEvent {
