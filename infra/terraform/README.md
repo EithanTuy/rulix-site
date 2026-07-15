@@ -18,6 +18,40 @@ and recovery procedures are documented in
 
 This starter intentionally does not create Bedrock model access, VPC endpoints, RDS/OpenSearch, or customer SSO yet. Those should be added after the first pilot customer chooses the target AWS partition, region, and compliance baseline.
 
+## Production state backend
+
+Production state is stored in the versioned, public-blocked, KMS-encrypted S3
+bucket `rulix-terraform-state-431445330783-us-east-1` under
+`rulix/prod/terraform.tfstate`. The backend uses Terraform's native S3 lockfile;
+there is no separate DynamoDB lock table. Initialize from the repository root:
+
+```powershell
+terraform -chdir=infra/terraform init -reconfigure `
+  -backend-config="bucket=rulix-terraform-state-431445330783-us-east-1" `
+  -backend-config="key=rulix/prod/terraform.tfstate" `
+  -backend-config="region=us-east-1" `
+  -backend-config="profile=rulix-codex" `
+  -backend-config="encrypt=true" `
+  -backend-config="kms_key_id=arn:aws:kms:us-east-1:431445330783:key/ae363238-24d8-4a69-8a53-117a7e539dfd" `
+  -backend-config="use_lockfile=true"
+```
+
+The `profile` argument is for local operators only. GitHub OIDC jobs omit it and
+use their assumed role. Never run `apply` from an empty or newly selected state;
+`terraform state list` must show the imported `rulix-prod-*` resources first.
+
+The one-time recovery/import command is deliberately separate from normal
+deployment:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/import-production-state.ps1
+```
+
+It validates the AWS account, imports only the known pre-existing production
+resources, skips addresses already present, and stops at the first failed
+import. New audit, normalized-workspace, alarm, OAC, and WAF support resources
+are not imported because Terraform must create them from the reviewed plan.
+
 ## Example
 
 ```bash

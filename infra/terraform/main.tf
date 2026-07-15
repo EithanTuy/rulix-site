@@ -449,8 +449,13 @@ data "aws_iam_policy_document" "analysis_worker" {
 }
 
 resource "aws_iam_policy" "analysis_worker" {
-  name        = "${local.name_prefix}-analysis-worker"
-  description = "Read normalized analysis inputs, write S3 evidence, and invoke approved Bedrock models without workspace mutation."
-  policy      = data.aws_iam_policy_document.analysis_worker.json
-  tags        = local.common_tags
+  # Keep the established production policy identity so tightening its grants is
+  # an in-place change rather than an attachment-breaking replacement.
+  name   = "${local.name_prefix}-worker"
+  policy = data.aws_iam_policy_document.analysis_worker.json
+  tags   = local.common_tags
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

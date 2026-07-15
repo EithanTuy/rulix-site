@@ -27,11 +27,11 @@ variable "bedrock_resource_arns" {
     condition = length(var.bedrock_resource_arns) > 0 && alltrue([
       for arn in var.bedrock_resource_arns :
       arn != "*" && can(regex(
-        "^arn:(aws|aws-us-gov|aws-cn):bedrock:[a-z0-9-]+:[0-9]*:[A-Za-z0-9_./:-]+$",
+        "^arn:(aws|aws-us-gov|aws-cn):bedrock:[a-z0-9-]*:[0-9]*:[A-Za-z0-9_./:-]+$",
         arn
       ))
     ])
-    error_message = "bedrock_resource_arns must contain one or more explicit Bedrock ARNs; '*' and malformed ARNs are not allowed."
+    error_message = "bedrock_resource_arns must contain one or more explicit Bedrock ARNs; '*' and malformed ARNs are not allowed. Regionless foundation-model ARNs returned by Bedrock are supported."
   }
 }
 
