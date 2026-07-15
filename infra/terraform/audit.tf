@@ -117,7 +117,7 @@ resource "aws_lambda_function" "audit_writer" {
   source_code_hash               = data.archive_file.audit_lambda.output_base64sha256
   memory_size                    = 256
   timeout                        = 10
-  reserved_concurrent_executions = 5
+  reserved_concurrent_executions = var.audit_reserved_concurrency
 
   environment {
     variables = {

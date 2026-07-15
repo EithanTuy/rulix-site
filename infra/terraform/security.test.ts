@@ -178,6 +178,7 @@ describe("Terraform security invariants", () => {
       audit,
       'resource "aws_lambda_function" "audit_writer"'
     ).text;
+    const auditConcurrency = terraformVariable("audit_reserved_concurrency");
     const runtimePolicy = extractBlock(
       audit,
       'data "aws_iam_policy_document" "audit_lambda"'
@@ -222,6 +223,9 @@ describe("Terraform security invariants", () => {
     expect(workspace).toContain('function_response_types            = ["ReportBatchItemFailures"]');
     expect(audit).not.toContain('resource "aws_lambda_function_url"');
     expect(auditLambda).toMatch(/runtime\s*=\s*"nodejs24\.x"/);
+    expect(auditLambda).toContain("reserved_concurrent_executions = var.audit_reserved_concurrency");
+    expect(auditConcurrency).toMatch(/default\s*=\s*5/);
+    expect(auditConcurrency).toContain("var.audit_reserved_concurrency == -1");
     expect(audit).toContain('source_dir  = "${path.module}/../../audit-lambda-build"');
     expect(audit).toMatch(/RULIX_AUDIT_TABLE\s*=\s*aws_dynamodb_table\.audit_events\.name/);
     expect(audit).toMatch(/RULIX_AUDIT_TENANT_ID\s*=\s*var\.tenant_slug/);

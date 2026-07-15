@@ -419,6 +419,23 @@ variable "app_reserved_concurrency" {
   }
 }
 
+variable "audit_reserved_concurrency" {
+  description = "Hard ceiling for concurrent audit-writer Lambda executions. Use -1 when the account quota cannot reserve capacity while retaining AWS's required unreserved minimum."
+  type        = number
+  default     = 5
+
+  validation {
+    condition = (
+      floor(var.audit_reserved_concurrency) == var.audit_reserved_concurrency
+      && (
+        var.audit_reserved_concurrency == -1
+        || (var.audit_reserved_concurrency >= 1 && var.audit_reserved_concurrency <= 1000)
+      )
+    )
+    error_message = "audit_reserved_concurrency must be -1 (unreserved) or an integer from 1 through 1000."
+  }
+}
+
 variable "enable_waf" {
   description = "Attach an AWS WAF Web ACL to CloudFront for managed protections and route-specific rate limits."
   type        = bool
