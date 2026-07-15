@@ -280,6 +280,35 @@ describe("workspace v2 migration", () => {
     });
   });
 
+  it("atomically completes metadata and lease release without addressing one item twice", async () => {
+    const plan = await planWorkspaceMigration("tenant", "user", sampleState());
+    let transaction: TransactWriteCommand["input"] | undefined;
+    const doc = {
+      async send(command: unknown) {
+        if (!(command instanceof TransactWriteCommand)) throw new Error("unexpected command");
+        transaction = command.input;
+        return {};
+      }
+    };
+    const backend = new DynamoWorkspaceMigrationBackend("workspace", "tenant", doc as never);
+
+    await backend.complete(plan, "migration-owner", "2026-07-14T12:00:00.000Z");
+
+    const items = transaction?.TransactItems ?? [];
+    const keys = items.map((item) => {
+      if (item.Put) return `${String(item.Put.Item?.pk)}|${String(item.Put.Item?.sk)}`;
+      if (item.Delete) return `${String(item.Delete.Key?.pk)}|${String(item.Delete.Key?.sk)}`;
+      throw new Error("completion transaction must use put or conditional delete only");
+    });
+    expect(items).toHaveLength(2);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(items[0]?.Put?.Item).toMatchObject({ sk: workspaceSk.meta(), migrationStatus: "complete" });
+    expect(items[1]?.Delete).toMatchObject({
+      Key: { sk: workspaceSk.migrationLease() },
+      ConditionExpression: "#leaseOwner = :owner AND #migrationDigest = :digest"
+    });
+  });
+
   it("detects target corruption and a changed legacy source after completion", async () => {
     const plan = await planWorkspaceMigration("tenant", "user", sampleState());
     const backend = new MemoryMigrationBackend();

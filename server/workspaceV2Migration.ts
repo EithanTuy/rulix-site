@@ -632,15 +632,6 @@ export class DynamoWorkspaceMigrationBackend implements WorkspaceMigrationBacken
     await this.doc.send(new TransactWriteCommand({
       TransactItems: [
         {
-          ConditionCheck: {
-            TableName: this.destinationTable,
-            Key: { pk, sk: workspaceSk.migrationLease() },
-            ConditionExpression: "#leaseOwner = :owner AND #migrationDigest = :digest",
-            ExpressionAttributeNames: { "#leaseOwner": "leaseOwner", "#migrationDigest": "migrationDigest" },
-            ExpressionAttributeValues: { ":owner": owner, ":digest": plan.migrationDigest }
-          }
-        },
-        {
           Put: {
             TableName: this.destinationTable,
             Item: meta,
@@ -652,7 +643,10 @@ export class DynamoWorkspaceMigrationBackend implements WorkspaceMigrationBacken
         {
           Delete: {
             TableName: this.destinationTable,
-            Key: { pk, sk: workspaceSk.migrationLease() }
+            Key: { pk, sk: workspaceSk.migrationLease() },
+            ConditionExpression: "#leaseOwner = :owner AND #migrationDigest = :digest",
+            ExpressionAttributeNames: { "#leaseOwner": "leaseOwner", "#migrationDigest": "migrationDigest" },
+            ExpressionAttributeValues: { ":owner": owner, ":digest": plan.migrationDigest }
           }
         }
       ]
