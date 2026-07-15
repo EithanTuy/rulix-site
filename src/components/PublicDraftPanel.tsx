@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Globe2, Plus, Search } from "lucide-react";
 import { draftPublicMemo } from "../lib/apiClient";
+import { SafeExternalLink } from "./SafeExternalLink";
 
 interface PublicDraftPanelProps {
-  onCreateMemo: (title: string, memoText: string) => void;
+  onCreateMemo: (title: string, memoText: string) => Promise<void>;
 }
 
 export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
@@ -11,6 +12,7 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Awaited<ReturnType<typeof draftPublicMemo>> | undefined>();
+  const [addBusy, setAddBusy] = useState(false);
 
   const generateDraft = async () => {
     if (!item.trim()) return;
@@ -25,13 +27,28 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
     }
   };
 
+  const addDraft = async () => {
+    if (!draft || addBusy) return;
+    setAddBusy(true);
+    setError("");
+    try {
+      await onCreateMemo(draft.title, draft.memoText);
+      setDraft(undefined);
+      setItem("");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Review creation failed. Your draft was kept.");
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
   return (
     <section className="public-draft-panel" aria-label="Public source memo draft">
       <div className="public-draft-header">
         <Globe2 size={19} />
         <div>
-          <strong>Public-Source Draft</strong>
-          <span>Draft a starting memo and verify public-source facts.</span>
+          <strong>Public-Source Template</strong>
+          <span>Build a local starting memo, then attach and verify official sources.</span>
         </div>
       </div>
 
@@ -51,7 +68,7 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
         disabled={busy || !item.trim()}
       >
         <Search size={16} />
-        {busy ? "Drafting..." : "Draft Memo"}
+        {busy ? "Building locally..." : "Build Local Template"}
       </button>
       {error && <p className="memo-chat-error">{error}</p>}
 
@@ -69,19 +86,20 @@ export function PublicDraftPanel({ onCreateMemo }: PublicDraftPanelProps) {
             <div className="public-source-list">
               <strong>Public sources</strong>
               {draft.sources.map((source) => (
-                <a href={source.url} target="_blank" rel="noreferrer" key={source.url}>
+                <SafeExternalLink href={source.url} key={source.url}>
                   {source.title}
-                </a>
+                </SafeExternalLink>
               ))}
             </div>
           )}
           <button
             type="button"
             className="button primary full"
-            onClick={() => onCreateMemo(draft.title, draft.memoText)}
+            onClick={() => void addDraft()}
+            disabled={addBusy}
           >
             <Plus size={16} />
-            Add Draft to Queue
+            {addBusy ? "Adding..." : "Add Draft to Queue"}
           </button>
         </div>
       )}

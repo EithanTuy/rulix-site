@@ -23,12 +23,30 @@ data "aws_iam_policy_document" "github_actions_assume" {
     }
 
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:Daculguy/Rulix:ref:refs/heads/main",
-        "repo:Daculguy/Rulix:environment:production"
-      ]
+      values   = ["repo:Daculguy/Rulix:environment:production"]
+    }
+
+    # Environment-based OIDC subjects do not include the originating ref. Bind
+    # the separate ref claim so a manually-dispatched workflow on another branch
+    # cannot assume the production deployment role.
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:ref"
+      values   = ["refs/heads/main"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:environment"
+      values   = ["production"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:repository"
+      values   = ["Daculguy/Rulix"]
     }
   }
 }
@@ -48,7 +66,8 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "lambda:UpdateFunctionCode"
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.fn_name}"
+      "arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.fn_name}",
+      "arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.audit_lambda_name}"
     ]
   }
 }

@@ -1,16 +1,414 @@
 openapi: 3.1.0
 info:
   title: Rulix ECCN API
-  version: 0.1.0
-  description: API contract for the ECCN memo review workflow.
+  version: 0.2.0
+  description: API contract for the ECCN memo review workflow. AI operations use a server-owned data classification, an exact provider-region allowlist, and atomic per-account workload admission; caller labels can never lower those controls.
 servers:
   - url: https://{tenantHost}/api
     variables:
       tenantHost:
-        default: tenant.example.com
+        default: app.rulix.cloud
 security:
   - cookieAuth: []
 paths:
+  /admin/users:
+    get:
+      summary: List one bounded page of aggregate-backed account activity
+      operationId: listAdminUsers
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+      responses:
+        "200":
+          description: Stable account page; cursors are signed, query-bound, and short-lived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserPage"
+        "400":
+          description: Invalid or expired cursor
+        "403":
+          description: Admin access required
+        "503":
+          description: Mandatory legacy aggregate backfill is incomplete or failed integrity checks
+  /admin/outreach-config:
+    get:
+      summary: Read provider selection and deployment credential readiness without secret material
+      operationId: getOutreachProviderConfig
+      responses:
+        "200":
+          description: Deployment-owned provider status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachProviderConfig"
+    put:
+      summary: Select the deployment-approved, deployment-configured outreach provider
+      operationId: setOutreachProviderConfig
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [provider]
+              properties:
+                provider:
+                  type: string
+                  enum: [bedrock, anthropic]
+      responses:
+        "200":
+          description: Provider selection saved; credentials remain deployment-owned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachProviderConfig"
+        "400":
+          description: Unknown or credential-bearing fields were rejected
+        "409":
+          description: Selection conflicts with the deployment provider policy
+        "503":
+          description: Deployment credential or provider infrastructure is not ready
+  /admin/metrics:
+    get:
+      summary: Read bounded administrative usage and account metrics
+      operationId: getAdminMetrics
+      parameters:
+        - name: rangeDays
+          in: query
+          schema:
+            type: integer
+            enum: [7, 30, 90]
+            default: 30
+      responses:
+        "200":
+          description: Exact bounded usage and account-total snapshot with explicit facet availability
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [metrics]
+                properties:
+                  metrics:
+                    $ref: "#/components/schemas/AdminMetrics"
+        "400":
+          description: rangeDays was not one of 7, 30, or 90
+        "403":
+          description: Export-control officer access required
+        "503":
+          description: Exact materialized metrics are not yet available or failed an integrity check
+  /admin/outreach:
+    get:
+      summary: Read the bounded outreach workspace
+      operationId: getAdminOutreachWorkspace
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Leads, drafts, workflows, jobs, runs, and provider readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachWorkspace"
+        "400":
+          description: Invalid page size or cursor
+        "403":
+          description: Export-control officer access required
+  /admin/outreach/pages/{collection}:
+    parameters:
+      - name: collection
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [leads, lead-rows, drafts, runs, workflows, jobs]
+    get:
+      summary: Continue one bounded outreach collection
+      operationId: getAdminOutreachCollectionPage
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Query-bound continuation page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachCollectionPage"
+        "400":
+          description: Invalid, expired, cross-account, cross-collection, or page-size-mismatched cursor
+        "404":
+          description: Unknown collection
+  /admin/outreach/generate:
+    post:
+      summary: Generate an outreach draft for one stored lead
+      operationId: generateAdminOutreachDraft
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [requestId, leadId]
+              properties:
+                requestId:
+                  type: string
+                  format: uuid
+                leadId:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                direction:
+                  type: string
+                  maxLength: 4000
+      responses:
+        "200":
+          description: Generated draft and lead
+        "404":
+          description: Lead not found
+  /admin/outreach/drafts/{leadId}:
+    parameters:
+      - $ref: "#/components/parameters/LeadId"
+    put:
+      summary: Save an officer-edited outreach draft
+      operationId: saveAdminOutreachDraft
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subject, body]
+              properties:
+                subject:
+                  type: string
+                  minLength: 1
+                  maxLength: 998
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 48000
+      responses:
+        "200":
+          description: Saved draft and lead
+  /admin/outreach/drafts/{leadId}/mark-sent:
+    parameters:
+      - $ref: "#/components/parameters/LeadId"
+    post:
+      summary: Mark a saved outreach draft sent
+      operationId: markAdminOutreachDraftSent
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        "200":
+          description: Updated draft
+  /admin/outreach/drafts/{leadId}/personalize:
+    parameters:
+      - $ref: "#/components/parameters/LeadId"
+    post:
+      summary: Personalize one saved outreach draft
+      operationId: personalizeAdminOutreachDraft
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [requestId]
+              properties:
+                requestId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Personalized draft and lead
+  /admin/leads/{leadId}/workflow:
+    parameters:
+      - $ref: "#/components/parameters/LeadId"
+    put:
+      summary: Update one lead review and lifecycle workflow
+      operationId: updateAdminLeadWorkflow
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reviewStatus, lifecycleStatus]
+              properties:
+                reviewStatus:
+                  type: string
+                  enum: [new, pending-review, approved, rejected, needs-research, ready-to-send]
+                lifecycleStatus:
+                  type: string
+                  enum: [not-contacted, drafted, personalized, approved, sent, replied, follow-up-due, closed, opted-out]
+                assignedOwner:
+                  type: string
+                  maxLength: 240
+                notes:
+                  type: string
+                  maxLength: 10000
+                lastContactedAt:
+                  type: string
+                  format: date-time
+                followUpAt:
+                  type: string
+                  format: date-time
+                replyStatus:
+                  type: string
+                  maxLength: 240
+      responses:
+        "200":
+          description: Updated lead workflow
+  /admin/outreach/jobs:
+    post:
+      summary: Queue a bounded outreach batch job
+      operationId: createAdminOutreachJob
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [draft-missing, personalize-all, lead-search]
+                maxCostUsd:
+                  type: number
+                  minimum: 0.05
+                  maximum: 100
+                maxRetries:
+                  type: integer
+                  minimum: 0
+                  maximum: 5
+                direction:
+                  type: string
+                  maxLength: 4000
+                searchDurationSeconds:
+                  type: integer
+                  minimum: 15
+                  maximum: 45
+      responses:
+        "202":
+          description: Queued or immediately completed job
+        "422":
+          description: Eligible collection exceeds the explicit 1,000-item per-job safety cap
+  /admin/outreach/jobs/{jobId}/{action}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [pause, resume, retry, terminate]
+    post:
+      summary: Control one outreach batch job
+      operationId: controlAdminOutreachJob
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        "200":
+          description: Updated job
+        "404":
+          description: Job not found
+        "409":
+          description: Job state does not permit the action
+  /admin/leads/search:
+    post:
+      summary: Run one bounded lead-discovery request
+      operationId: searchAdminLeads
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                durationSeconds:
+                  type: integer
+                  minimum: 15
+                  maximum: 45
+      responses:
+        "200":
+          description: Discovered leads and search run
+        "502":
+          description: Search failed before candidates were saved
+  /auth/bootstrap-invite:
+    post:
+      summary: Create the first deployment officer invite using the bootstrap secret
+      description: Deployment-only bootstrap endpoint. Invalid or absent x-rulix-bootstrap-secret values receive a non-enumerable 404.
+      operationId: createBootstrapInvite
+      security: []
+      parameters:
+        - name: x-rulix-bootstrap-secret
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 32
+            maxLength: 512
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                name:
+                  type: string
+                  maxLength: 120
+                role:
+                  $ref: "#/components/schemas/UserRole"
+      responses:
+        "201":
+          description: Bootstrap invite created
+        "404":
+          description: Endpoint unavailable or bootstrap secret invalid
   /auth/invites:
     get:
       summary: List invite status for the tenant
@@ -62,17 +460,17 @@ paths:
           description: Admin access required
         "409":
           description: Account or pending invite already exists
-  /auth/invites/{token}:
-    get:
-      summary: Validate an invite token without exposing private account data
+  /auth/invite/inspect:
+    post:
+      summary: Inspect a bounded invite token supplied only in the request body
       operationId: validateInvite
       security: []
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthTokenRequest"
       responses:
         "200":
           description: Invite token is valid
@@ -144,17 +542,17 @@ paths:
                 properties:
                   ok:
                     type: boolean
-  /auth/password-reset/{token}:
-    get:
-      summary: Validate a password reset token
+  /auth/password-reset/inspect:
+    post:
+      summary: Inspect a bounded password-reset token supplied only in the request body
       operationId: validatePasswordReset
       security: []
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthTokenRequest"
       responses:
         "200":
           description: Reset token is valid
@@ -224,6 +622,7 @@ paths:
     get:
       summary: Return the current authenticated user and CSRF token
       operationId: getCurrentUser
+      security: []
       responses:
         "200":
           description: Current session
@@ -243,26 +642,63 @@ paths:
       responses:
         "204":
           description: Signed out
-  /account/state:
+  /account/preferences:
     get:
-      summary: Get account-linked review workspace state
-      operationId: getAccountState
+      summary: Get versioned workspace preferences
+      operationId: getWorkspacePreferences
       responses:
         "200":
-          description: Account review state
+          description: Workspace preferences
           content:
             application/json:
               schema:
-                type: object
-                required: [state]
-                properties:
-                  state:
-                    $ref: "#/components/schemas/AccountReviewState"
-        "401":
-          description: Sign in required
+                $ref: "#/components/schemas/WorkspacePreferences"
+    patch:
+      summary: Update bounded workspace preferences with compare-and-swap
+      operationId: updateWorkspacePreferences
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspacePreferenceUpdateCommand"
+      responses:
+        "200":
+          description: Authoritative updated preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspacePreferences"
+        "409":
+          description: Preference version conflict
+  /account/memo-builder/sessions:
+    get:
+      summary: List memo-builder sessions as a bounded page
+      operationId: listMemoBuilderSessions
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Memo-builder session page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoBuilderSessionPage"
+  /account/memo-builder/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^builder-[A-Za-z0-9_-]+$'
     put:
-      summary: Replace account-linked review workspace state
-      operationId: saveAccountState
+      summary: Create or replace one memo-builder session with compare-and-swap
+      operationId: upsertMemoBuilderSession
       security:
         - cookieAuth: []
           csrfToken: []
@@ -272,13 +708,40 @@ paths:
           application/json:
             schema:
               type: object
-              required: [state]
+              additionalProperties: false
+              required: [expectedVersion, session]
               properties:
-                state:
-                  $ref: "#/components/schemas/AccountReviewState"
+                expectedVersion:
+                  type: integer
+                  minimum: 0
+                session:
+                  $ref: "#/components/schemas/MemoBuilderSession"
       responses:
         "200":
-          description: Saved account state
+          description: Authoritative versioned session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionedMemoBuilderSession"
+        "409":
+          description: Session version conflict
+    delete:
+      summary: Delete one memo-builder session with compare-and-swap
+      operationId: deleteMemoBuilderSession
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpectedVersion"
+      responses:
+        "204":
+          description: Session deleted
+        "409":
+          description: Session version conflict
   /health:
     get:
       summary: Check backend health and provider configuration
@@ -301,12 +764,10 @@ paths:
                     type: string
                   provider:
                     type: object
-                    required: [configured, model]
+                    required: [configured]
                     properties:
                       configured:
                         type: boolean
-                      model:
-                        type: string
   /corpus:
     get:
       summary: Get the active official-source corpus snapshot
@@ -315,10 +776,11 @@ paths:
       responses:
         "200":
           description: Corpus snapshot
-  /ai/review:
+  /public-memo-draft:
     post:
-      summary: Run backend AI council analysis for an ad hoc memo
-      operationId: analyzeMemo
+      summary: Create a local cautious memo template for later source verification
+      operationId: draftPublicMemo
+      description: This workflow is deterministic and local-only. It never calls an AI provider, web service, or source-retrieval system because a free-form item description has no server-verifiable public provenance.
       security:
         - cookieAuth: []
           csrfToken: []
@@ -328,60 +790,143 @@ paths:
           application/json:
             schema:
               type: object
-              required: [memo]
+              additionalProperties: false
+              required: [item]
               properties:
-                memo:
-                  $ref: "#/components/schemas/MemoRecord"
-                depth:
-                  $ref: "#/components/schemas/AnalysisDepth"
+                item:
+                  type: string
+                  minLength: 1
+                  maxLength: 8000
       responses:
         "200":
-          description: Review result
+          description: Local template and explicit zero-provider status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicMemoDraft"
+  /documents/extract:
+    post:
+      summary: Validate and extract text from a bounded document payload
+      operationId: extractDocument
+      description: Supports plain text, PDF, DOCX, and approved image formats. An explicit recognized classification is required; provider-backed extraction additionally requires an exact-payload officer approval bound to the current provider lane.
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [requestId, fileName, mediaType, dataBase64, dataClass]
+              properties:
+                requestId:
+                  type: string
+                  format: uuid
+                fileName:
+                  type: string
+                  minLength: 1
+                  maxLength: 140
+                mediaType:
+                  type: string
+                  minLength: 1
+                  maxLength: 160
+                dataBase64:
+                  type: string
+                  contentEncoding: base64
+                  maxLength: 6292480
+                dataClass:
+                  type: string
+                  enum: [public, proprietary, export-controlled, itar-risk, cui]
+      responses:
+        "200":
+          description: Validated extraction result
           content:
             application/json:
               schema:
                 type: object
-                required: [result]
+                required: [extraction]
                 properties:
-                  result:
-                    $ref: "#/components/schemas/ReviewResult"
-  /documents:
+                  extraction:
+                    $ref: "#/components/schemas/DocumentExtraction"
+        "413":
+          description: Document exceeds the decoded size limit
+        "400":
+          description: File metadata, base64, signature, or DOCX container is invalid
+        "403":
+          description: Provider-backed binary extraction requires an export-control officer to approve and extract the exact bytes
+        "422":
+          description: Content or AI egress policy rejected the operation
+        "429":
+          description: Per-account AI workload limit reached
+        "503":
+          description: AI egress policy or workload admission unavailable
+  /ai/memo-builder-chat:
     post:
-      summary: Upload a memo or supporting document
-      operationId: createDocument
+      summary: Continue an AI-assisted memo-building conversation
+      operationId: memoBuilderChat
+      description: The server reloads the saved session and classification, appends one exact pending message, and requires officer approval bound to the semantic payload and exact provider request body before dispatch. Callers cannot submit history or classification here.
+      security:
+        - cookieAuth: []
+          csrfToken: []
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
-              required: [file, documentType]
+              additionalProperties: false
+              required: [requestId, sessionId, pendingMessage]
               properties:
-                documentType:
+                requestId:
                   type: string
-                  enum: [memo, specification, prior-classification, vendor-source, correspondence]
-                dataClass:
+                  format: uuid
+                sessionId:
                   type: string
-                  enum: [public, proprietary, export-controlled, itar-risk, cui]
-                file:
+                  pattern: '^builder-[A-Za-z0-9_-]+$'
+                  maxLength: 128
+                pendingMessage:
                   type: string
-                  format: binary
+                  minLength: 1
+                  maxLength: 8000
       responses:
-        "202":
-          description: Accepted for extraction
+        "200":
+          description: Assistant reply and optional complete draft
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
+                $ref: "#/components/schemas/MemoBuildChatResult"
+        "403":
+          description: Exact conversation requires export-control officer approval
+        "422":
+          description: Data classification or provider-region policy rejected the operation
+        "429":
+          description: Per-account AI workload limit reached
+        "503":
+          description: AI egress policy or workload admission unavailable
   /reviews:
     get:
-      summary: List stored review memos
+      summary: List bounded review summaries
       operationId: listReviews
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, all]
+            default: active
       responses:
         "200":
-          description: Review list
+          description: Review summary page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSummaryPage"
     post:
-      summary: Create a stored memo review
+      summary: Idempotently create one stored memo review
       operationId: createReview
       security:
         - cookieAuth: []
@@ -393,96 +938,413 @@ paths:
             schema:
               $ref: "#/components/schemas/NewReviewInput"
       responses:
+        "200":
+          description: Existing authoritative result replayed for the same request ID and normalized payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewCreateResult"
         "201":
           description: Review created
           content:
             application/json:
               schema:
-                type: object
-                required: [review]
-                properties:
-                  review:
-                    $ref: "#/components/schemas/MemoRecord"
+                $ref: "#/components/schemas/ReviewCreateResult"
+        "409":
+          description: Request ID was already used with a different normalized payload
+        "422":
+          description: A recognized classification is required and must be permitted by the deployment policy
   /reviews/{reviewId}:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
     get:
-      summary: Get a review result
+      summary: Get authoritative detail for one review
       operationId: getReview
-      parameters:
-        - name: reviewId
-          in: path
-          required: true
-          schema:
-            type: string
       responses:
         "200":
-          description: Review state
+          description: Targeted review detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewDetail"
+        "404":
+          description: Review not found in the authenticated workspace
+    patch:
+      summary: Edit memo text or change archival state using current review bindings
+      operationId: mutateReview
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/ReviewMemoUpdateCommand"
+                - $ref: "#/components/schemas/ReviewArchiveCommand"
+      responses:
+        "200":
+          description: Authoritative updated review and server-authored audit event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewMutationResult"
+        "409":
+          description: Review version, revision, or content hash is stale
+  /reviews/{reviewId}/audit:
+    get:
+      summary: List one review's server-authored audit history
+      operationId: listReviewAuditEvents
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Audit event page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CursorPage"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuditEvent"
+  /ai-approval-requests:
+    get:
+      summary: List the authenticated account's bounded AI approval requests
+      operationId: listOwnAiApprovalRequests
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+        - $ref: "#/components/parameters/AiApprovalRequestStatusFilter"
+      responses:
+        "200":
+          description: Metadata-only account request page; prospective chat text is never listed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestPage"
+    post:
+      summary: Request officer approval for one exact server-reconstructed AI operation
+      operationId: createAiApprovalRequest
+      description: The caller supplies only a target identifier, immutable optimistic bindings, and purpose-specific input. The server reloads all content, derives the target account from the session, constructs exact semantic/provider hashes, and stores memo-chat pending text only in a short-lived encrypted preview.
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/CouncilApprovalRequestCommand"
+                - $ref: "#/components/schemas/MemoChatApprovalRequestCommand"
+                - $ref: "#/components/schemas/MemoBuilderApprovalRequestCommand"
+              discriminator:
+                propertyName: purpose
+      responses:
+        "201":
+          description: Immutable pending request created, or an idempotent replay returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "409":
+          description: Target changed, request ID conflicts, or outstanding-request quota reached
+        "422":
+          description: Current provider, region, model, or data-class policy is not approved
+        "429":
+          description: Bounded account or tenant queue quota reached
+  /ai-approval-requests/{approvalRequestId}:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    get:
+      summary: Get one approval request owned by the authenticated account
+      operationId: getOwnAiApprovalRequest
+      responses:
+        "200":
+          description: Exact request status; memo-chat plaintext is never returned on this owner endpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "404":
+          description: Request not found in the authenticated account
+  /ai-approval-requests/{approvalRequestId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    post:
+      summary: Idempotently cancel one pending request owned by the authenticated account
+      operationId: cancelOwnAiApprovalRequest
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiApprovalReasonCommand"
+      responses:
+        "200":
+          description: Cancelled request status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "404":
+          description: Request is not owned by the authenticated account
+        "409":
+          description: Request was already decided or expired
+  /admin/ai-approval-requests:
+    get:
+      summary: List tenant AI approval requests for an export-control officer
+      operationId: listTenantAiApprovalRequests
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+        - $ref: "#/components/parameters/AiApprovalRequestStatusFilter"
+      responses:
+        "200":
+          description: Metadata-only tenant queue page; prospective chat text is never listed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestPage"
+        "403":
+          description: Export-control officer role required
+  /admin/ai-approval-requests/{approvalRequestId}:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    get:
+      summary: Inspect exact current target content before an officer decision
+      operationId: inspectTenantAiApprovalRequest
+      description: Reloads the target account's current review or Memo Builder session, decrypts a pending memo-chat preview only for this authorized detail view, and revalidates every exact binding. Approve remains disabled when current is false.
+      responses:
+        "200":
+          description: Officer-only exact content inspection and request status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestOfficerView"
+        "403":
+          description: Export-control officer role required
+        "404":
+          description: Tenant request not found
+  /admin/ai-approval-requests/{approvalRequestId}/approve:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    post:
+      summary: Approve the immutable request for one target-account dispatch
+      operationId: approveTenantAiApprovalRequest
+      description: The body cannot override target account, content, classification, provider, region, model, hashes, or expiry. All bindings come from the immutable request and are atomically revalidated.
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiApprovalDecisionCommand"
+      responses:
+        "200":
+          description: Approved request status and target-account approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "403":
+          description: Export-control officer role required
+        "409":
+          description: Request expired, was decided, preview expired, or target bindings changed
+  /admin/ai-approval-requests/{approvalRequestId}/reject:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    post:
+      summary: Reject one pending tenant AI approval request
+      operationId: rejectTenantAiApprovalRequest
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiApprovalReasonCommand"
+      responses:
+        "200":
+          description: Rejected request status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "403":
+          description: Export-control officer role required
+        "409":
+          description: Request expired or was already decided
+  /admin/ai-approval-requests/{approvalRequestId}/revoke:
+    parameters:
+      - $ref: "#/components/parameters/AiApprovalRequestId"
+    post:
+      summary: Revoke an approval created from a cross-account queued request
+      operationId: revokeTenantQueuedAiApproval
+      description: Derives the target account and approval ID only from the immutable approved request and decision; the caller cannot supply either binding.
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiApprovalReasonCommand"
+      responses:
+        "200":
+          description: Approved request with its target-account approval now revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiApprovalRequestStatus"
+        "403":
+          description: Export-control officer role required
+        "409":
+          description: Request is not approved or revocation command conflicts
+  /reviews/{reviewId}/ai-approvals/council:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+    get:
+      summary: Inspect whether the current review revision and depth have a usable exact AI approval
+      operationId: getCouncilApproval
+      parameters:
+        - name: depth
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/AnalysisDepth"
+      responses:
+        "200":
+          description: Current exact approval expectation and status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouncilApprovalView"
+        "404":
+          description: Review not found
+    post:
+      summary: Approve one exact review revision, depth, policy, semantic payload, and provider body
+      operationId: approveCouncilAnalysis
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouncilApprovalCommand"
+      responses:
+        "201":
+          description: Exact single-dispatch approval created by an export-control officer
           content:
             application/json:
               schema:
                 type: object
-                required: [review, auditEvents]
+                additionalProperties: false
+                required: [approval, usable]
                 properties:
-                  review:
-                    $ref: "#/components/schemas/MemoRecord"
-                  decision:
-                    $ref: "#/components/schemas/ReviewerDecision"
-                  auditEvents:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/AuditEvent"
-    patch:
-      summary: Update memo text for a stored review
-      operationId: updateReviewMemoText
+                  approval:
+                    $ref: "#/components/schemas/AiApprovalStatus"
+                  usable:
+                    const: true
+        "403":
+          description: Export-control officer role required
+        "409":
+          description: Review bindings became stale before approval
+  /ai-approvals/{approvalId}/revoke:
+    parameters:
+      - name: approvalId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^aia-[a-f0-9]{40}$'
+    post:
+      summary: Idempotently revoke an exact AI approval before dispatch
+      operationId: revokeAiApproval
       security:
         - cookieAuth: []
           csrfToken: []
-      parameters:
-        - name: reviewId
-          in: path
-          required: true
-          schema:
-            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [memoText]
+              additionalProperties: false
+              required: [requestId, reason]
               properties:
-                memoText:
+                requestId:
                   type: string
+                  format: uuid
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
       responses:
         "200":
-          description: Review updated
+          description: Approval is durably revoked
           content:
             application/json:
               schema:
                 type: object
-                required: [review]
+                additionalProperties: false
+                required: [approval, usable]
                 properties:
-                  review:
-                    $ref: "#/components/schemas/MemoRecord"
+                  approval:
+                    $ref: "#/components/schemas/AiApprovalStatus"
+                  usable:
+                    const: false
+        "403":
+          description: Export-control officer role required
+        "404":
+          description: Approval not found in the authenticated account
   /reviews/{reviewId}/analyze:
     post:
-      summary: Run AI council analysis for a stored review memo
+      summary: Analyze the exact review revision currently displayed by the caller
       operationId: analyzeStoredReview
       security:
         - cookieAuth: []
           csrfToken: []
       parameters:
-        - name: reviewId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ReviewId"
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
               type: object
+              additionalProperties: false
+              required: [requestId, expectedVersion, expectedRevision, expectedHash, depth]
               properties:
+                requestId:
+                  type: string
+                  format: uuid
+                expectedVersion:
+                  type: integer
+                  minimum: 1
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                expectedHash:
+                  $ref: "#/components/schemas/Sha256"
                 depth:
                   $ref: "#/components/schemas/AnalysisDepth"
       responses:
@@ -492,33 +1354,84 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [result]
+                required: [review, result, auditEvents]
                 properties:
+                  review:
+                    $ref: "#/components/schemas/MemoRecord"
                   result:
                     $ref: "#/components/schemas/ReviewResult"
+                  decisionInvalidated:
+                    type: boolean
+                  auditEvents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+        "409":
+          description: Review bindings became stale before the analysis result committed
+        "403":
+          description: No usable exact officer approval exists for this revision and depth
+        "422":
+          description: Stored classification or current provider-region policy rejected the operation
+        "429":
+          description: Per-account AI workload limit reached
+        "503":
+          description: AI egress policy or workload admission unavailable
   /reviews/{reviewId}/chat:
+    get:
+      summary: List one review's bound chat messages
+      operationId: listReviewChatMessages
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Chat message page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CursorPage"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MemoChatMessage"
     post:
-      summary: Chat about a memo and optionally draft a memo edit
+      summary: Chat about the exact memo revision currently displayed by the caller
       operationId: chatAboutMemo
       security:
         - cookieAuth: []
           csrfToken: []
       parameters:
-        - name: reviewId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ReviewId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [message]
+              additionalProperties: false
+              required: [requestId, expectedVersion, expectedRevision, expectedHash, message]
               properties:
+                requestId:
+                  type: string
+                  format: uuid
+                expectedVersion:
+                  type: integer
+                  minimum: 1
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                expectedHash:
+                  $ref: "#/components/schemas/Sha256"
                 message:
                   type: string
+                  minLength: 1
+                  maxLength: 8000
+                  description: Maximum 8,000 Unicode code points after trimming.
       responses:
         "200":
           description: Updated memo chat thread
@@ -526,38 +1439,66 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [messages]
+                required: [review, messages]
                 properties:
+                  review:
+                    $ref: "#/components/schemas/MemoRecord"
                   messages:
                     type: array
                     items:
                       $ref: "#/components/schemas/MemoChatMessage"
-  /findings/{findingId}:
-    patch:
-      summary: Update reviewer disposition for a finding
-      operationId: updateFinding
+                  auditEvents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+        "409":
+          description: Review bindings became stale before chat messages committed
+        "403":
+          description: Exact message requires export-control officer approval or an approved pending request
+        "422":
+          description: Stored classification or current provider-region policy rejected the operation
+        "429":
+          description: Per-account AI workload limit reached
+        "503":
+          description: AI egress policy or workload admission unavailable
+  /reviews/{reviewId}/chat/{messageId}/apply:
+    post:
+      summary: Apply only the server-stored suggestion identified by message ID
+      operationId: applyMemoChatSuggestion
+      security:
+        - cookieAuth: []
+          csrfToken: []
       parameters:
-        - name: findingId
+        - $ref: "#/components/parameters/ReviewId"
+        - name: messageId
           in: path
           required: true
           schema:
             type: string
+            pattern: '^chat-[A-Za-z0-9_-]+$'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [reviewerStatus]
+              additionalProperties: false
+              required: [expectedVersion, expectedHash]
               properties:
-                reviewerStatus:
-                  type: string
-                  enum: [accepted, rejected, needs-info, escalated]
-                note:
-                  type: string
+                expectedVersion:
+                  type: integer
+                  minimum: 1
+                expectedHash:
+                  $ref: "#/components/schemas/Sha256"
       responses:
         "200":
-          description: Finding updated
+          description: Authoritative memo and applied message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewMutationResult"
+        "409":
+          description: Review or suggestion binding is stale
   /reviews/{reviewId}/decision:
     post:
       summary: Submit human reviewer decision
@@ -566,31 +1507,782 @@ paths:
         - cookieAuth: []
           csrfToken: []
       parameters:
-        - name: reviewId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ReviewId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReviewerDecision"
+              $ref: "#/components/schemas/ReviewDecisionCommand"
       responses:
         "200":
           description: Decision recorded
+        "409":
+          description: Analysis is absent, stale, non-live, or contains blocking findings; only an authorized explicit override can preserve blockers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
-      name: rulix_session
+      name: __Host-rulix_session
     csrfToken:
       type: apiKey
       in: header
       name: x-rulix-csrf
+  parameters:
+    LeadId:
+      name: leadId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._-]+$'
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^review-[A-Za-z0-9_-]+$'
+        maxLength: 128
+    AiApprovalRequestId:
+      name: approvalRequestId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^air-[a-f0-9]{40}$'
+        maxLength: 128
+    AiApprovalRequestStatusFilter:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [pending, approved, rejected, cancelled, expired]
+    PageLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 25
+    PageCursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        maxLength: 4096
+        pattern: '^[A-Za-z0-9_.-]+$'
   schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        code:
+          type: string
+          maxLength: 128
+        error:
+          type: string
+          maxLength: 2000
+        correlationId:
+          type: string
+          format: uuid
+    AuthTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 32
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_-]+$'
+    PublicMemoDraft:
+      type: object
+      required: [title, memoText, sources, provider]
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        memoText:
+          type: string
+          maxLength: 12000
+        sources:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [title, url]
+            properties:
+              title:
+                type: string
+                maxLength: 240
+              url:
+                type: string
+                format: uri
+                maxLength: 2048
+        provider:
+          type: object
+          required: [configured, model, live, message]
+          properties:
+            configured:
+              type: boolean
+            model:
+              type: string
+            live:
+              type: boolean
+            message:
+              type: string
+    AiApprovalSubject:
+      type: object
+      additionalProperties: false
+      required: [kind, id, version, contentHash]
+      properties:
+        kind:
+          type: string
+          enum: [review, document, memo-builder]
+        id:
+          type: string
+          minLength: 1
+          maxLength: 512
+        version:
+          type: integer
+          minimum: 1
+        revision:
+          type: integer
+          minimum: 1
+        contentHash:
+          $ref: "#/components/schemas/Sha256"
+    AiApprovalSubjectSummary:
+      type: object
+      additionalProperties: false
+      required: [kind, id, version]
+      properties:
+        kind:
+          type: string
+          enum: [review, document, memo-builder]
+        id:
+          type: string
+          minLength: 1
+          maxLength: 512
+        version:
+          type: integer
+          minimum: 1
+        revision:
+          type: integer
+          minimum: 1
+    AiApprovalPolicy:
+      type: object
+      additionalProperties: false
+      required: [version, mode, provider, clientRegion, model]
+      properties:
+        version:
+          type: string
+          minLength: 1
+          maxLength: 128
+        mode:
+          type: string
+          enum: [blocked, approved]
+        provider:
+          type: string
+          enum: [amazon-bedrock, anthropic-direct]
+        clientRegion:
+          type: string
+          minLength: 1
+          maxLength: 128
+        model:
+          type: string
+          minLength: 1
+          maxLength: 512
+    AiApprovalRecord:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, id, requestId, commandHash, tenantId, accountId, purpose, subject, payloadHash, providerRequestHashes, dataClass, policy, approvedBy, approvedAt, expiresAt, validUntilEpoch, expiresAtEpoch, dispatchLimit]
+      properties:
+        schemaVersion:
+          const: rulix.ai-approval/v1
+        id:
+          type: string
+          pattern: '^aia-[a-f0-9]{40}$'
+        requestId:
+          type: string
+          format: uuid
+        commandHash:
+          $ref: "#/components/schemas/Sha256"
+        tenantId:
+          type: string
+          maxLength: 160
+        accountId:
+          type: string
+          maxLength: 512
+        purpose:
+          type: string
+          enum: [council, memo-chat, memo-builder, document-extraction]
+        subject:
+          $ref: "#/components/schemas/AiApprovalSubject"
+        payloadHash:
+          $ref: "#/components/schemas/Sha256"
+        providerRequestHashes:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Sha256"
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        policy:
+          $ref: "#/components/schemas/AiApprovalPolicy"
+        approvedBy:
+          type: object
+          additionalProperties: false
+          required: [id, role]
+          properties:
+            id:
+              type: string
+              maxLength: 512
+            role:
+              const: export-control-officer
+        approvedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        validUntilEpoch:
+          type: integer
+          minimum: 1
+        expiresAtEpoch:
+          type: integer
+          minimum: 1
+        dispatchLimit:
+          type: integer
+          minimum: 1
+          maximum: 2
+    AiApprovalRevocation:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, approvalId, accountId, requestId, commandHash, revokedBy, revokedAt, reason]
+      properties:
+        schemaVersion:
+          const: rulix.ai-approval-revocation/v1
+        approvalId:
+          type: string
+          maxLength: 160
+        accountId:
+          type: string
+          maxLength: 512
+        requestId:
+          type: string
+          format: uuid
+        commandHash:
+          $ref: "#/components/schemas/Sha256"
+        revokedBy:
+          type: string
+          maxLength: 512
+        revokedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    AiApprovalStatus:
+      type: object
+      additionalProperties: false
+      required: [approval, current, dispatchesReserved]
+      properties:
+        approval:
+          $ref: "#/components/schemas/AiApprovalRecord"
+        current:
+          type: boolean
+        dispatchesReserved:
+          type: integer
+          minimum: 0
+          maximum: 2
+        revocation:
+          $ref: "#/components/schemas/AiApprovalRevocation"
+    AiApprovalDecisionCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+    AiApprovalReasonCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId, reason]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    CouncilApprovalRequestCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId, purpose, reviewId, depth, expectedVersion, expectedRevision, expectedHash]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        purpose:
+          const: council
+        reviewId:
+          type: string
+          pattern: '^review-[A-Za-z0-9_-]+$'
+          maxLength: 128
+        depth:
+          $ref: "#/components/schemas/AnalysisDepth"
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+    MemoChatApprovalRequestCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId, purpose, reviewId, message, expectedVersion, expectedRevision, expectedHash]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        purpose:
+          const: memo-chat
+        reviewId:
+          type: string
+          pattern: '^review-[A-Za-z0-9_-]+$'
+          maxLength: 128
+        message:
+          type: string
+          minLength: 1
+          maxLength: 8000
+          description: Maximum 8,000 Unicode code points after trimming.
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+    MemoBuilderApprovalRequestCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId, purpose, sessionId]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        purpose:
+          const: memo-builder
+        sessionId:
+          type: string
+          pattern: '^builder-[A-Za-z0-9_-]+$'
+          maxLength: 128
+    AiApprovalRequestContext:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, depth]
+          properties:
+            kind:
+              const: council
+            depth:
+              $ref: "#/components/schemas/AnalysisDepth"
+        - type: object
+          additionalProperties: false
+          required: [kind, pendingMessageHash, historyHash]
+          properties:
+            kind:
+              const: memo-chat
+            pendingMessageHash:
+              $ref: "#/components/schemas/Sha256"
+            historyHash:
+              $ref: "#/components/schemas/Sha256"
+        - type: object
+          additionalProperties: false
+          required: [kind]
+          properties:
+            kind:
+              const: memo-builder
+    AiApprovalRequestRecord:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, id, requestId, commandHash, tenantId, targetAccountId, requestedBy, purpose, subject, payloadHash, providerRequestHashes, dataClass, policy, context, createdAt, expiresAt, validUntilEpoch, expiresAtEpoch]
+      properties:
+        schemaVersion:
+          const: rulix.ai-approval-request/v1
+        id:
+          type: string
+          pattern: '^air-[a-f0-9]{40}$'
+        requestId:
+          type: string
+          format: uuid
+        commandHash:
+          $ref: "#/components/schemas/Sha256"
+        tenantId:
+          type: string
+          maxLength: 160
+        targetAccountId:
+          type: string
+          maxLength: 512
+        requestedBy:
+          type: object
+          additionalProperties: false
+          required: [id, role]
+          properties:
+            id:
+              type: string
+              maxLength: 512
+            role:
+              type: string
+              enum: [export-control-officer, reviewer, submitter, counsel]
+        purpose:
+          type: string
+          enum: [council, memo-chat, memo-builder]
+        subject:
+          $ref: "#/components/schemas/AiApprovalSubject"
+        payloadHash:
+          $ref: "#/components/schemas/Sha256"
+        providerRequestHashes:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: "#/components/schemas/Sha256"
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        policy:
+          $ref: "#/components/schemas/AiApprovalPolicy"
+        context:
+          $ref: "#/components/schemas/AiApprovalRequestContext"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        validUntilEpoch:
+          type: integer
+          minimum: 1
+        expiresAtEpoch:
+          type: integer
+          minimum: 1
+    AiApprovalRequestDecision:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, requestId, targetAccountId, decisionRequestId, commandHash, decision, decidedBy, decidedAt, expiresAtEpoch]
+      properties:
+        schemaVersion:
+          const: rulix.ai-approval-request-decision/v1
+        requestId:
+          type: string
+          pattern: '^air-[a-f0-9]{40}$'
+        targetAccountId:
+          type: string
+          maxLength: 512
+        decisionRequestId:
+          type: string
+          format: uuid
+        commandHash:
+          $ref: "#/components/schemas/Sha256"
+        decision:
+          type: string
+          enum: [approved, rejected, cancelled]
+        decidedBy:
+          type: object
+          additionalProperties: false
+          required: [id, role]
+          properties:
+            id:
+              type: string
+              maxLength: 512
+            role:
+              type: string
+              enum: [export-control-officer, reviewer, submitter, counsel]
+        decidedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        approvalId:
+          type: string
+          pattern: '^aia-[a-f0-9]{40}$'
+        expiresAtEpoch:
+          type: integer
+          minimum: 1
+    AiApprovalRequestStatus:
+      type: object
+      additionalProperties: false
+      required: [request, status]
+      properties:
+        request:
+          $ref: "#/components/schemas/AiApprovalRequestRecord"
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled, expired]
+        decision:
+          $ref: "#/components/schemas/AiApprovalRequestDecision"
+        approval:
+          $ref: "#/components/schemas/AiApprovalStatus"
+    AiApprovalRequestListItem:
+      type: object
+      additionalProperties: false
+      required: [id, targetAccountId, requestedBy, purpose, subject, dataClass, policy, context, status, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          pattern: '^air-[a-f0-9]{40}$'
+        targetAccountId:
+          type: string
+          maxLength: 512
+        requestedBy:
+          type: object
+          required: [id, role]
+          properties:
+            id:
+              type: string
+            role:
+              type: string
+              enum: [export-control-officer, reviewer, submitter, counsel]
+        purpose:
+          type: string
+          enum: [council, memo-chat, memo-builder]
+        subject:
+          $ref: "#/components/schemas/AiApprovalSubjectSummary"
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        policy:
+          $ref: "#/components/schemas/AiApprovalPolicy"
+        context:
+          $ref: "#/components/schemas/AiApprovalRequestContext"
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled, expired]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+    AiApprovalRequestPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/AiApprovalRequestListItem"
+        nextCursor:
+          type: string
+          maxLength: 512
+    AiApprovalRequestOfficerView:
+      type: object
+      additionalProperties: false
+      required: [approvalRequest, inspection]
+      properties:
+        approvalRequest:
+          $ref: "#/components/schemas/AiApprovalRequestStatus"
+        pendingContent:
+          type: object
+          additionalProperties: false
+          required: [kind, text]
+          properties:
+            kind:
+              const: memo-chat
+            text:
+              type: string
+              minLength: 1
+              maxLength: 8000
+        inspection:
+          $ref: "#/components/schemas/AiApprovalInspection"
+    AiApprovalInspection:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, current, depth, memo]
+          properties:
+            kind:
+              const: council
+            current:
+              type: boolean
+            depth:
+              $ref: "#/components/schemas/AnalysisDepth"
+            memo:
+              $ref: "#/components/schemas/MemoRecord"
+            providerRequest:
+              type: object
+              description: Exact canonical provider body with no credentials or SDK transport headers.
+            providerRequestHash:
+              $ref: "#/components/schemas/Sha256"
+            unavailableReason:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [kind, current, memo, history]
+          properties:
+            kind:
+              const: memo-chat
+            current:
+              type: boolean
+            memo:
+              $ref: "#/components/schemas/MemoRecord"
+            history:
+              type: array
+              maxItems: 50
+              items:
+                $ref: "#/components/schemas/MemoChatMessage"
+            pendingMessage:
+              type: string
+              minLength: 1
+              maxLength: 8000
+            providerRequest:
+              type: object
+              description: Exact canonical provider body with no credentials or SDK transport headers.
+            providerRequestHash:
+              $ref: "#/components/schemas/Sha256"
+            unavailableReason:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [kind, current]
+          properties:
+            kind:
+              const: memo-builder
+            current:
+              type: boolean
+            session:
+              $ref: "#/components/schemas/MemoBuilderSession"
+            version:
+              type: integer
+              minimum: 1
+            messages:
+              type: array
+              maxItems: 21
+              items:
+                $ref: "#/components/schemas/MemoBuildChatMessage"
+            pendingMessage:
+              type: string
+              minLength: 1
+              maxLength: 8000
+            providerRequest:
+              type: object
+              description: Exact canonical provider body with no credentials or SDK transport headers.
+            providerRequestHash:
+              $ref: "#/components/schemas/Sha256"
+            unavailableReason:
+              type: string
+    CouncilApprovalCommand:
+      type: object
+      additionalProperties: false
+      required: [requestId, depth, expectedVersion, expectedRevision, expectedHash]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        depth:
+          $ref: "#/components/schemas/AnalysisDepth"
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+    CouncilApprovalView:
+      type: object
+      additionalProperties: false
+      required: [purpose, depth, subject, payloadHash, policy, usable]
+      properties:
+        purpose:
+          const: council
+        depth:
+          $ref: "#/components/schemas/AnalysisDepth"
+        subject:
+          $ref: "#/components/schemas/AiApprovalSubject"
+        payloadHash:
+          $ref: "#/components/schemas/Sha256"
+        policy:
+          $ref: "#/components/schemas/AiApprovalPolicy"
+        approval:
+          $ref: "#/components/schemas/AiApprovalStatus"
+        usable:
+          type: boolean
+    DocumentExtraction:
+      type: object
+      required: [fileName, mediaType, text, method]
+      properties:
+        fileName:
+          type: string
+        mediaType:
+          type: string
+        text:
+          type: string
+        method:
+          type: string
+          enum: [text, bedrock-document, bedrock-image, pdf-image-fallback, unavailable]
+        warning:
+          type: string
+    MemoBuildChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+          minLength: 1
+          maxLength: 8000
+    MemoBuildChatResult:
+      type: object
+      required: [reply]
+      properties:
+        reply:
+          type: string
+        draft:
+          type: object
+          required: [title, itemFamily, dataClass, memoText]
+          properties:
+            title:
+              type: string
+            itemFamily:
+              type: string
+            manufacturer:
+              type: string
+            intendedUse:
+              type: string
+            dataClass:
+              type: string
+              enum: [public, proprietary, export-controlled, itar-risk, cui]
+            memoText:
+              type: string
     AuthResponse:
       type: object
       required: [user, csrfToken]
@@ -680,6 +2372,7 @@ components:
         inviteLink:
           type: string
           format: uri
+          description: App URL with the one-time token in the URL fragment, never the query string or request path.
         delivery:
           $ref: "#/components/schemas/EmailDeliveryResult"
     UserProfile:
@@ -698,57 +2391,338 @@ components:
         createdAt:
           type: string
           format: date-time
-    AccountReviewState:
+    Sha256:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+    CursorPage:
       type: object
-      required: [memos, decisions, auditEvents, analysisResults, chatMessages]
+      required: [items]
       properties:
-        memos:
+        items:
           type: array
-          items:
-            $ref: "#/components/schemas/MemoRecord"
+          items: {}
+        nextCursor:
+          type: string
+    ExpectedVersion:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 0
+    ExpectedReviewBindings:
+      type: object
+      required: [expectedVersion, expectedRevision, expectedHash]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+    WorkspacePreferences:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+          minimum: 0
         selectedMemoId:
           type: string
-        decisions:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/ReviewerDecision"
+        activeMemoBuilderSessionId:
+          type: string
+    WorkspacePreferenceUpdateCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 0
+        selectedMemoId:
+          type: [string, "null"]
+        activeMemoBuilderSessionId:
+          type: [string, "null"]
+    MemoBuilderSession:
+      type: object
+      additionalProperties: false
+      required: [id, title, dataClass, messages, updatedAt]
+      properties:
+        id:
+          type: string
+          pattern: '^builder-[A-Za-z0-9_-]+$'
+        title:
+          type: string
+          maxLength: 160
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        messages:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/MemoBuildChatMessage"
+        updatedAt:
+          type: string
+          format: date-time
+        starterPrompt:
+          type: string
+          maxLength: 8000
+        contextMemoId:
+          type: string
+        pendingInput:
+          type: string
+          maxLength: 8000
+        draft:
+          $ref: "#/components/schemas/MemoBuilderDraft"
+    MemoBuilderDraft:
+      type: object
+      additionalProperties: false
+      required: [title, itemFamily, dataClass, memoText]
+      properties:
+        title:
+          type: string
+          maxLength: 240
+        itemFamily:
+          type: string
+          maxLength: 240
+        manufacturer:
+          type: string
+          maxLength: 240
+        intendedUse:
+          type: string
+          maxLength: 2000
+        dataClass:
+          type: string
+          enum: [public, proprietary, export-controlled, itar-risk, cui]
+        memoText:
+          type: string
+          maxLength: 80000
+        attachments:
+          type: array
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 240
+        source:
+          type: string
+          enum: [chat, attachments, sample, review-improvement]
+        qualityChecks:
+          type: array
+          maxItems: 24
+          items:
+            type: string
+            maxLength: 1000
+        missingFacts:
+          type: array
+          maxItems: 24
+          items:
+            type: string
+            maxLength: 1000
+        sourceNotes:
+          type: array
+          maxItems: 24
+          items:
+            type: string
+            maxLength: 1000
+        reviewContextMemoId:
+          type: string
+    VersionedMemoBuilderSession:
+      type: object
+      required: [session, version]
+      properties:
+        session:
+          $ref: "#/components/schemas/MemoBuilderSession"
+        version:
+          type: integer
+          minimum: 1
+    MemoBuilderSessionPage:
+      allOf:
+        - $ref: "#/components/schemas/CursorPage"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/VersionedMemoBuilderSession"
+    ReviewSummary:
+      type: object
+      description: MemoRecord metadata without memoText or attachments.
+      required: [id, title, itemFamily, owner, updatedAt, documentCode, status, version, revision, contentHash]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        itemFamily:
+          type: string
+        owner:
+          type: string
+        updatedAt:
+          type: string
+        documentCode:
+          type: string
+        status:
+          type: string
+          enum: [draft, ready, needs-info, conflict, signed-off]
+        archivedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+        revision:
+          type: integer
+          minimum: 1
+        contentHash:
+          $ref: "#/components/schemas/Sha256"
+    ReviewSummaryPage:
+      allOf:
+        - $ref: "#/components/schemas/CursorPage"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              maxItems: 50
+              items:
+                $ref: "#/components/schemas/ReviewSummary"
+    ReviewDetail:
+      type: object
+      required: [review]
+      properties:
+        review:
+          $ref: "#/components/schemas/MemoRecord"
+        result:
+          $ref: "#/components/schemas/ReviewResult"
+        decision:
+          $ref: "#/components/schemas/ReviewerDecision"
+    ReviewCreateResult:
+      type: object
+      required: [review, auditEvents, replayed]
+      properties:
+        review:
+          $ref: "#/components/schemas/MemoRecord"
         auditEvents:
           type: array
           items:
             $ref: "#/components/schemas/AuditEvent"
-        analysisResults:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/ReviewResult"
-        chatMessages:
-          type: object
-          additionalProperties:
-            type: array
-            items:
-              $ref: "#/components/schemas/MemoChatMessage"
+        replayed:
+          type: boolean
+    ReviewMutationResult:
+      type: object
+      required: [review, auditEvents]
+      properties:
+        review:
+          $ref: "#/components/schemas/MemoRecord"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemoChatMessage"
+        auditEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+    ReviewMemoUpdateCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, expectedRevision, expectedHash, memoText]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+        memoText:
+          type: string
+          minLength: 1
+          maxLength: 200000
+    ReviewArchiveCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, expectedRevision, expectedHash, archived]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+        archived:
+          type: boolean
+    ReviewDecisionCommand:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, expectedRevision, expectedHash, action, notes, expectedAnalysisId, expectedAnalysisHash]
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 1
+        expectedRevision:
+          type: integer
+          minimum: 1
+        expectedHash:
+          $ref: "#/components/schemas/Sha256"
+        action:
+          type: string
+          enum: [accept, request-info, override]
+        notes:
+          type: string
+          minLength: 1
+        expectedAnalysisId:
+          type: string
+          maxLength: 160
+        expectedAnalysisHash:
+          $ref: "#/components/schemas/Sha256"
     MemoChatMessage:
       type: object
-      required: [id, memoId, role, text, createdAt]
+      required: [id, memoId, role, text, createdAt, memoRevision, memoVersion, memoHash]
       properties:
         id:
           type: string
+          maxLength: 128
         memoId:
           type: string
+          maxLength: 128
         role:
           type: string
           enum: [user, assistant]
         text:
           type: string
+          minLength: 1
+          maxLength: 12000
         createdAt:
           type: string
           format: date-time
+        sequence:
+          type: integer
+          minimum: 1
         proposedMemoText:
           type: string
+          minLength: 1
+          maxLength: 200000
+        memoRevision:
+          type: integer
+          minimum: 1
+        memoVersion:
+          type: integer
+          minimum: 1
+        memoHash:
+          $ref: "#/components/schemas/Sha256"
         applied:
           type: boolean
     AuditEvent:
       type: object
-      required: [id, memoId, at, actor, action, detail, severity]
+      required: [id, memoId, at, actor, actorId, organizationId, action, detail, severity, metadata]
       properties:
         id:
           type: string
@@ -759,6 +2733,10 @@ components:
           format: date-time
         actor:
           type: string
+        actorId:
+          type: string
+        organizationId:
+          type: string
         action:
           type: string
         detail:
@@ -766,6 +2744,20 @@ components:
         severity:
           type: string
           enum: [info, review, escalate]
+        metadata:
+          type: object
+          required: [actorType, source, outcome, subjectType, subjectId]
+          properties:
+            actorType:
+              const: user
+            source:
+              const: authenticated-api
+            outcome:
+              const: succeeded
+            subjectType:
+              const: review
+            subjectId:
+              type: string
     Document:
       type: object
       required: [id, status, checksumSha256]
@@ -792,8 +2784,12 @@ components:
           type: string
     NewReviewInput:
       type: object
-      required: [title, itemFamily, memoText]
+      additionalProperties: false
+      required: [requestId, title, itemFamily, manufacturer, intendedUse, dataClass, sourcePath, memoText, attachments]
       properties:
+        requestId:
+          type: string
+          format: uuid
         title:
           type: string
         itemFamily:
@@ -810,10 +2806,29 @@ components:
           enum: [manufacturer, self-classification, ccats, cj, unknown]
         memoText:
           type: string
+          minLength: 1
+          maxLength: 200000
         attachments:
           type: array
+          maxItems: 32
           items:
             type: string
+            maxLength: 240
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        assignedTo:
+          type: string
+          maxLength: 128
+        dueAt:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+            maxLength: 80
     ReviewRun:
       type: object
       required: [id, status, corpusId]
@@ -865,8 +2880,10 @@ components:
           enum: [info, review, escalate]
     ReviewerDecision:
       type: object
-      required: [action, notes]
+      required: [id, action, notes, signerId, signedBy, signedAt, createdAt, memoRevision, memoHash, analysisId, analysisHash]
       properties:
+        id:
+          type: string
         action:
           type: string
           enum: [accept, request-info, override]
@@ -876,9 +2893,516 @@ components:
           type: string
         signedAt:
           type: string
+          format: date-time
+        signerId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        memoRevision:
+          type: integer
+          minimum: 1
+        memoHash:
+          $ref: "#/components/schemas/Sha256"
+        analysisId:
+          type: string
+        analysisHash:
+          $ref: "#/components/schemas/Sha256"
+    UserAdminSummary:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          required: [online, usage]
+          properties:
+            lastSeenAt:
+              type: string
+              format: date-time
+            online:
+              type: boolean
+            usage:
+              type: object
+              required: [costUsd, inputTokens, outputTokens, calls]
+              properties:
+                costUsd:
+                  type: number
+                  minimum: 0
+                inputTokens:
+                  type: number
+                  minimum: 0
+                outputTokens:
+                  type: number
+                  minimum: 0
+                calls:
+                  type: integer
+                  minimum: 0
+    AdminMetricAvailability:
+      type: object
+      additionalProperties: false
+      required: [status, exact]
+      properties:
+        status:
+          type: string
+          enum: [available, unavailable]
+        exact:
+          type: boolean
+        asOf:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    AdminMetricBucket:
+      type: object
+      additionalProperties: false
+      required: [key, label, costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, calls]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        costUsd:
+          type: number
+          minimum: 0
+        inputTokens:
+          type: integer
+          minimum: 0
+        outputTokens:
+          type: integer
+          minimum: 0
+        cacheReadTokens:
+          type: integer
+          minimum: 0
+        cacheWriteTokens:
+          type: integer
+          minimum: 0
+        calls:
+          type: integer
+          minimum: 0
+    AdminMetricTotals:
+      type: object
+      additionalProperties: false
+      required: [costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, calls, avgLatencyMs]
+      properties:
+        costUsd:
+          type: number
+          minimum: 0
+        inputTokens:
+          type: integer
+          minimum: 0
+        outputTokens:
+          type: integer
+          minimum: 0
+        cacheReadTokens:
+          type: integer
+          minimum: 0
+        cacheWriteTokens:
+          type: integer
+          minimum: 0
+        calls:
+          type: integer
+          minimum: 0
+        avgLatencyMs:
+          type: integer
+          minimum: 0
+    AdminCostTimelinePoint:
+      type: object
+      additionalProperties: false
+      required: [period, label, segments]
+      properties:
+        period:
+          type: string
+          pattern: '^\d{4}-\d{2}$'
+        label:
+          type: string
+        segments:
+          type: array
+          maxItems: 32
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, label, costUsd]
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              costUsd:
+                type: number
+                minimum: 0
+    AdminMetrics:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, rangeDays, rangeStart, rangeEnd, availability, totals, byModel, byCallType, daily, monthlyByModel, monthlyByCallType, pricing, topUsers, users]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        rangeDays:
+          type: integer
+          enum: [7, 30, 90]
+        rangeStart:
+          type: string
+          format: date
+        rangeEnd:
+          type: string
+          format: date
+        availability:
+          type: object
+          additionalProperties: false
+          required: [status, usage, accountTotal, onlineUsers, topUsers]
+          properties:
+            status:
+              type: string
+              enum: [complete, partial]
+            usage:
+              $ref: "#/components/schemas/AdminMetricAvailability"
+            accountTotal:
+              $ref: "#/components/schemas/AdminMetricAvailability"
+            onlineUsers:
+              $ref: "#/components/schemas/AdminMetricAvailability"
+            topUsers:
+              $ref: "#/components/schemas/AdminMetricAvailability"
+        totals:
+          $ref: "#/components/schemas/AdminMetricTotals"
+        byModel:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/AdminMetricBucket"
+        byCallType:
+          type: array
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/AdminMetricBucket"
+        daily:
+          type: array
+          maxItems: 90
+          items:
+            $ref: "#/components/schemas/AdminMetricBucket"
+        monthlyByModel:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/AdminCostTimelinePoint"
+        monthlyByCallType:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/AdminCostTimelinePoint"
+        pricing:
+          type: array
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, label, inputPer1M, outputPer1M, cacheReadPer1M, cacheWritePer1M]
+            properties:
+              key:
+                type: string
+              label:
+                type: string
+              inputPer1M:
+                type: number
+                minimum: 0
+              outputPer1M:
+                type: number
+                minimum: 0
+              cacheReadPer1M:
+                type: number
+                minimum: 0
+              cacheWritePer1M:
+                type: number
+                minimum: 0
+        topUsers:
+          type: array
+          maxItems: 10
+          description: Empty in Dynamo mode unless an exact bounded ranking index is available; consult availability.topUsers.
+          items:
+            type: object
+        users:
+          type: object
+          additionalProperties: false
+          required: [total, online]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            online:
+              type: [integer, "null"]
+              minimum: 0
+    AdminUserPage:
+      type: object
+      required: [items, users]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/UserAdminSummary"
+        users:
+          type: array
+          deprecated: true
+          description: Compatibility alias of items.
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/UserAdminSummary"
+        nextCursor:
+          type: string
+    OutreachProviderConfig:
+      type: object
+      additionalProperties: false
+      required: [provider, deploymentProvider, credentialConfigured, ready]
+      properties:
+        provider:
+          type: string
+          enum: [bedrock, anthropic]
+        deploymentProvider:
+          type: string
+          enum: [bedrock, anthropic]
+        credentialConfigured:
+          type: boolean
+          description: Boolean readiness only; secret values and fingerprints are never returned.
+        ready:
+          type: boolean
+    OutreachPageMetadata:
+      type: object
+      additionalProperties: false
+      required: [loadedCount, hasMore]
+      properties:
+        loadedCount:
+          type: integer
+          minimum: 0
+          maximum: 50
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
+          maxLength: 4096
+          pattern: '^[A-Za-z0-9_.-]+$'
+    OutreachWorkspace:
+      type: object
+      additionalProperties: false
+      required: [leads, drafts, leadSearchRuns, leadWorkflows, outreachJobs, pagination, bedrock]
+      properties:
+        leads:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/OutreachLead"
+        drafts:
+          type: object
+          maxProperties: 100
+          additionalProperties:
+            $ref: "#/components/schemas/OutreachDraft"
+        leadSearchRuns:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/LeadSearchRun"
+        leadWorkflows:
+          type: object
+          maxProperties: 100
+          additionalProperties:
+            $ref: "#/components/schemas/LeadWorkflow"
+        outreachJobs:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/OutreachJob"
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [leads, drafts, runs, workflows, jobs]
+          properties:
+            leads:
+              $ref: "#/components/schemas/OutreachPageMetadata"
+            drafts:
+              $ref: "#/components/schemas/OutreachPageMetadata"
+            runs:
+              $ref: "#/components/schemas/OutreachPageMetadata"
+            workflows:
+              $ref: "#/components/schemas/OutreachPageMetadata"
+            jobs:
+              $ref: "#/components/schemas/OutreachPageMetadata"
+        bedrock:
+          type: object
+          additionalProperties: false
+          required: [ready, provider, model, personalizationModel, leadSearchModel, region]
+          properties:
+            ready:
+              type: boolean
+            provider:
+              type: string
+              enum: [bedrock, anthropic]
+            model:
+              type: string
+            personalizationModel:
+              type: string
+            leadSearchModel:
+              type: string
+            region:
+              type: string
+    OutreachCollectionPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/OutreachLead"
+              - $ref: "#/components/schemas/OutreachLeadRow"
+              - $ref: "#/components/schemas/OutreachDraft"
+              - $ref: "#/components/schemas/LeadSearchRun"
+              - $ref: "#/components/schemas/LeadWorkflow"
+              - $ref: "#/components/schemas/OutreachJob"
+        nextCursor:
+          type: string
+          maxLength: 4096
+          pattern: '^[A-Za-z0-9_.-]+$'
+    OutreachLeadRow:
+      type: object
+      additionalProperties: false
+      required: [lead]
+      properties:
+        lead:
+          $ref: "#/components/schemas/OutreachLead"
+        draft:
+          $ref: "#/components/schemas/OutreachDraft"
+        workflow:
+          $ref: "#/components/schemas/LeadWorkflow"
+    OutreachLead:
+      type: object
+      additionalProperties: false
+      required: [leadId, organization, organizationType, segment, website, domain, city, state, source, sourceUrl, fitScore, priority, email, status, outreachAngle, owner, notes, persona]
+      properties:
+        leadId: { type: string, minLength: 1, maxLength: 128 }
+        organization: { type: string, minLength: 1, maxLength: 500 }
+        organizationType: { type: string, maxLength: 128 }
+        segment: { type: string, maxLength: 500 }
+        website: { type: string, format: uri, maxLength: 2048 }
+        domain: { type: string, maxLength: 253 }
+        city: { type: string, maxLength: 240 }
+        state: { type: string, maxLength: 120 }
+        source: { type: string, maxLength: 500 }
+        sourceUrl: { type: string, format: uri, maxLength: 2048 }
+        fitScore: { type: number, minimum: 0, maximum: 100 }
+        priority: { type: string, maxLength: 32 }
+        email: { type: string, format: email, maxLength: 254 }
+        status: { type: string, maxLength: 240 }
+        outreachAngle: { type: string, maxLength: 4000 }
+        owner: { type: string, maxLength: 240 }
+        notes: { type: string, maxLength: 10000 }
+        persona: { type: string, maxLength: 1000 }
+        discoveredAt: { type: string, format: date-time }
+    OutreachDraft:
+      type: object
+      additionalProperties: false
+      required: [leadId, organization, email, subject, body, model, updatedAt]
+      properties:
+        leadId: { type: string, minLength: 1, maxLength: 128 }
+        organization: { type: string, minLength: 1, maxLength: 500 }
+        email: { type: string, format: email, maxLength: 254 }
+        subject: { type: string, minLength: 1, maxLength: 998 }
+        body: { type: string, minLength: 1, maxLength: 48000 }
+        model: { type: string, maxLength: 512 }
+        updatedAt: { type: string, format: date-time }
+        generatedAt: { type: string, format: date-time }
+        sentAt: { type: string, format: date-time }
+        personalizationStatus:
+          type: string
+          enum: [generic, personalized, needs-research]
+        personalizationDetail: { type: string, maxLength: 10000 }
+        personalizationRelevance: { type: string, maxLength: 10000 }
+        personalizationSourceTitle: { type: string, maxLength: 1000 }
+        personalizationSourceUrl: { type: string, format: uri, maxLength: 2048 }
+        personalizationVerifiedAt: { type: string, format: date-time }
+        personalizationConfidence: { type: number, minimum: 0, maximum: 1 }
+    LeadSearchRun:
+      type: object
+      additionalProperties: false
+      required: [id, startedAt, completedAt, durationSeconds, model, status, addedLeadIds, activity]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 128 }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        durationSeconds: { type: integer, minimum: 15, maximum: 45 }
+        model: { type: string, maxLength: 512 }
+        status: { type: string, enum: [completed, failed] }
+        addedLeadIds:
+          type: array
+          maxItems: 12
+          items: { type: string, maxLength: 128 }
+        activity:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [at, message]
+            properties:
+              at: { type: string, format: date-time }
+              message: { type: string, maxLength: 2000 }
+        error: { type: string, maxLength: 4000 }
+    LeadWorkflow:
+      type: object
+      additionalProperties: false
+      required: [leadId, reviewStatus, lifecycleStatus, updatedAt]
+      properties:
+        leadId: { type: string, minLength: 1, maxLength: 128 }
+        reviewStatus:
+          type: string
+          enum: [new, pending-review, approved, rejected, needs-research, ready-to-send]
+        lifecycleStatus:
+          type: string
+          enum: [not-contacted, drafted, personalized, approved, sent, replied, follow-up-due, closed, opted-out]
+        assignedOwner: { type: string, maxLength: 240 }
+        notes: { type: string, maxLength: 10000 }
+        lastContactedAt: { type: string, format: date-time }
+        followUpAt: { type: string, format: date-time }
+        replyStatus: { type: string, maxLength: 240 }
+        updatedAt: { type: string, format: date-time }
+    OutreachJob:
+      type: object
+      additionalProperties: false
+      required: [id, type, status, itemIds, cursor, completedCount, failedCount, retryCount, maxRetries, maxCostUsd, estimatedCostUsd, createdAt, updatedAt, logs]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 128 }
+        type: { type: string, enum: [draft-missing, personalize-all, lead-search] }
+        status: { type: string, enum: [queued, running, paused, completed, failed, terminated] }
+        itemIds:
+          type: array
+          maxItems: 1000
+          items: { type: string, minLength: 1, maxLength: 128 }
+        cursor: { type: integer, minimum: 0, maximum: 1000 }
+        completedCount: { type: integer, minimum: 0, maximum: 1000 }
+        failedCount: { type: integer, minimum: 0, maximum: 1000 }
+        retryCount: { type: integer, minimum: 0, maximum: 5 }
+        maxRetries: { type: integer, minimum: 0, maximum: 5 }
+        maxCostUsd: { type: number, minimum: 0.01, maximum: 100 }
+        estimatedCostUsd: { type: number, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        direction: { type: string, maxLength: 4000 }
+        searchDurationSeconds: { type: integer, minimum: 15, maximum: 45 }
+        error: { type: string, maxLength: 4000 }
+        logs:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [at, message, level]
+            properties:
+              at: { type: string, format: date-time }
+              message: { type: string, maxLength: 2000 }
+              level: { type: string, enum: [info, success, warning, error] }
     MemoRecord:
       type: object
-      required: [id, title, itemFamily, owner, updatedAt, documentCode, status, memoText, attachments]
+      required: [id, title, itemFamily, owner, updatedAt, documentCode, status, memoText, attachments, version, revision, contentHash]
       properties:
         id:
           type: string
@@ -901,6 +3425,14 @@ components:
           type: array
           items:
             type: string
+        version:
+          type: integer
+          minimum: 1
+        revision:
+          type: integer
+          minimum: 1
+        contentHash:
+          $ref: "#/components/schemas/Sha256"
         dataClass:
           type: string
           enum: [public, proprietary, export-controlled, itar-risk, cui]

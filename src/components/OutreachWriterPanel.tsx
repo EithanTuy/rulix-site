@@ -3,12 +3,15 @@ import { CheckCircle2, Copy, ExternalLink, Mail, RefreshCw, Save, Send, Sparkles
 import {
   generateOutreachEmail,
   createOutreachJob,
+  getOutreachPage,
   getOutreachWorkspace,
   markOutreachSent,
   personalizeOutreachEmail,
-  saveOutreachDraft
+  saveOutreachDraft,
+  type OutreachLeadRow
 } from "../lib/apiClient";
 import type { OutreachDraft, OutreachLead } from "../types";
+import { SafeExternalLink } from "./SafeExternalLink";
 
 export function OutreachWriterPanel() {
   const [leads, setLeads] = useState<OutreachLead[]>([]);
@@ -26,6 +29,8 @@ export function OutreachWriterPanel() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [signature, setSignature] = useState("Eithan Tuyilingire\nComputational Data Science");
+  const [leadCursor, setLeadCursor] = useState<string | undefined>();
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const lead = useMemo(
     () => leads.find((item) => item.leadId === selectedId) ?? leads[0],
@@ -38,6 +43,7 @@ export function OutreachWriterPanel() {
       const workspace = await getOutreachWorkspace();
       setLeads(workspace.leads);
       setDrafts(workspace.drafts);
+      setLeadCursor(workspace.pagination.leads.nextCursor);
       setModel(workspace.bedrock.model);
       setPersonalizationModel(workspace.bedrock.personalizationModel);
       setRegion(workspace.bedrock.region);
@@ -47,6 +53,25 @@ export function OutreachWriterPanel() {
       setError(message(loadError, "Could not load the outreach workspace."));
     }
   }, []);
+
+  const loadMore = async () => {
+    if (!leadCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await getOutreachPage<OutreachLeadRow>("lead-rows", { limit: 25, cursor: leadCursor });
+      setLeads((current) => mergeLeads(current, page.items.map((row) => row.lead)));
+      setDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(page.items.flatMap((row) => row.draft ? [[row.lead.leadId, row.draft]] : []))
+      }));
+      setLeadCursor(page.nextCursor);
+    } catch (loadError) {
+      setError(message(loadError, "Could not load more outreach rows."));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -162,12 +187,6 @@ export function OutreachWriterPanel() {
   };
 
   const draftAllMissing = async () => {
-    const missing = leads.filter((item) => !hasDraft(drafts[item.leadId]));
-    if (!missing.length) {
-      setNotice("Every lead already has a draft.");
-      return;
-    }
-
     setBusy(true);
     setError("");
     setNotice("");
@@ -210,15 +229,6 @@ export function OutreachWriterPanel() {
   };
 
   const personalizeAll = async () => {
-    const candidates = leads.filter((item) => {
-      const draft = drafts[item.leadId];
-      return hasDraft(draft) && !draft?.sentAt;
-    });
-    if (!candidates.length) {
-      setNotice("Every eligible draft is already personalized.");
-      return;
-    }
-
     setBusy(true);
     setError("");
     setNotice("");
@@ -245,12 +255,6 @@ export function OutreachWriterPanel() {
 
   const currentDraft = lead ? drafts[lead.leadId] : undefined;
   const fullDraft = `To: ${lead?.email ?? ""}\nSubject: ${subject}\n\n${body}`;
-  const missingDraftCount = leads.filter((item) => !hasDraft(drafts[item.leadId])).length;
-  const personalizationCount = leads.filter((item) => {
-    const draft = drafts[item.leadId];
-    return hasDraft(draft) && !draft?.sentAt;
-  }).length;
-
   return (
     <section className="outreach-panel" id="writer">
       <div className="outreach-head">
@@ -328,8 +332,8 @@ export function OutreachWriterPanel() {
             </button>
             <button type="button" onClick={() => void markSent()} disabled={busy || !subject || !body}><Send size={14} /> Mark sent</button>
             <button type="button" onClick={goNext} disabled={!lead || leads.findIndex((item) => item.leadId === lead.leadId) >= leads.length - 1}>Next →</button>
-            <button type="button" className="dash-primary" onClick={() => void signAllUnsent()} disabled={busy || !signature.trim()}>Sign all</button>
-            <button type="button" className="dash-secondary" onClick={() => void removeSignatureFromAll()} disabled={busy || !signature.trim()}>Remove from all</button>
+            <button type="button" className="dash-primary" onClick={() => void signAllUnsent()} disabled={busy || !signature.trim()}>Sign loaded drafts</button>
+            <button type="button" className="dash-secondary" onClick={() => void removeSignatureFromAll()} disabled={busy || !signature.trim()}>Remove from loaded</button>
           </div>
           <label>
             <span>Body</span>
@@ -350,30 +354,28 @@ export function OutreachWriterPanel() {
           <div>
             <span className="dash-eyebrow">Outreach status</span>
             <h3>Email queue</h3>
-            <p>Draft and manual-send status for every configured lead.</p>
+            <p>Draft and manual-send status for {leads.length}{leadCursor ? "+" : ""} loaded leads.</p>
           </div>
           <div className="outreach-ledger-actions">
             <button
               type="button"
               className="dash-secondary"
               onClick={() => void personalizeAll()}
-              disabled={busy || !ready || personalizationCount === 0}
+              disabled={busy || !ready}
             >
               <Sparkles size={16} />
-              {personalizationCount ? `Refresh subtle context (${personalizationCount})` : "No eligible drafts"}
+              Refresh all eligible drafts
             </button>
             <button
               type="button"
               className="dash-primary"
               onClick={() => void draftAllMissing()}
-              disabled={busy || !ready || missingDraftCount === 0}
+              disabled={busy || !ready}
             >
               <Mail size={16} />
               {busy && bulkProgress
                 ? "Working..."
-                : missingDraftCount
-                  ? `Draft all missing (${missingDraftCount})`
-                  : "All emails drafted"}
+                : "Draft all missing"}
             </button>
           </div>
         </div>
@@ -414,6 +416,11 @@ export function OutreachWriterPanel() {
             );
           })}
         </div>
+        {leadCursor && (
+          <button type="button" className="dash-secondary" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "Loading more outreach..." : "Load 25 more leads"}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -432,9 +439,9 @@ function PersonalizationEvidence({ draft }: { draft: OutreachDraft }) {
       {draft.personalizationDetail && <p><strong>Public detail:</strong> {draft.personalizationDetail}</p>}
       {draft.personalizationRelevance && <p><strong>Why it matters:</strong> {draft.personalizationRelevance}</p>}
       {draft.personalizationSourceUrl && (
-        <a href={draft.personalizationSourceUrl} target="_blank" rel="noreferrer">
+        <SafeExternalLink href={draft.personalizationSourceUrl}>
           {draft.personalizationSourceTitle || "Open personalization source"} <ExternalLink size={13} />
-        </a>
+        </SafeExternalLink>
       )}
       {status === "generic" && <p>Add restrained sourced context while preserving the original structure and most wording.</p>}
     </div>
@@ -443,6 +450,10 @@ function PersonalizationEvidence({ draft }: { draft: OutreachDraft }) {
 
 function hasDraft(draft: OutreachDraft | undefined) {
   return Boolean(draft?.subject.trim() || draft?.body.trim());
+}
+
+function mergeLeads(current: OutreachLead[], incoming: OutreachLead[]) {
+  return [...new Map([...current, ...incoming].map((lead) => [lead.leadId, lead])).values()];
 }
 
 function personalizationLabel(draft: OutreachDraft | undefined) {

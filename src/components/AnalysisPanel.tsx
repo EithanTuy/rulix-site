@@ -15,11 +15,23 @@ import {
   XSquare
 } from "lucide-react";
 import { getSourceChunk } from "../data/corpus";
-import { ANALYSIS_MODE_CONFIG, type AnalysisMode } from "../lib/apiClient";
+import {
+  ANALYSIS_MODE_CONFIG,
+  type AnalysisMode,
+  type CouncilApprovalView
+} from "../lib/apiClient";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
-import type { AuditEvent, MemoChatMessage, MemoRecord, ReviewerDecision, ReviewResult } from "../types";
+import type {
+  AuditEvent,
+  MemoChatMessage,
+  MemoRecord,
+  ReviewerDecision,
+  ReviewResult,
+  UserProfile
+} from "../types";
 import { MemoChatPanel } from "./MemoChatPanel";
 import { renderMarkdown, renderInline } from "../lib/markdown";
+import { SafeExternalLink } from "./SafeExternalLink";
 
 type SupportTab = "chat" | "analysis" | "decision" | "audit";
 
@@ -35,14 +47,22 @@ interface AnalysisPanelProps {
   backendNotice: string;
   liveAnalysisAvailable: boolean;
   onRunAnalysis: () => void;
+  userRole: UserProfile["role"];
+  councilApproval?: CouncilApprovalView;
+  approvalBusy: boolean;
+  onRevokeCouncilApproval: () => Promise<void> | void;
   decision?: ReviewerDecision;
   auditEvents: AuditEvent[];
   chatMessages: MemoChatMessage[];
   analysisLocked: boolean;
   memoDraftDirty: boolean;
-  onDecision: (action: ReviewerDecision["action"], notes: string) => void;
-  onSendChat: (memoId: string, message: string) => Promise<void>;
-  onApplyChatSuggestion: (memoId: string, messageId: string, proposedMemoText: string) => void;
+  onDecision: (action: ReviewerDecision["action"], notes: string) => Promise<void>;
+  onSendChat: (memoId: string, message: string) => Promise<"sent" | "queued">;
+  onApplyChatSuggestion: (memoId: string, messageId: string) => Promise<void>;
+  chatHasMore?: boolean;
+  auditHasMore?: boolean;
+  onLoadMoreChat?: (memoId: string) => Promise<void>;
+  onLoadMoreAudit?: (memoId: string) => Promise<void>;
 
   selectedFindingId?: string;
   onFindingSelect: (findingId: string | undefined) => void;
@@ -57,6 +77,10 @@ export function AnalysisPanel({
   backendNotice,
   liveAnalysisAvailable,
   onRunAnalysis,
+  userRole,
+  councilApproval,
+  approvalBusy,
+  onRevokeCouncilApproval,
   decision,
   auditEvents,
   chatMessages,
@@ -65,6 +89,10 @@ export function AnalysisPanel({
   onDecision,
   onSendChat,
   onApplyChatSuggestion,
+  chatHasMore = false,
+  auditHasMore = false,
+  onLoadMoreChat = async () => undefined,
+  onLoadMoreAudit = async () => undefined,
 
   selectedFindingId,
   onFindingSelect
@@ -74,6 +102,16 @@ export function AnalysisPanel({
   const [selectedAction, setSelectedAction] = useState<ReviewerDecision["action"] | undefined>(
     decision?.action
   );
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionError, setDecisionError] = useState("");
+  const isOfficer = userRole === "export-control-officer";
+  const analysisActionLabel = analysisState.status === "running"
+    ? "Analyzing..."
+    : isOfficer
+      ? "Approve & Analyze"
+      : councilApproval?.usable
+        ? "Run Approved Analysis"
+        : "Request Officer Approval";
   useEffect(() => {
     setNotes(decision?.notes ?? "");
     setSelectedAction(decision?.action);
@@ -115,6 +153,9 @@ export function AnalysisPanel({
       memoDraftDirty={memoDraftDirty}
       onSendChat={onSendChat}
       onApplyChatSuggestion={onApplyChatSuggestion}
+      hasMore={chatHasMore}
+      onLoadMore={onLoadMoreChat}
+      userRole={userRole}
     />
   );
 
@@ -140,11 +181,18 @@ export function AnalysisPanel({
                 onModeChange={onAnalysisModeChange}
                 disabled={analysisState.status === "running"}
               />
+              <CouncilApprovalCard
+                memo={memo}
+                approval={councilApproval}
+                isOfficer={isOfficer}
+                busy={approvalBusy}
+                onRevoke={onRevokeCouncilApproval}
+              />
               <button
                 type="button"
                 className="button primary full"
                 onClick={onRunAnalysis}
-                disabled={analysisState.status === "running" || memoDraftDirty || !liveAnalysisAvailable}
+                disabled={analysisState.status === "running" || approvalBusy || memoDraftDirty || !liveAnalysisAvailable}
                 title={
                   memoDraftDirty
                     ? "Save or discard memo edits before running analysis."
@@ -153,7 +201,7 @@ export function AnalysisPanel({
                       : undefined
                 }
               >
-                {analysisState.status === "running" ? "Analyzing..." : "Run AI Analysis"}
+                {analysisActionLabel}
               </button>
             </section>
 
@@ -194,7 +242,7 @@ export function AnalysisPanel({
               type="button"
               className="button small"
               onClick={onRunAnalysis}
-              disabled={memoDraftDirty || !liveAnalysisAvailable}
+              disabled={approvalBusy || memoDraftDirty || !liveAnalysisAvailable}
               title={
                 memoDraftDirty
                   ? "Save or discard memo edits before rerunning analysis."
@@ -203,13 +251,20 @@ export function AnalysisPanel({
                     : undefined
               }
             >
-              Re-run Analysis
+              {isOfficer ? "Approve & Re-run" : councilApproval?.usable ? "Run Approved Analysis" : "Request Approval"}
             </button>
           </section>
 
           <section className="analysis-section">
             <h3>Analysis Mode</h3>
             <AnalysisModeSelector mode={analysisMode} onModeChange={onAnalysisModeChange} />
+            <CouncilApprovalCard
+              memo={memo}
+              approval={councilApproval}
+              isOfficer={isOfficer}
+              busy={approvalBusy}
+              onRevoke={onRevokeCouncilApproval}
+            />
             <div className="run-metadata">
               <strong>Last result</strong>
               <span>
@@ -290,9 +345,9 @@ export function AnalysisPanel({
                 </ul>
               )}
             </div>
-            <a href={firstSourceUrl(result)} target="_blank" rel="noreferrer">
+            <SafeExternalLink href={firstSourceUrl(result)}>
               View ECCN Guidance <ExternalLink size={15} />
-            </a>
+            </SafeExternalLink>
           </section>
 
           <section className="analysis-section">
@@ -325,9 +380,9 @@ export function AnalysisPanel({
                 {selectedFinding.sourceChunkIds.map((id) => {
                   const source = getSourceChunk(id);
                   return source ? (
-                    <a href={source.url} target="_blank" rel="noreferrer" key={id}>
+                    <SafeExternalLink href={source.url} key={id}>
                       {source.locator}
-                    </a>
+                    </SafeExternalLink>
                   ) : null;
                 })}
               </div>
@@ -351,7 +406,7 @@ export function AnalysisPanel({
         <h3>Source Citations</h3>
         <div className="citation-list">
           {citations.slice(0, 6).map((chunk) => (
-            <a href={chunk!.url} target="_blank" rel="noreferrer" key={chunk!.id}>
+            <SafeExternalLink href={chunk!.url} key={chunk!.id}>
               <FileText size={18} />
               <span>
                 <strong>{chunk!.locator}</strong>
@@ -359,7 +414,7 @@ export function AnalysisPanel({
               </span>
               <small>Official Corpus v2026.06</small>
               <ExternalLink size={14} />
-            </a>
+            </SafeExternalLink>
           ))}
         </div>
       </section>
@@ -389,6 +444,11 @@ export function AnalysisPanel({
             </div>
           ))}
           {auditEvents.length === 0 && <p className="empty-note">No audit events recorded yet.</p>}
+          {auditHasMore && (
+            <button type="button" className="button small full" onClick={() => void onLoadMoreAudit(memo.id)}>
+              Load more audit events
+            </button>
+          )}
         </div>
       </section>
       )}
@@ -447,15 +507,22 @@ export function AnalysisPanel({
         <button
           type="button"
           className="button signoff full"
-          disabled={!canSubmit}
+          disabled={!canSubmit || decisionBusy}
           onClick={() => {
             if (selectedAction && notes.trim()) {
-              onDecision(selectedAction, notes.trim());
+              setDecisionBusy(true);
+              setDecisionError("");
+              void onDecision(selectedAction, notes.trim())
+                .catch((error) => {
+                  setDecisionError(error instanceof Error ? error.message : "Decision was not recorded.");
+                })
+                .finally(() => setDecisionBusy(false));
             }
           }}
         >
-          <UserRound size={17} /> Record Decision
+          <UserRound size={17} /> {decisionBusy ? "Recording..." : "Record Decision"}
         </button>
+        {decisionError && <p className="decision-state warning">{decisionError}</p>}
         {acceptBlocked && (
           <p className="decision-state warning">
             Missing or conflicting evidence is still blocking acceptance. Request more info or override instead.
@@ -470,6 +537,49 @@ export function AnalysisPanel({
       </section>
       )}
     </aside>
+  );
+}
+
+function CouncilApprovalCard({
+  memo,
+  approval,
+  isOfficer,
+  busy,
+  onRevoke
+}: {
+  memo: MemoRecord;
+  approval?: CouncilApprovalView;
+  isOfficer: boolean;
+  busy: boolean;
+  onRevoke: () => Promise<void> | void;
+}) {
+  const status = approval?.approval;
+  const label = approval?.usable
+    ? "Approved for one exact dispatch"
+    : status?.revocation
+      ? "Approval revoked"
+      : status && status.dispatchesReserved >= status.approval.dispatchLimit
+        ? "Approval already used"
+        : status
+          ? "Approval no longer matches"
+          : "Officer approval required";
+  return (
+    <div className={`ai-approval-card ${approval?.usable ? "approved" : "pending"}`}>
+      <div>
+        <strong>{label}</strong>
+        <span>
+          Revision {memo.revision ?? 1} · {approval?.depth === "deep" ? "deep" : "standard"} · hash {(memo.contentHash ?? "not-loaded").slice(0, 10)}…
+        </span>
+        {status?.approval.expiresAt && (
+          <small>Expires {formatAuditTime(status.approval.expiresAt)}; any memo or mode edit invalidates it.</small>
+        )}
+      </div>
+      {isOfficer && status?.current && !status.revocation && status.dispatchesReserved === 0 && (
+        <button type="button" className="button small" disabled={busy} onClick={() => void onRevoke()}>
+          Revoke
+        </button>
+      )}
+    </div>
   );
 }
 

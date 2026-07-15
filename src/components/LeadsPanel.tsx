@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Search, Sparkles } from "lucide-react";
-import { createOutreachJob, getOutreachWorkspace } from "../lib/apiClient";
+import { createOutreachJob, getOutreachPage, getOutreachWorkspace } from "../lib/apiClient";
 import type { LeadSearchActivity, LeadSearchRun, OutreachJob, OutreachLead } from "../types";
+import { SafeExternalLink } from "./SafeExternalLink";
 
 const SEARCH_BUDGETS = [15, 30, 45] as const;
 
@@ -14,6 +15,8 @@ export function LeadsPanel() {
   const [activity, setActivity] = useState<LeadSearchActivity[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeJob, setActiveJob] = useState<OutreachJob | undefined>();
+  const [leadCursor, setLeadCursor] = useState<string | undefined>();
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -21,6 +24,7 @@ export function LeadsPanel() {
     try {
       const workspace = await getOutreachWorkspace();
       setLeads(workspace.leads);
+      setLeadCursor(workspace.pagination.leads.nextCursor);
       setRuns(workspace.leadSearchRuns ?? []);
       setModel(workspace.bedrock.leadSearchModel);
       const job = workspace.outreachJobs?.find((candidate) =>
@@ -34,11 +38,44 @@ export function LeadsPanel() {
     }
   }, []);
 
+  const refreshActivity = useCallback(async () => {
+    try {
+      const [runPage, jobPage] = await Promise.all([
+        getOutreachPage<LeadSearchRun>("runs", { limit: 25 }),
+        getOutreachPage<OutreachJob>("jobs", { limit: 25 })
+      ]);
+      setRuns(runPage.items);
+      const job = jobPage.items.find((candidate) =>
+        candidate.type === "lead-search" && ["queued", "running"].includes(candidate.status)
+      );
+      setActiveJob(job);
+      setSearching(Boolean(job));
+      if (job) setActivity(job.logs.map((log) => ({ at: log.at, message: log.message })));
+    } catch {
+      // Keep the last known activity during a transient polling failure.
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 3000);
+    const timer = window.setInterval(() => void refreshActivity(), 3000);
     return () => window.clearInterval(timer);
-  }, [load]);
+  }, [load, refreshActivity]);
+
+  const loadMore = async () => {
+    if (!leadCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await getOutreachPage<OutreachLead>("leads", { limit: 25, cursor: leadCursor });
+      setLeads((current) => mergeByLeadId(current, page.items));
+      setLeadCursor(page.nextCursor);
+    } catch (loadError) {
+      setError(message(loadError, "Could not load more leads."));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const visibleLeads = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -122,7 +159,7 @@ export function LeadsPanel() {
         </div>
         <div className="lead-search-meta">
           <span><strong>Model</strong>{friendlyModel(model)}</span>
-          <span><strong>Pipeline</strong>{leads.length} leads</span>
+          <span><strong>Loaded pipeline</strong>{leads.length}{leadCursor ? "+" : ""} leads</span>
           <span><strong>Last run</strong>{latestRun ? formatDateTime(latestRun.completedAt) : "Not run yet"}</span>
           {activeJob && <span><strong>Background job</strong>{activeJob.status} · ${activeJob.estimatedCostUsd.toFixed(3)} est.</span>}
         </div>
@@ -147,7 +184,7 @@ export function LeadsPanel() {
         <div className="leads-table-toolbar">
           <div>
             <h2>Lead Master</h2>
-            <p>{visibleLeads.length} of {leads.length} outreach-ready and AI-discovered leads</p>
+            <p>{visibleLeads.length} of {leads.length} loaded outreach-ready and AI-discovered leads</p>
           </div>
           <label className="leads-search">
             <Search size={16} />
@@ -163,9 +200,18 @@ export function LeadsPanel() {
             {visibleLeads.map((lead) => <LeadRow lead={lead} key={lead.leadId} />)}
           </div>
         </div>
+        {leadCursor && (
+          <button type="button" className="dash-secondary" onClick={() => void loadMore()} disabled={loadingMore}>
+            {loadingMore ? "Loading more leads..." : "Load 25 more leads"}
+          </button>
+        )}
       </div>
     </section>
   );
+}
+
+function mergeByLeadId(current: OutreachLead[], incoming: OutreachLead[]) {
+  return [...new Map([...current, ...incoming].map((lead) => [lead.leadId, lead])).values()];
 }
 
 function LeadRow({ lead, header = false }: { lead: OutreachLead | undefined; header?: boolean }) {
@@ -187,12 +233,12 @@ function LeadRow({ lead, header = false }: { lead: OutreachLead | undefined; hea
       <span className="lead-organization">{lead.organization}</span>
       <span>{lead.organizationType}</span>
       <span>{lead.segment}</span>
-      <span>{lead.website ? <a href={lead.website} target="_blank" rel="noreferrer">Website <ExternalLink size={12} /></a> : ""}</span>
+      <span>{lead.website ? <SafeExternalLink href={lead.website}>Website <ExternalLink size={12} /></SafeExternalLink> : ""}</span>
       <span>{lead.domain}</span>
       <span>{lead.city}</span>
       <span>{lead.state}</span>
       <span>{lead.source}</span>
-      <span>{lead.sourceUrl ? <a href={lead.sourceUrl} target="_blank" rel="noreferrer">Source <ExternalLink size={12} /></a> : ""}</span>
+      <span>{lead.sourceUrl ? <SafeExternalLink href={lead.sourceUrl}>Source <ExternalLink size={12} /></SafeExternalLink> : ""}</span>
       <span>{lead.fitScore}</span>
       <span>{lead.priority}</span>
       <span className="lead-email">{lead.email}</span>

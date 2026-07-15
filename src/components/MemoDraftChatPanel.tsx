@@ -16,21 +16,28 @@ import {
   X
 } from "lucide-react";
 import {
+  ApiError,
+  requestMemoBuilderApproval,
   sendMemoBuildChat,
   type MemoBuildDraft,
   type MemoBuildMessage
 } from "../lib/apiClient";
 import { extractFileText, formatExtractedAttachment } from "../lib/documentIntake";
 import { renderMarkdown } from "../lib/markdown";
-import type { MemoBuilderDraftSource, MemoBuilderSession } from "../types";
+import type { MemoBuilderDraftSource, MemoBuilderSession, UserProfile } from "../types";
 
 interface MemoDraftChatPanelProps {
   sessions: MemoBuilderSession[];
   activeSessionId?: string;
   onSessionsChange: (sessions: MemoBuilderSession[]) => void;
   onActiveSessionChange: (sessionId: string) => void;
-  onCreateMemo: (draft: MemoBuildDraft) => string | void;
-  onCreateAndAnalyze: (draft: MemoBuildDraft) => string | void;
+  onCreateMemo: (draft: MemoBuildDraft) => Promise<string | void>;
+  onCreateAndAnalyze: (draft: MemoBuildDraft) => Promise<string | void>;
+  onPrepareSessionForAi: (session: MemoBuilderSession) => Promise<MemoBuilderSession>;
+  userRole: UserProfile["role"];
+  hasMoreSessions?: boolean;
+  loadingMoreSessions?: boolean;
+  onLoadMoreSessions?: () => Promise<void>;
 }
 
 interface BuilderAttachment {
@@ -61,10 +68,16 @@ export function MemoDraftChatPanel({
   onSessionsChange,
   onActiveSessionChange,
   onCreateMemo,
-  onCreateAndAnalyze
+  onCreateAndAnalyze,
+  onPrepareSessionForAi,
+  userRole,
+  hasMoreSessions = false,
+  loadingMoreSessions = false,
+  onLoadMoreSessions = async () => undefined
 }: MemoDraftChatPanelProps) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
   const [error, setError] = useState("");
   const [attachments, setAttachments] = useState<BuilderAttachment[]>([]);
   const [copyNotice, setCopyNotice] = useState("");
@@ -225,10 +238,6 @@ export function MemoDraftChatPanel({
       content: buildUserContentForSonnet(visibleText, readyAttachments)
     };
     const nextMessages = [...messages, userMsg];
-    updateActiveSession({
-      title: activeSessionTitle(activeSession, visibleText),
-      messages: nextMessages
-    });
     setInput("");
     setAttachments([]);
     setBusy(true);
@@ -237,7 +246,37 @@ export function MemoDraftChatPanel({
     setWriteNotice("");
 
     try {
-      const result = await sendMemoBuildChat(nextMessages);
+      const session = activeSession ?? createBlankSession();
+      const preparedSession = await onPrepareSessionForAi({
+        ...session,
+        title: activeSessionTitle(activeSession, visibleText),
+        pendingInput: userMsg.content
+      });
+      const fingerprint = JSON.stringify({
+        id: preparedSession.id,
+        dataClass: preparedSession.dataClass,
+        messages: preparedSession.messages,
+        pendingInput: preparedSession.pendingInput,
+        updatedAt: preparedSession.updatedAt
+      });
+      let result;
+      try {
+        result = await sendMemoBuildChat(
+          preparedSession.id,
+          userMsg.content,
+          fingerprint
+        );
+      } catch (error) {
+        if (userRole !== "export-control-officer" &&
+            error instanceof ApiError && error.code === "ai_officer_approval_required") {
+          await requestMemoBuilderApproval(preparedSession.id, fingerprint);
+          setInput(text);
+          setAttachments(unsentAttachments);
+          setWriteNotice("Approval requested. This exact saved message is ready for an export-control officer to inspect.");
+          return;
+        }
+        throw error;
+      }
       const assistantMsg: MemoBuildMessage = { role: "assistant", content: result.reply };
       const returnedDraft = result.draft
         ? normalizeDraft(result.draft, readyAttachments, draft, nextMessages, draftSource, activeSession?.contextMemoId)
@@ -247,10 +286,12 @@ export function MemoDraftChatPanel({
       }
       updateActiveSession({
         messages: [...nextMessages, assistantMsg],
-        draft: returnedDraft ?? draft
+        draft: returnedDraft ?? draft,
+        pendingInput: ""
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setInput(text);
       setAttachments(unsentAttachments);
     } finally {
       setBusy(false);
@@ -281,7 +322,7 @@ export function MemoDraftChatPanel({
         { id, name: file.name, content: "", status: "reading", detail: "Reading attachment. PDFs can take a bit..." }
       ]);
       try {
-        const extraction = await extractFileText(file);
+        const extraction = await extractFileText(file, activeSession?.dataClass ?? "proprietary");
         const content = extraction.text.trim() ? formatExtractedAttachment(file.name, extraction) : "";
         setAttachments((current) =>
           current.map((attachment) =>
@@ -314,17 +355,26 @@ export function MemoDraftChatPanel({
     }
   };
 
-  const handleWrite = (analyze: boolean) => {
-    if (!draft || !draft.memoText.trim()) return;
-    const reviewId = analyze ? onCreateAndAnalyze(draft) : onCreateMemo(draft);
-    updateActiveSession({
-      draft: undefined,
-      starterPrompt: undefined,
-      contextMemoId: undefined
-    });
-    setInput("");
+  const handleWrite = async (analyze: boolean) => {
+    if (!draft || !draft.memoText.trim() || writeBusy) return;
+    setWriteBusy(true);
     setError("");
-    setWriteNotice(reviewId ? `Added to Reviews as ${reviewId}.` : "Added to Reviews.");
+    setWriteNotice(analyze ? "Adding review before analysis..." : "Adding review...");
+    try {
+      const reviewId = await (analyze ? onCreateAndAnalyze(draft) : onCreateMemo(draft));
+      updateActiveSession({
+        draft: undefined,
+        starterPrompt: undefined,
+        contextMemoId: undefined
+      });
+      setInput("");
+      setWriteNotice(reviewId ? `Added to Reviews as ${reviewId}.` : "Added to Reviews.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The review could not be created. Try again.");
+      setWriteNotice("");
+    } finally {
+      setWriteBusy(false);
+    }
   };
 
   const clearDraft = () => {
@@ -415,6 +465,16 @@ export function MemoDraftChatPanel({
               </span>
             </button>
           ))}
+          {hasMoreSessions && (
+            <button
+              type="button"
+              className="button small full"
+              onClick={() => void onLoadMoreSessions()}
+              disabled={loadingMoreSessions}
+            >
+              {loadingMoreSessions ? "Loading more chats..." : "Load more chats"}
+            </button>
+          )}
         </div>
       </aside>
 
@@ -425,6 +485,23 @@ export function MemoDraftChatPanel({
             <strong>Memo Builder</strong>
             <span>Draft, copy, and send review-ready ECCN memos into Reviews</span>
           </div>
+          <label className="memo-builder-classification">
+            Classification
+            <select
+              aria-label="Memo Builder classification"
+              value={activeSession?.dataClass ?? "proprietary"}
+              disabled={busy}
+              onChange={(event) => updateActiveSession({
+                dataClass: event.target.value as MemoBuilderSession["dataClass"]
+              })}
+            >
+              <option value="public">Public</option>
+              <option value="proprietary">Proprietary</option>
+              <option value="export-controlled">Export-controlled</option>
+              <option value="itar-risk">ITAR risk</option>
+              <option value="cui">CUI</option>
+            </select>
+          </label>
         </div>
 
         <div className="memo-builder-thread" ref={threadRef}>
@@ -497,11 +574,21 @@ export function MemoDraftChatPanel({
                     <Download size={14} />
                     Download .md
                   </button>
-                  <button type="button" className="button primary small" onClick={() => handleWrite(false)}>
+                  <button
+                    type="button"
+                    className="button primary small"
+                    onClick={() => void handleWrite(false)}
+                    disabled={writeBusy}
+                  >
                     <Plus size={14} />
                     Add to Reviews
                   </button>
-                  <button type="button" className="button small" onClick={() => handleWrite(true)}>
+                  <button
+                    type="button"
+                    className="button small"
+                    onClick={() => void handleWrite(true)}
+                    disabled={writeBusy}
+                  >
                     <CheckCircle2 size={14} />
                     Add &amp; Analyze
                   </button>
@@ -594,12 +681,20 @@ export function MemoDraftChatPanel({
               className="button primary memo-builder-send"
               onClick={() => void send()}
               disabled={busy || (!input.trim() && !attachments.some((attachment) => attachment.content.trim()))}
-              aria-label="Send"
+              aria-label={userRole === "export-control-officer" ? "Approve and send" : "Request officer approval"}
+              title={userRole === "export-control-officer"
+                ? "Approve this exact saved conversation and send one provider request"
+                : "Submit this exact saved conversation for officer approval"}
             >
               <Send size={16} />
+              <span>{userRole === "export-control-officer" ? "Approve & Send" : "Request Approval"}</span>
             </button>
           </div>
-          <p className="memo-chat-note">Ctrl+Enter to send - attached documents go to Sonnet as extracted source text - reviewer signoff required</p>
+          <p className="memo-chat-note">
+            {userRole === "export-control-officer"
+              ? "Ctrl+Enter approves this exact saved conversation and sends one request - reviewer signoff is still required."
+              : "Ctrl+Enter submits this exact saved conversation for export-control officer approval; edits create a new request."}
+          </p>
         </div>
       </div>
     </div>
@@ -638,8 +733,9 @@ function DraftQualitySummary({ draft }: { draft: MemoBuildDraft }) {
 function createBlankSession(): MemoBuilderSession {
   const now = new Date().toISOString();
   return {
-    id: `builder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `builder-${crypto.randomUUID()}`,
     title: "New memo chat",
+    dataClass: "proprietary",
     messages: [],
     updatedAt: now
   };

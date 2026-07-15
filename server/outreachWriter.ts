@@ -1,11 +1,22 @@
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import type { OutreachDraft, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
-import { createAIClient, outreachProviderReady, resolveModel, type StoredOutreachConfig } from "./aiClient";
+import { outreachProviderReady, resolveModel, type StoredOutreachConfig } from "./aiClient";
+import {
+  AiEgressPolicyError,
+  dispatchAuthorizedAiRequest,
+  resolveConfiguredAiLane,
+  type AiEgressContext,
+  type AiProviderClient,
+  type AiProviderLane
+} from "./aiEgressGateway";
+import { fetchPublicHttp } from "./publicHttp";
 
 export const DEFAULT_OUTREACH_MODEL = "us.anthropic.claude-opus-4-6-v1";
 export const DEFAULT_PERSONALIZATION_MODEL = "global.anthropic.claude-sonnet-4-6";
+type TrustedOutreachEgress = Pick<
+  AiEgressContext,
+  "accountId" | "dataClass" | "dispatchId" | "trustedWorkflowGrant"
+>;
 
 const SYSTEM_PROMPT = `You write concise founder outreach for Rulix.
 Return one calm, direct, conversational email. Personalization is optional and minimal. In most cases, the organization and relevant department are enough.
@@ -143,15 +154,24 @@ export async function generateOutreachDraft(
   lead: OutreachLead,
   direction = "",
   onUsage?: (sample: UsageSample) => void,
-  config: StoredOutreachConfig = { provider: "bedrock" }
+  config: StoredOutreachConfig = { provider: "bedrock" },
+  egress?: TrustedOutreachEgress,
+  providerClient?: AiProviderClient
 ): Promise<OutreachDraft> {
+  const egressBase = requireOutreachEgress(egress);
   const model = outreachModel();
-  const apiModel = resolveModel(model, config);
+  const lane = resolveOutreachLane(config, model);
   const startedAt = Date.now();
-  const client = createAIClient(config);
-  const response = await client.messages.create(
+  const response = await dispatchAuthorizedAiRequest(
     {
-      model: apiModel,
+      ...egressBase,
+      dispatchId: `${egressBase.dispatchId}:draft`,
+      purpose: "outreach-writer",
+      payload: { lead, direction }
+    },
+    lane,
+    {
+      model: lane.model,
       max_tokens: 700,
       temperature: 0.35,
       system: SYSTEM_PROMPT,
@@ -173,14 +193,14 @@ export async function generateOutreachDraft(
       ]
     },
     {
-      signal: AbortSignal.timeout(55_000),
-      maxRetries: 0
-    }
+      signal: AbortSignal.timeout(55_000)
+    },
+    providerClient
   );
 
   const usage = response.usage as unknown as Record<string, unknown>;
   onUsage?.({
-    model,
+    model: lane.model,
     callType: "outreach-writer",
     inputTokens: numberValue(usage.input_tokens),
     outputTokens: numberValue(usage.output_tokens),
@@ -209,7 +229,7 @@ export async function generateOutreachDraft(
     email: lead.email,
     subject,
     body,
-    model,
+    model: lane.model,
     generatedAt: now,
     updatedAt: now,
     personalizationStatus: "generic"
@@ -220,15 +240,10 @@ export async function personalizeOutreachDraft(
   lead: OutreachLead,
   draft: OutreachDraft,
   onUsage?: (sample: UsageSample) => void,
-  config: StoredOutreachConfig = { provider: "bedrock" }
+  config: StoredOutreachConfig = { provider: "bedrock" },
+  egress?: TrustedOutreachEgress,
+  providerClient?: AiProviderClient
 ): Promise<OutreachDraft> {
-  if (!outreachProviderReady(config)) {
-    throw new Error(
-      config.provider === "anthropic"
-        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
-        : "Amazon Bedrock is not enabled for this deployment."
-    );
-  }
   const sources = await collectPublicSources(lead);
   if (!sources.length) {
     return {
@@ -242,13 +257,20 @@ export async function personalizeOutreachDraft(
     };
   }
 
+  const egressBase = requireOutreachEgress(egress);
   const model = personalizationModel();
-  const apiModel = resolveModel(model, config);
+  const lane = resolveOutreachLane(config, model);
   const startedAt = Date.now();
-  const client = createAIClient(config);
-  const response = await client.messages.create(
+  const response = await dispatchAuthorizedAiRequest(
     {
-      model: apiModel,
+      ...egressBase,
+      dispatchId: `${egressBase.dispatchId}:candidate`,
+      purpose: "outreach-personalization",
+      payload: { lead, draft, sources }
+    },
+    lane,
+    {
+      model: lane.model,
       max_tokens: 1100,
       temperature: 0.2,
       system: PERSONALIZATION_PROMPT,
@@ -269,12 +291,13 @@ export async function personalizeOutreachDraft(
         }
       ]
     },
-    { signal: AbortSignal.timeout(28_000), maxRetries: 0 }
+    { signal: AbortSignal.timeout(28_000) },
+    providerClient
   );
 
   const usage = response.usage as unknown as Record<string, unknown>;
   onUsage?.({
-    model,
+    model: lane.model,
     callType: "outreach-personalization",
     inputTokens: numberValue(usage.input_tokens),
     outputTokens: numberValue(usage.output_tokens),
@@ -323,9 +346,10 @@ export async function personalizeOutreachDraft(
       relevance: clean(String(payload.relevance ?? ""))
     },
     source,
-    client,
-    apiModel,
-    model,
+    lane,
+    egress: egressBase,
+    providerClient,
+    config,
     onUsage
   });
   if (review.decision !== "approve") {
@@ -345,7 +369,7 @@ export async function personalizeOutreachDraft(
     ...draft,
     subject,
     body,
-    model,
+    model: lane.model,
     personalizationStatus: "personalized",
     personalizationDetail: clean(String(payload.detail ?? "")),
     personalizationRelevance: `${clean(String(payload.relevance ?? ""))} Reviewer approved: ${review.reason}`.trim(),
@@ -362,24 +386,33 @@ async function reviewPersonalizationCandidate({
   draft,
   candidate,
   source,
-  client,
-  apiModel,
-  model,
+  lane,
+  egress,
+  providerClient,
+  config,
   onUsage
 }: {
   lead: OutreachLead;
   draft: OutreachDraft;
   candidate: { subject: string; body: string; detail: string; relevance: string };
   source: PublicSource;
-  client: ReturnType<typeof createAIClient>;
-  apiModel: string;
-  model: string;
+  lane: AiProviderLane;
+  egress: TrustedOutreachEgress;
+  providerClient?: AiProviderClient;
+  config: StoredOutreachConfig;
   onUsage?: (sample: UsageSample) => void;
 }) {
   const startedAt = Date.now();
-  const response = await client.messages.create(
+  const response = await dispatchAuthorizedAiRequest(
     {
-      model: apiModel,
+      ...egress,
+      dispatchId: `${egress.dispatchId}:review`,
+      purpose: "outreach-personalization",
+      payload: { lead, draft, candidate, source, review: true }
+    },
+    lane,
+    {
+      model: lane.model,
       max_tokens: 300,
       temperature: 0,
       system: PERSONALIZATION_REVIEW_PROMPT,
@@ -396,11 +429,12 @@ async function reviewPersonalizationCandidate({
         })
       }]
     },
-    { signal: AbortSignal.timeout(15_000), maxRetries: 0 }
+    { signal: AbortSignal.timeout(15_000) },
+    providerClient
   );
   const usage = response.usage as unknown as Record<string, unknown>;
   onUsage?.({
-    model,
+    model: lane.model,
     callType: "outreach-personalization",
     inputTokens: numberValue(usage.input_tokens),
     outputTokens: numberValue(usage.output_tokens),
@@ -422,6 +456,25 @@ export function normalizePersonalizationReview(payload: Record<string, unknown>)
   const reason = clean(String(payload.reason ?? "")).slice(0, 300) ||
     (decision === "approve" ? "The edit is subtle and relevant." : "The edit was not clearly better than the default.");
   return { decision, reason };
+}
+
+function resolveOutreachLane(config: StoredOutreachConfig, bedrockModel: string) {
+  const lane = resolveConfiguredAiLane(config, {
+    anthropicModel: resolveModel(bedrockModel, { ...config, provider: "anthropic" }),
+    bedrockModel
+  });
+  if (!lane) throw new Error("No approved AI provider lane is configured for outreach.");
+  return lane;
+}
+
+function requireOutreachEgress(
+  egress: TrustedOutreachEgress | undefined
+) {
+  if (egress) return egress;
+  throw new AiEgressPolicyError(
+    "ai_egress_context_required",
+    "Outreach generation requires a server-owned AI egress context."
+  );
 }
 
 function clean(value: string) {
@@ -522,70 +575,32 @@ async function collectPublicSources(lead: OutreachLead): Promise<PublicSource[]>
 }
 
 async function fetchPublicSource(rawUrl: string): Promise<PublicSource | undefined> {
-  let url = new URL(rawUrl);
-  for (let redirect = 0; redirect < 3; redirect += 1) {
-    await assertPublicUrl(url);
-    const response = await fetch(url, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(4_000),
-      headers: { "user-agent": "RulixPublicResearch/1.0 (+https://rulix.cloud)" }
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) return undefined;
-      url = new URL(location, url);
-      continue;
-    }
-    if (!response.ok) return undefined;
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html") && !contentType.includes("text/plain")) return undefined;
-    const html = (await response.text()).slice(0, 300_000);
-    const title = decodeHtml(
-      html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() ||
-      url.hostname
-    );
-    const excerpt = decodeHtml(
-      html
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 7_000)
-    );
-    if (excerpt.length < 120) return undefined;
-    return { title, url: url.toString(), excerpt };
-  }
-  return undefined;
-}
-
-async function assertPublicUrl(url: URL) {
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Only public HTTP sources are allowed.");
-  }
-  if (url.username || url.password || url.port) throw new Error("Unsafe source URL.");
-  const addresses = await lookup(url.hostname, { all: true });
-  if (!addresses.length || addresses.some((entry) => isPrivateAddress(entry.address))) {
-    throw new Error("Private source addresses are not allowed.");
-  }
-}
-
-function isPrivateAddress(address: string) {
-  if (!isIP(address)) return true;
-  const normalized = address.toLowerCase();
-  if (normalized === "::1" || normalized.startsWith("fe80:") || normalized.startsWith("fc") || normalized.startsWith("fd")) {
-    return true;
-  }
-  if (normalized.includes(":")) return false;
-  const [a, b] = normalized.split(".").map(Number);
-  return (
-    a === 10 ||
-    a === 127 ||
-    a === 0 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
+  const response = await fetchPublicHttp(rawUrl, {
+    maxRedirects: 2,
+    maxResponseBytes: 300_000,
+    timeoutMs: 4_000,
+    headers: { "user-agent": "RulixPublicResearch/1.0 (+https://rulix.cloud)" }
+  });
+  if (!response.ok) return undefined;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html") && !contentType.includes("text/plain")) return undefined;
+  const html = await response.text();
+  const finalUrl = new URL(response.url);
+  const title = decodeHtml(
+    html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() ||
+    finalUrl.hostname
   );
+  const excerpt = decodeHtml(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 7_000)
+  );
+  if (excerpt.length < 120) return undefined;
+  return { title, url: response.url, excerpt };
 }
 
 function decodeHtml(value: string) {

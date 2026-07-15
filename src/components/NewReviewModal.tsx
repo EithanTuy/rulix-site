@@ -5,7 +5,7 @@ import type { DataClass, NewReviewInput } from "../types";
 interface NewReviewModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (input: NewReviewInput) => void;
+  onCreate: (input: NewReviewInput) => Promise<void>;
 }
 
 function buildDefaultMemo(title: string) {
@@ -53,6 +53,8 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
   const [dataClass, setDataClass] = useState<DataClass>("proprietary");
   const [sourcePath, setSourcePath] = useState<NewReviewInput["sourcePath"]>("self-classification");
   const [memoText, setMemoText] = useState(() => buildDefaultMemo("New ECCN Classification Memo"));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const handleTitleChange = (next: string) => {
     setTitle(next);
@@ -64,18 +66,27 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
     onClose();
   };
 
-  const submit = () => {
-    onCreate({
-      title,
-      itemFamily,
-      manufacturer,
-      intendedUse,
-      dataClass,
-      sourcePath,
-      memoText,
-      attachments: []
-    });
-    close();
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onCreate({
+        title,
+        itemFamily,
+        manufacturer,
+        intendedUse,
+        dataClass,
+        sourcePath,
+        memoText,
+        attachments: []
+      });
+      close();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Review creation failed. Your draft was kept.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -130,16 +141,17 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
           <textarea value={memoText} onChange={(event) => setMemoText(event.target.value)} rows={12} />
         </label>
         <div className="modal-footer">
+          {error && <p className="memo-chat-error">{error}</p>}
           <button className="button" type="button" onClick={close}>
             Cancel
           </button>
           <button
             className="button primary"
             type="button"
-            onClick={submit}
-            disabled={!memoText.trim()}
+            onClick={() => void submit()}
+            disabled={!memoText.trim() || busy}
           >
-            Create Review
+            {busy ? "Creating..." : "Create Review"}
           </button>
         </div>
       </section>

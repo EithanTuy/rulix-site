@@ -6,7 +6,7 @@ import {
   UploadCloud,
   Wand2
 } from "lucide-react";
-import type { MemoRecord } from "../types";
+import type { DataClass, MemoRecord, UserProfile } from "../types";
 
 type SortMode = "newest" | "oldest" | "status" | "title";
 type StatusFilter = "all" | MemoRecord["status"];
@@ -19,9 +19,13 @@ interface ReviewListProps {
   corpusLabel: string;
   onSearch: (search: string) => void;
   onSelect: (memoId: string) => void;
-  onFile: (file: File) => Promise<void>;
-  onPasteMemo: (title: string, text: string) => void;
+  onFile: (file: File, dataClass: DataClass) => Promise<void>;
+  onPasteMemo: (title: string, text: string) => Promise<void>;
   onBuildWithAi: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => Promise<void>;
+  userRole: UserProfile["role"];
 }
 
 export function ReviewList({
@@ -34,7 +38,11 @@ export function ReviewList({
   onSelect,
   onFile,
   onPasteMemo,
-  onBuildWithAi
+  onBuildWithAi,
+  userRole,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore = async () => undefined
 }: ReviewListProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -43,6 +51,9 @@ export function ReviewList({
   const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [pasteBusy, setPasteBusy] = useState(false);
+  const [pasteError, setPasteError] = useState("");
+  const [uploadDataClass, setUploadDataClass] = useState<DataClass | "">("");
 
   const visibleMemos = [...memos]
     .filter((memo) => statusFilter === "all" || memo.status === statusFilter)
@@ -56,17 +67,25 @@ export function ReviewList({
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
-    if (!file) return;
-    await onFile(file);
+    if (!file || !uploadDataClass) return;
+    await onFile(file, uploadDataClass);
     event.currentTarget.value = "";
   };
 
-  const submitPaste = () => {
-    if (!pasteText.trim()) return;
-    onPasteMemo(pasteTitle, pasteText);
-    setPasteTitle("");
-    setPasteText("");
-    setPasteOpen(false);
+  const submitPaste = async () => {
+    if (!pasteText.trim() || pasteBusy) return;
+    setPasteBusy(true);
+    setPasteError("");
+    try {
+      await onPasteMemo(pasteTitle, pasteText);
+      setPasteTitle("");
+      setPasteText("");
+      setPasteOpen(false);
+    } catch (error) {
+      setPasteError(error instanceof Error ? error.message : "Review creation failed. Your pasted text was kept.");
+    } finally {
+      setPasteBusy(false);
+    }
   };
 
   return (
@@ -86,13 +105,30 @@ export function ReviewList({
       <section className="intake-section" aria-label="Intake and new review">
         <div className="section-title">Add a Memo</div>
         <div className="intake-card">
+          <label className="intake-classification">
+            File classification
+            <select
+              aria-label="File classification"
+              value={uploadDataClass}
+              onChange={(event) => setUploadDataClass(event.target.value as DataClass | "")}
+            >
+              <option value="">Select before upload</option>
+              <option value="public">Public</option>
+              <option value="proprietary">Proprietary</option>
+              <option value="export-controlled">Export-controlled</option>
+              <option value="itar-risk">ITAR risk</option>
+              <option value="cui">CUI</option>
+            </select>
+          </label>
           <button
             className="button small"
             type="button"
+            disabled={!uploadDataClass}
+            title={uploadDataClass ? "Upload a classified file" : "Select the file classification first"}
             onClick={() => inputRef.current?.click()}
           >
             <UploadCloud size={16} />
-            Upload File
+            {userRole === "export-control-officer" ? "Upload / Approve" : "Upload File"}
           </button>
           <button
             className="button small"
@@ -118,6 +154,11 @@ export function ReviewList({
             hidden
           />
         </div>
+        <p className="intake-role-note">
+          {userRole === "export-control-officer"
+            ? "Text formats stay local. For PDF, DOCX, or images, this action explicitly approves the exact validated bytes for bounded extraction."
+            : "Text formats are read locally. Provider-backed PDF, DOCX, and image extraction is officer-only; Rulix does not store binary files for cross-user handoff."}
+        </p>
         {pasteOpen && (
           <div className="paste-box">
             <input
@@ -134,11 +175,12 @@ export function ReviewList({
             <button
               className="button primary small full"
               type="button"
-              disabled={!pasteText.trim()}
-              onClick={submitPaste}
+              disabled={!pasteText.trim() || pasteBusy}
+              onClick={() => void submitPaste()}
             >
-              Add Memo
+              {pasteBusy ? "Adding..." : "Add Memo"}
             </button>
+            {pasteError && <p className="memo-chat-error">{pasteError}</p>}
           </div>
         )}
         {warning && <div className="intake-warning">{warning}</div>}
@@ -220,6 +262,16 @@ export function ReviewList({
         {visibleMemos.length === 0 && (
           <div className="empty-list">No reviews match this view.</div>
         )}
+        {hasMore && (
+          <button
+            type="button"
+            className="button small full"
+            onClick={() => void onLoadMore()}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading more reviews..." : "Load more reviews"}
+          </button>
+        )}
       </div>
       <div className="list-footer">Showing {visibleMemos.length ? `1-${visibleMemos.length}` : "0"} of {memos.length}</div>
     </aside>
@@ -244,7 +296,19 @@ function compareMemos(a: MemoRecord, b: MemoRecord, sortMode: SortMode) {
   if (sortMode === "oldest") return a.updatedAt.localeCompare(b.updatedAt);
   if (sortMode === "title") return a.title.localeCompare(b.title);
   if (sortMode === "status") {
-    const rank = { conflict: 0, "needs-info": 1, draft: 2, ready: 3, "signed-off": 4 };
+    const rank: Record<MemoRecord["status"], number> = {
+      conflict: 0,
+      "needs-info": 1,
+      "changes-requested": 2,
+      "in-review": 3,
+      draft: 4,
+      ready: 5,
+      approved: 6,
+      "signed-off": 6,
+      rejected: 7,
+      superseded: 8,
+      archived: 9
+    };
     return rank[a.status] - rank[b.status] || b.updatedAt.localeCompare(a.updatedAt);
   }
   return b.updatedAt.localeCompare(a.updatedAt);

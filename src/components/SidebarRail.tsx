@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileText,
   Settings,
+  CircleHelp,
   ShieldCheck,
   Wand2,
   UsersRound
@@ -28,9 +29,10 @@ const navItems: NavItem[] = [
 interface SidebarRailProps {
   activeView: AppView;
   onViewChange: (view: AppView) => void;
+  onHelp: () => void;
 }
 
-export function SidebarRail({ activeView, onViewChange }: SidebarRailProps) {
+export function SidebarRail({ activeView, onViewChange, onHelp }: SidebarRailProps) {
   return (
     <nav className="side-rail" aria-label="Primary">
       <div className="rail-items">
@@ -51,6 +53,16 @@ export function SidebarRail({ activeView, onViewChange }: SidebarRailProps) {
           );
         })}
       </div>
+      <button
+        type="button"
+        className="rail-button rail-help"
+        aria-label="Help and getting started"
+        title="Help and getting started"
+        onClick={onHelp}
+      >
+        <CircleHelp size={22} strokeWidth={1.8} />
+        <span className="rail-label">Help</span>
+      </button>
     </nav>
   );
 }

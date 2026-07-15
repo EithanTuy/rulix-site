@@ -1,10 +1,20 @@
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import type { LeadSearchActivity, OutreachLead } from "../src/types";
 import type { UsageSample } from "./bedrockCouncil";
-import { createAIClient, outreachProviderReady, resolveModel, type StoredOutreachConfig } from "./aiClient";
+import { resolveModel, type StoredOutreachConfig } from "./aiClient";
+import {
+  AiEgressPolicyError,
+  dispatchAuthorizedAiRequest,
+  resolveConfiguredAiLane,
+  type AiEgressContext,
+  type AiProviderClient
+} from "./aiEgressGateway";
+import { fetchPublicHttp } from "./publicHttp";
 
 export const DEFAULT_LEAD_SEARCH_MODEL = "global.anthropic.claude-sonnet-4-6";
+type TrustedLeadSearchEgress = Pick<
+  AiEgressContext,
+  "accountId" | "dataClass" | "dispatchId" | "trustedWorkflowGrant"
+>;
 
 const TOOL = {
   name: "record_lead_candidates",
@@ -94,24 +104,26 @@ export async function discoverLeads({
   existingLeads,
   durationSeconds,
   onUsage,
+  egress,
+  providerClient,
   config = { provider: "bedrock" }
 }: {
   existingLeads: OutreachLead[];
   durationSeconds: number;
   onUsage?: (sample: UsageSample) => void;
+  egress?: TrustedLeadSearchEgress;
+  providerClient?: AiProviderClient;
   config?: StoredOutreachConfig;
 }): Promise<{ leads: OutreachLead[]; activity: LeadSearchActivity[]; model: string }> {
-  if (!outreachProviderReady(config)) {
-    throw new Error(
-      config.provider === "anthropic"
-        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
-        : "Amazon Bedrock is not enabled for this deployment."
-    );
-  }
+  const egressBase = requireLeadSearchEgress(egress);
 
   const startedAt = Date.now();
   const model = leadSearchModel();
-  const apiModel = resolveModel(model, config);
+  const lane = resolveConfiguredAiLane(config, {
+    anthropicModel: resolveModel(model, { ...config, provider: "anthropic" }),
+    bedrockModel: model
+  });
+  if (!lane) throw new Error("No approved AI provider lane is configured for lead search.");
   const targetCount = durationSeconds <= 15 ? 3 : durationSeconds <= 30 ? 6 : 10;
   const activity = [
     log(`Loaded ${existingLeads.length} existing leads and built duplicate guards.`),
@@ -123,10 +135,16 @@ export async function discoverLeads({
     activity
   );
   activity.push(log(`Collected ${webEvidence.length} public search results for model review.`));
-  const client = createAIClient(config);
-  const response = await client.messages.create(
+  const response = await dispatchAuthorizedAiRequest(
     {
-      model: apiModel,
+      ...egressBase,
+      dispatchId: `${egressBase.dispatchId}:search`,
+      purpose: "lead-search",
+      payload: { existingLeads, durationSeconds, webEvidence }
+    },
+    lane,
+    {
+      model: lane.model,
       max_tokens: 3000,
       temperature: 0.2,
       system: SYSTEM_PROMPT,
@@ -147,9 +165,9 @@ export async function discoverLeads({
       ]
     },
     {
-      signal: AbortSignal.timeout(Math.min(50_000, Math.max(12_000, durationSeconds * 1000))),
-      maxRetries: 0
-    }
+      signal: AbortSignal.timeout(Math.min(50_000, Math.max(12_000, durationSeconds * 1000)))
+    },
+    providerClient
   );
 
   const usage = response.usage as unknown as Record<string, unknown>;
@@ -258,8 +276,10 @@ async function fetchBingRss(query: string) {
   const url = new URL("https://www.bing.com/search");
   url.searchParams.set("format", "rss");
   url.searchParams.set("q", query);
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(6_000),
+  const response = await fetchPublicHttp(url, {
+    maxRedirects: 1,
+    maxResponseBytes: 500_000,
+    timeoutMs: 6_000,
     headers: { "user-agent": "RulixLeadResearch/1.0 (+https://rulix.cloud)" }
   });
   if (!response.ok) throw new Error(`Search returned ${response.status}.`);
@@ -274,52 +294,31 @@ async function fetchBingRss(query: string) {
 }
 
 async function fetchPublicPage(rawUrl: string) {
-  let url = new URL(rawUrl);
-  for (let redirect = 0; redirect < 2; redirect += 1) {
-    await assertPublicUrl(url);
-    const response = await fetch(url, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(5_000),
-      headers: { "user-agent": "RulixLeadResearch/1.0 (+https://rulix.cloud)" }
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) return "";
-      url = new URL(location, url);
-      continue;
-    }
-    if (!response.ok) return "";
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html") && !contentType.includes("text/plain")) return "";
-    return (await response.text())
-      .slice(0, 250_000)
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .slice(0, 12_000);
-  }
-  return "";
+  const response = await fetchPublicHttp(rawUrl, {
+    maxRedirects: 1,
+    maxResponseBytes: 250_000,
+    timeoutMs: 5_000,
+    headers: { "user-agent": "RulixLeadResearch/1.0 (+https://rulix.cloud)" }
+  });
+  if (!response.ok) return "";
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html") && !contentType.includes("text/plain")) return "";
+  return (await response.text())
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 12_000);
 }
 
-async function assertPublicUrl(url: URL) {
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.port) {
-    throw new Error("Unsafe search result URL.");
-  }
-  const addresses = await lookup(url.hostname, { all: true });
-  if (!addresses.length || addresses.some((entry) => isPrivateAddress(entry.address))) {
-    throw new Error("Private search result address blocked.");
-  }
-}
-
-function isPrivateAddress(address: string) {
-  if (!isIP(address)) return true;
-  const normalized = address.toLowerCase();
-  if (normalized === "::1" || normalized.startsWith("fe80:") || normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  if (normalized.includes(":")) return false;
-  const [a, b] = normalized.split(".").map(Number);
-  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+function requireLeadSearchEgress(
+  egress: TrustedLeadSearchEgress | undefined
+) {
+  if (egress) return egress;
+  throw new AiEgressPolicyError(
+    "ai_egress_context_required",
+    "Lead search requires a server-owned AI egress context."
+  );
 }
 
 function decodeXml(value: string) {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 import {
   createOutreachJob,
-  getOutreachWorkspace,
+  getOutreachPage,
   updateOutreachJob
 } from "../lib/apiClient";
 import type { OutreachJob } from "../types";
@@ -11,22 +11,44 @@ export function OutreachJobsPanel() {
   const [jobs, setJobs] = useState<OutreachJob[]>([]);
   const [maxCostUsd, setMaxCostUsd] = useState(5);
   const [busy, setBusy] = useState(false);
+  const [jobCursor, setJobCursor] = useState<string | undefined>();
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const workspace = await getOutreachWorkspace();
-      setJobs(workspace.outreachJobs ?? []);
+      const page = await getOutreachPage<OutreachJob>("jobs", { limit: 25 });
+      setJobs((current) => mergeJobs(page.items, current));
     } catch (loadError) {
       setError(message(loadError, "Could not load background jobs."));
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    void getOutreachPage<OutreachJob>("jobs", { limit: 25 })
+      .then((page) => {
+        setJobs(page.items);
+        setJobCursor(page.nextCursor);
+      })
+      .catch((loadError) => setError(message(loadError, "Could not load background jobs.")));
     const timer = window.setInterval(() => void load(), 3000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  const loadMore = async () => {
+    if (!jobCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const page = await getOutreachPage<OutreachJob>("jobs", { limit: 25, cursor: jobCursor });
+      setJobs((current) => mergeJobs(current, page.items));
+      setJobCursor(page.nextCursor);
+    } catch (loadError) {
+      setError(message(loadError, "Could not load more jobs."));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const start = async (type: OutreachJob["type"]) => {
     setBusy(true);
@@ -124,8 +146,17 @@ export function OutreachJobsPanel() {
         })}
         {!jobs.length && <div className="dash-empty">No background jobs yet.</div>}
       </div>
+      {jobCursor && (
+        <button type="button" className="dash-secondary" onClick={() => void loadMore()} disabled={loadingMore}>
+          {loadingMore ? "Loading more jobs..." : "Load 25 more jobs"}
+        </button>
+      )}
     </section>
   );
+}
+
+function mergeJobs(primary: OutreachJob[], secondary: OutreachJob[]) {
+  return [...new Map([...primary, ...secondary].map((job) => [job.id, job])).values()];
 }
 
 function jobTitle(type: OutreachJob["type"]) {

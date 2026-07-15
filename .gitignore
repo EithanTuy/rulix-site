@@ -1,12 +1,15 @@
 node_modules/
 dist/
 lambda-build/
+audit-lambda-build/
 infra/terraform/function.zip
+infra/terraform/audit-function.zip
 infra/terraform/.terraform/
 infra/terraform/*.tfstate*
-infra/terraform/tfplan.bin
+infra/terraform/*.bin
 infra/terraform/*.tfvars
 infra/terraform/*.auto.tfvars
+.rulix-workspace-v2-checkpoint.json*
 .vite/
 coverage/
 playwright-report/
@@ -17,6 +20,7 @@ test-results/
 corpus/raw/
 corpus/manifest.generated.json
 tmp/
+.tmp/
 data/
 *.tsbuildinfo
 vite.config.js

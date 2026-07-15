@@ -71,11 +71,11 @@ afterEach(() => {
 
 function ControlledBuilder({
   onCreateMemo,
-  onCreateAndAnalyze = vi.fn(),
+  onCreateAndAnalyze = vi.fn(async () => undefined),
   initialSessions = []
 }: {
-  onCreateMemo: (draft: MemoBuildDraft) => string | void;
-  onCreateAndAnalyze?: (draft: MemoBuildDraft) => string | void;
+  onCreateMemo: (draft: MemoBuildDraft) => Promise<string | void>;
+  onCreateAndAnalyze?: (draft: MemoBuildDraft) => Promise<string | void>;
   initialSessions?: MemoBuilderSession[];
 }) {
   const [sessions, setSessions] = useState<MemoBuilderSession[]>(initialSessions);
@@ -95,6 +95,8 @@ function ControlledBuilder({
           onActiveSessionChange={setActiveSessionId}
           onCreateMemo={onCreateMemo}
           onCreateAndAnalyze={onCreateAndAnalyze}
+          onPrepareSessionForAi={async (session) => session}
+          userRole="export-control-officer"
         />
       )}
     </>
@@ -103,7 +105,7 @@ function ControlledBuilder({
 
 describe("MemoDraftChatPanel", () => {
   it("persists chat state and writes a non-empty memo draft", async () => {
-    const onCreateMemo = vi.fn((draft: MemoBuildDraft) => {
+    const onCreateMemo = vi.fn(async (draft: MemoBuildDraft) => {
       expect(draft.memoText).toBeTruthy();
       return "review-1";
     });
@@ -112,7 +114,7 @@ describe("MemoDraftChatPanel", () => {
     fireEvent.change(screen.getByPlaceholderText("Attach a datasheet or describe the item to classify..."), {
       target: { value: "Draft from the TSL-580-C-E datasheet." }
     });
-    fireEvent.click(screen.getByLabelText("Send"));
+    fireEvent.click(screen.getByLabelText("Approve and send"));
 
     await screen.findByText("Your memo draft is ready.");
     expect(screen.getByRole("article", { name: "Generated memo draft" })).toHaveTextContent("TSL-580-C-E tunable source");
@@ -133,7 +135,7 @@ describe("MemoDraftChatPanel", () => {
   });
 
   it("copies and downloads the full generated markdown", async () => {
-    const onCreateMemo = vi.fn();
+    const onCreateMemo = vi.fn(async () => undefined);
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
     fireEvent.click(screen.getByRole("button", { name: /create sample memo/i }));
@@ -148,8 +150,8 @@ describe("MemoDraftChatPanel", () => {
   });
 
   it("sends a draft into create-and-analyze without treating analysis as default", async () => {
-    const onCreateMemo = vi.fn();
-    const onCreateAndAnalyze = vi.fn((draft: MemoBuildDraft) => {
+    const onCreateMemo = vi.fn(async () => undefined);
+    const onCreateAndAnalyze = vi.fn(async (draft: MemoBuildDraft) => {
       expect(draft.memoText).toBeTruthy();
       return "review-2";
     });
@@ -159,7 +161,7 @@ describe("MemoDraftChatPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /add & analyze/i }));
 
     expect(onCreateMemo).not.toHaveBeenCalled();
-    expect(onCreateAndAnalyze).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onCreateAndAnalyze).toHaveBeenCalledTimes(1));
     const analyzedDraft = onCreateAndAnalyze.mock.calls[0]?.[0];
     expect(analyzedDraft?.source).toBe("sample");
   });
@@ -168,15 +170,31 @@ describe("MemoDraftChatPanel", () => {
     const session: MemoBuilderSession = {
       id: "builder-review-context",
       title: "Improve Laser Memo",
+      dataClass: "proprietary",
       messages: [],
       updatedAt: "2026-06-27T12:00:00.000Z",
       starterPrompt: "Improve this memo using finding context.",
       contextMemoId: "memo-1"
     };
-    render(<ControlledBuilder onCreateMemo={vi.fn()} initialSessions={[session]} />);
+    render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} initialSessions={[session]} />);
 
     expect(screen.getByText("Review context is loaded. Use it to draft an improved memo or ask Sonnet for a focused rewrite.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^use context$/i }));
     expect(screen.getByPlaceholderText("Attach a datasheet or describe the item to classify...")).toHaveValue("Improve this memo using finding context.");
+  });
+
+  it("keeps the generated draft when review creation fails", async () => {
+    const onCreateMemo = vi.fn(async () => {
+      throw new Error("Review creation failed safely.");
+    });
+    render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create sample memo/i }));
+    const draft = screen.getByRole("article", { name: "Generated memo draft" });
+    fireEvent.click(screen.getByRole("button", { name: /add to reviews/i }));
+
+    expect(await screen.findByText("Review creation failed safely.")).toBeInTheDocument();
+    expect(draft).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add to reviews/i })).toBeEnabled();
   });
 });

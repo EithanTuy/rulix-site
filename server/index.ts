@@ -8,6 +8,6 @@ const provider = getBedrockRuntime();
 
 app.listen(port, host, () => {
   console.log(
-    `Rulix ECCN API listening on http://${host}:${port} (${provider.configured ? "Bedrock configured" : "local fallback"}, model ${provider.model})`
+    `Rulix ECCN API listening on http://${host}:${port} (${provider.configured ? "Bedrock configured" : "live AI unavailable"}, model ${provider.model})`
   );
 });

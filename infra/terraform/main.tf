@@ -21,11 +21,15 @@ data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix           = "rulix-${var.tenant_slug}"
-  log_group_name        = "/aws/rulix/${var.tenant_slug}/application"
-  lambda_log_group_name = "/aws/lambda/${local.name_prefix}-app"
-  log_group_arn         = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
-  lambda_log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.lambda_log_group_name}"
+  name_prefix                 = "rulix-${var.tenant_slug}"
+  log_group_name              = "/aws/rulix/${var.tenant_slug}/application"
+  lambda_log_group_name       = "/aws/lambda/${local.name_prefix}-app"
+  audit_lambda_name           = "${local.name_prefix}-audit-writer"
+  audit_lambda_log_group_name = "/aws/lambda/${local.audit_lambda_name}"
+  log_group_arn               = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
+  lambda_log_group_arn        = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.lambda_log_group_name}"
+  audit_lambda_log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.audit_lambda_log_group_name}"
+  approved_ai_region          = coalesce(var.approved_region, var.aws_region)
   common_tags = {
     Application = "Rulix ECCN"
     Tenant      = var.tenant_slug
@@ -67,7 +71,9 @@ data "aws_iam_policy_document" "tenant_kms" {
         local.log_group_arn,
         "${local.log_group_arn}:*",
         local.lambda_log_group_arn,
-        "${local.lambda_log_group_arn}:*"
+        "${local.lambda_log_group_arn}:*",
+        local.audit_lambda_log_group_arn,
+        "${local.audit_lambda_log_group_arn}:*"
       ]
     }
   }
@@ -145,11 +151,116 @@ resource "aws_s3_bucket_public_access_block" "all" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_ownership_controls" "all" {
+  for_each = {
+    uploads  = aws_s3_bucket.uploads.id
+    corpus   = aws_s3_bucket.corpus.id
+    evidence = aws_s3_bucket.evidence.id
+  }
+
+  bucket = each.value
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "all" {
+  for_each = {
+    uploads  = aws_s3_bucket.uploads.id
+    corpus   = aws_s3_bucket.corpus.id
+    evidence = aws_s3_bucket.evidence.id
+  }
+
+  bucket = each.value
+  rule {
+    id     = "retained-version-hygiene"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 2555
+    }
+  }
+}
+
+data "aws_iam_policy_document" "tenant_bucket_tls" {
+  for_each = {
+    uploads  = aws_s3_bucket.uploads.arn
+    corpus   = aws_s3_bucket.corpus.arn
+    evidence = aws_s3_bucket.evidence.arn
+  }
+
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      each.value,
+      "${each.value}/*"
+    ]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  statement {
+    sid       = "DenyWrongEncryption"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["${each.value}/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:x-amz-server-side-encryption"
+      values   = ["aws:kms"]
+    }
+  }
+
+  statement {
+    sid       = "DenyWrongKmsKey"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["${each.value}/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:x-amz-server-side-encryption-aws-kms-key-id"
+      values   = [aws_kms_key.tenant.arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "tenant_bucket_tls" {
+  for_each = {
+    uploads  = aws_s3_bucket.uploads.id
+    corpus   = aws_s3_bucket.corpus.id
+    evidence = aws_s3_bucket.evidence.id
+  }
+
+  bucket = each.value
+  policy = data.aws_iam_policy_document.tenant_bucket_tls[each.key].json
+}
+
 resource "aws_dynamodb_table" "audit_events" {
-  name         = "${local.name_prefix}-audit-events"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "tenantReviewId"
-  range_key    = "eventTime"
+  name                        = "${local.name_prefix}-audit-events"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "tenantReviewId"
+  range_key                   = "eventTime"
+  deletion_protection_enabled = var.data_deletion_protection_enabled
 
   attribute {
     name = "tenantReviewId"
@@ -174,10 +285,11 @@ resource "aws_dynamodb_table" "audit_events" {
 }
 
 resource "aws_dynamodb_table" "auth" {
-  name         = "${local.name_prefix}-auth"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
-  range_key    = "sk"
+  name                        = "${local.name_prefix}-auth"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "pk"
+  range_key                   = "sk"
+  deletion_protection_enabled = var.data_deletion_protection_enabled
 
   attribute {
     name = "pk"
@@ -209,9 +321,10 @@ resource "aws_dynamodb_table" "auth" {
 }
 
 resource "aws_dynamodb_table" "account_state" {
-  name         = "${local.name_prefix}-account-state"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "pk"
+  name                        = "${local.name_prefix}-account-state"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "pk"
+  deletion_protection_enabled = var.data_deletion_protection_enabled
 
   attribute {
     name = "pk"
@@ -246,19 +359,29 @@ resource "aws_cloudwatch_log_group" "lambda" {
   tags              = local.common_tags
 }
 
-data "aws_iam_policy_document" "worker" {
+data "aws_iam_policy_document" "analysis_worker" {
   statement {
-    sid = "TenantBucketAccess"
+    sid = "ReadAnalysisInputs"
     actions = [
       "s3:GetObject",
-      "s3:PutObject",
       "s3:ListBucket"
     ]
     resources = [
       aws_s3_bucket.uploads.arn,
       "${aws_s3_bucket.uploads.arn}/*",
       aws_s3_bucket.corpus.arn,
-      "${aws_s3_bucket.corpus.arn}/*",
+      "${aws_s3_bucket.corpus.arn}/*"
+    ]
+  }
+
+  statement {
+    sid = "WriteAnalysisEvidence"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket"
+    ]
+    resources = [
       aws_s3_bucket.evidence.arn,
       "${aws_s3_bucket.evidence.arn}/*"
     ]
@@ -275,20 +398,42 @@ data "aws_iam_policy_document" "worker" {
     resources = [aws_kms_key.tenant.arn]
   }
 
+  dynamic "statement" {
+    for_each = var.workspace_mode == "normalized" ? [] : [1]
+    content {
+      sid       = "ReadLegacyAccountState"
+      actions   = ["dynamodb:GetItem"]
+      resources = [aws_dynamodb_table.account_state.arn]
+    }
+  }
+
   statement {
-    sid = "TenantTableAccess"
-    actions = [
-      "dynamodb:DeleteItem",
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:Query",
-      "dynamodb:UpdateItem"
-    ]
+    sid     = "ReadNormalizedWorkspace"
+    actions = ["dynamodb:GetItem", "dynamodb:Query"]
     resources = [
-      aws_dynamodb_table.audit_events.arn,
-      aws_dynamodb_table.auth.arn,
-      aws_dynamodb_table.account_state.arn
+      aws_dynamodb_table.workspace.arn,
+      "${aws_dynamodb_table.workspace.arn}/index/*"
     ]
+  }
+
+  statement {
+    sid       = "ReadWorkspaceContent"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.workspace_content.arn}/tenant/${var.tenant_slug}/*"]
+  }
+
+  statement {
+    sid       = "DecryptWorkspaceViaServices"
+    actions   = ["kms:Decrypt", "kms:DescribeKey"]
+    resources = [aws_kms_key.workspace.arn]
+    condition {
+      test     = "StringLike"
+      variable = "kms:ViaService"
+      values = [
+        "dynamodb.${var.aws_region}.amazonaws.com",
+        "s3.${var.aws_region}.amazonaws.com"
+      ]
+    }
   }
 
   statement {
@@ -303,8 +448,14 @@ data "aws_iam_policy_document" "worker" {
   }
 }
 
-resource "aws_iam_policy" "worker" {
+resource "aws_iam_policy" "analysis_worker" {
+  # Keep the established production policy identity so tightening its grants is
+  # an in-place change rather than an attachment-breaking replacement.
   name   = "${local.name_prefix}-worker"
-  policy = data.aws_iam_policy_document.worker.json
+  policy = data.aws_iam_policy_document.analysis_worker.json
   tags   = local.common_tags
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

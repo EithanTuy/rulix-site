@@ -3,16 +3,36 @@
 #
 # The single Node service (Express serving the built Vite client + /api) is
 # bundled by `npm run build:lambda` into ../../lambda-build, zipped here, and
-# run on the Node 20 Lambda runtime. CloudFront terminates TLS for the custom
+# run on the Node 24 Lambda runtime. CloudFront terminates TLS for the custom
 # domain and forwards everything to the Function URL. See docs/aws-deploy.md.
 
 locals {
   fn_name = "rulix-${var.tenant_slug}-app"
+  configured_bedrock_models = toset([
+    var.bedrock_model,
+    var.bedrock_deep_model,
+    var.bedrock_outreach_model,
+    var.bedrock_personalization_model,
+    var.bedrock_lead_search_model
+  ])
 }
 
-resource "random_password" "edge_shared_secret" {
-  length  = 32
-  special = false
+# Exact memo-chat content is retained only long enough for an officer to
+# inspect a pending request. Generate a dedicated AES-256 key and keep prior
+# keys only during the documented, bounded rotation overlap.
+resource "random_id" "ai_approval_preview" {
+  byte_length = 32
+  keepers = {
+    key_id = var.ai_approval_preview_key_id
+  }
+}
+
+locals {
+  ai_approval_preview_previous_keys = try(jsondecode(var.ai_approval_preview_previous_keys_json), {})
+  ai_approval_preview_keys = merge(local.ai_approval_preview_previous_keys, {
+    (var.ai_approval_preview_key_id) = random_id.ai_approval_preview.b64_url
+  })
+  ai_approval_preview_keys_json = sensitive(jsonencode(local.ai_approval_preview_keys))
 }
 
 data "archive_file" "lambda" {
@@ -62,18 +82,51 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
 
 data "aws_iam_policy_document" "lambda_auth" {
   statement {
-    sid = "AuthAndAccountTables"
+    sid = "AuthTableCommands"
     actions = [
       "dynamodb:DeleteItem",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:Query",
+      "dynamodb:TransactWriteItems",
+      "dynamodb:UpdateItem"
+    ]
+    resources = [aws_dynamodb_table.auth.arn]
+  }
+
+  dynamic "statement" {
+    for_each = var.workspace_mode == "normalized" ? [] : [1]
+    content {
+      sid = "LegacyAccountState"
+      actions = var.workspace_mode == "legacy" ? [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem"
+      ] : ["dynamodb:GetItem"]
+      resources = [aws_dynamodb_table.account_state.arn]
+    }
+  }
+
+  statement {
+    sid = "NormalizedWorkspaceCommands"
+    actions = [
+      "dynamodb:BatchGetItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:Query",
+      "dynamodb:TransactWriteItems",
       "dynamodb:UpdateItem"
     ]
     resources = [
-      aws_dynamodb_table.auth.arn,
-      aws_dynamodb_table.account_state.arn
+      aws_dynamodb_table.workspace.arn,
+      "${aws_dynamodb_table.workspace.arn}/index/*"
     ]
+  }
+
+  statement {
+    sid       = "ImmutableWorkspaceContent"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.workspace_content.arn}/tenant/${var.tenant_slug}/*"]
   }
 
   statement {
@@ -93,6 +146,30 @@ data "aws_iam_policy_document" "lambda_auth" {
       "kms:GenerateDataKey"
     ]
     resources = [aws_kms_key.tenant.arn]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["dynamodb.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid = "WorkspaceKmsViaServices"
+    actions = [
+      "kms:Decrypt",
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:GenerateDataKey"
+    ]
+    resources = [aws_kms_key.workspace.arn]
+    condition {
+      test     = "StringLike"
+      variable = "kms:ViaService"
+      values = [
+        "dynamodb.${var.aws_region}.amazonaws.com",
+        "s3.${var.aws_region}.amazonaws.com"
+      ]
+    }
   }
 }
 
@@ -104,55 +181,135 @@ resource "aws_iam_role_policy" "lambda_auth" {
 
 # ---- The function ----
 resource "aws_lambda_function" "app" {
-  function_name    = local.fn_name
-  role             = aws_iam_role.lambda_exec.arn
-  runtime          = "nodejs20.x"
-  handler          = "handler.handler"
-  filename         = data.archive_file.lambda.output_path
-  source_code_hash = data.archive_file.lambda.output_base64sha256
-  memory_size      = 1024
-  timeout          = 180
+  function_name                  = local.fn_name
+  role                           = aws_iam_role.lambda_exec.arn
+  runtime                        = "nodejs24.x"
+  handler                        = "handler.handler"
+  filename                       = data.archive_file.lambda.output_path
+  source_code_hash               = data.archive_file.lambda.output_base64sha256
+  kms_key_arn                    = aws_kms_key.tenant.arn
+  memory_size                    = 1024
+  timeout                        = 120
+  reserved_concurrent_executions = var.app_reserved_concurrency
 
   environment {
     variables = merge(
       {
-        NODE_ENV                      = "production"
-        RULIX_DIST_DIR                = "dist"
-        BEDROCK_ENABLED               = tostring(var.bedrock_enabled)
-        BEDROCK_MODEL                 = var.bedrock_model
-        BEDROCK_DEEP_MODEL            = var.bedrock_deep_model
-        BEDROCK_OUTREACH_MODEL        = var.bedrock_outreach_model
-        BEDROCK_PERSONALIZATION_MODEL = var.bedrock_personalization_model
-        BEDROCK_LEAD_SEARCH_MODEL     = var.bedrock_lead_search_model
-        RULIX_AUTH_TABLE              = aws_dynamodb_table.auth.name
-        RULIX_ACCOUNT_TABLE           = aws_dynamodb_table.account_state.name
-        RULIX_TENANT_ID               = var.tenant_slug
-        RULIX_ALLOWED_ORIGINS         = join(",", compact([var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"]))
-        APP_BASE_URL                  = var.app_base_url
-        AUTH_INVITE_TTL_HOURS         = tostring(var.auth_invite_ttl_hours)
-        AUTH_RESET_TTL_MINUTES        = tostring(var.auth_reset_ttl_minutes)
-        AUTH_SESSION_TTL_HOURS        = tostring(var.auth_session_ttl_hours)
+        NODE_ENV                                = "production"
+        RULIX_DIST_DIR                          = "dist"
+        BEDROCK_ENABLED                         = tostring(var.bedrock_enabled)
+        BEDROCK_MODEL                           = var.bedrock_model
+        BEDROCK_DEEP_MODEL                      = var.bedrock_deep_model
+        BEDROCK_OUTREACH_MODEL                  = var.bedrock_outreach_model
+        BEDROCK_PERSONALIZATION_MODEL           = var.bedrock_personalization_model
+        BEDROCK_LEAD_SEARCH_MODEL               = var.bedrock_lead_search_model
+        RULIX_APPROVED_MODEL_IDS                = jsonencode(var.approved_model_ids)
+        RULIX_AI_DATA_CLASS                     = var.ai_data_class
+        RULIX_APPROVED_PROVIDER                 = var.approved_provider
+        RULIX_APPROVED_REGION                   = local.approved_ai_region
+        RULIX_CONTROLLED_DATA_MODE              = var.controlled_data_mode
+        RULIX_AI_MAX_CONCURRENT                 = tostring(var.ai_max_concurrent)
+        RULIX_AI_REQUESTS_PER_MINUTE            = tostring(var.ai_requests_per_minute)
+        RULIX_AI_TOKENS_PER_DAY                 = tostring(var.ai_tokens_per_day)
+        RULIX_AI_SPEND_USD_PER_DAY              = tostring(var.ai_spend_usd_per_day)
+        RULIX_AI_MAX_TOKENS_PER_CALL            = tostring(var.ai_max_tokens_per_call)
+        RULIX_AI_MAX_COST_USD_PER_CALL          = tostring(var.ai_max_cost_usd_per_call)
+        RULIX_AI_LEASE_SECONDS                  = tostring(var.ai_lease_seconds)
+        RULIX_AI_APPROVAL_PREVIEW_ACTIVE_KEY_ID = var.ai_approval_preview_key_id
+        RULIX_AI_APPROVAL_PREVIEW_KEYS_JSON     = local.ai_approval_preview_keys_json
+        RULIX_AUTH_TABLE                        = aws_dynamodb_table.auth.name
+        RULIX_ACCOUNT_TABLE                     = aws_dynamodb_table.account_state.name
+        RULIX_WORKSPACE_TABLE                   = aws_dynamodb_table.workspace.name
+        RULIX_WORKSPACE_CONTENT_BUCKET          = aws_s3_bucket.workspace_content.bucket
+        RULIX_WORKSPACE_KMS_KEY_ARN             = aws_kms_key.workspace.arn
+        RULIX_WORKSPACE_MODE                    = var.workspace_mode
+        RULIX_WORKSPACE_CURSOR_ACTIVE_KID       = var.workspace_cursor_key_id
+        RULIX_WORKSPACE_CURSOR_KEYS_JSON        = jsonencode(local.workspace_cursor_keys)
+        RULIX_TENANT_ID                         = var.tenant_slug
+        RULIX_ALLOWED_ORIGINS                   = join(",", compact([var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"]))
+        APP_BASE_URL                            = var.app_base_url
+        AUTH_INVITE_TTL_HOURS                   = tostring(var.auth_invite_ttl_hours)
+        AUTH_RESET_TTL_MINUTES                  = tostring(var.auth_reset_ttl_minutes)
+        AUTH_SESSION_TTL_HOURS                  = tostring(var.auth_session_ttl_hours)
       },
+      var.bedrock_prices_json == "" ? {} : { RULIX_BEDROCK_PRICES = var.bedrock_prices_json },
       var.auth_email_from == "" ? {} : { AUTH_EMAIL_FROM = var.auth_email_from },
-      var.auth_bootstrap_secret == "" ? {} : { AUTH_BOOTSTRAP_SECRET = var.auth_bootstrap_secret },
-      var.custom_domain == "" ? {} : { RULIX_EDGE_SHARED_SECRET = random_password.edge_shared_secret.result }
+      var.auth_bootstrap_secret == "" ? {} : { AUTH_BOOTSTRAP_SECRET = var.auth_bootstrap_secret }
     )
+  }
+
+  lifecycle {
+    precondition {
+      condition = (
+        (var.approved_provider == "amazon-bedrock" && local.approved_ai_region == var.aws_region) ||
+        (var.approved_provider == "anthropic-direct" && local.approved_ai_region == "global")
+      )
+      error_message = "amazon-bedrock must use aws_region as approved_region; anthropic-direct must use global."
+    }
+
+    precondition {
+      condition     = var.controlled_data_mode != "approved" || var.approved_provider == "amazon-bedrock"
+      error_message = "controlled_data_mode may be approved only for amazon-bedrock."
+    }
+
+    precondition {
+      condition = var.controlled_data_mode != "approved" || (
+        length(var.approved_model_ids) > 0 &&
+        alltrue([for model in local.configured_bedrock_models : contains(var.approved_model_ids, model)])
+      )
+      error_message = "controlled_data_mode=approved requires every configured Bedrock workflow model in approved_model_ids."
+    }
+
+    precondition {
+      condition = var.controlled_data_mode != "approved" || alltrue([
+        for model in local.configured_bedrock_models :
+        !can(regex("^(global|us|eu|apac|jp|au)\\.", model)) &&
+        (!startswith(model, "arn:") || can(regex(
+          "^arn:(aws|aws-us-gov|aws-cn):bedrock:${local.approved_ai_region}:",
+          model
+        )))
+      ])
+      error_message = "Controlled-data workflows forbid cross-region profiles and require Bedrock ARNs to match approved_region."
+    }
+
+    precondition {
+      condition = alltrue([
+        for model in var.approved_model_ids :
+        startswith(model, "arn:")
+        ? contains(var.bedrock_resource_arns, model)
+        : anytrue([for arn in var.bedrock_resource_arns : endswith(arn, "/${model}")])
+      ])
+      error_message = "Every approved_model_ids entry must be covered by an exact bedrock_resource_arns entry."
+    }
   }
 
   tags = local.common_tags
 }
 
-# Function URL origin. With a custom domain, the app rejects direct requests
-# unless CloudFront supplies the generated origin secret header.
+# Function URL origin. Production custom-domain deployments require SigV4 and
+# grant only their CloudFront distribution permission to invoke the function.
+# The public NONE mode remains available solely for the documented, temporary
+# no-domain bootstrap/smoke-test configuration.
 resource "aws_lambda_function_url" "app" {
   function_name      = aws_lambda_function.app.function_name
-  authorization_type = "NONE"
+  authorization_type = var.custom_domain == "" && var.allow_public_function_url_bootstrap ? "NONE" : "AWS_IAM"
+}
+
+resource "aws_cloudfront_origin_access_control" "app" {
+  count = var.custom_domain == "" ? 0 : 1
+
+  name                              = "${local.fn_name}-lambda-url"
+  description                       = "SigV4 access from the Rulix CloudFront distribution to its Lambda URL"
+  origin_access_control_origin_type = "lambda"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
 }
 
 # ---- Edge security policy ----
 resource "aws_cloudfront_response_headers_policy" "app_security" {
-  count = var.custom_domain == "" ? 0 : 1
-  name  = "${local.fn_name}-security-headers"
+  count   = var.custom_domain == "" ? 0 : 1
+  name    = "${local.fn_name}-security-headers"
+  comment = "Security and noindex headers for Rulix app/dashboard"
 
   security_headers_config {
     content_security_policy {
@@ -203,6 +360,55 @@ resource "aws_cloudfront_response_headers_policy" "app_security" {
   }
 }
 
+resource "aws_wafv2_regex_pattern_set" "ai_routes" {
+  count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
+  name  = "${local.fn_name}-ai-routes"
+  scope = "CLOUDFRONT"
+
+  regular_expression { regex_string = "^/api/ai/memo-builder-chat$" }
+  regular_expression { regex_string = "^/api/ai-approval-requests$" }
+  regular_expression { regex_string = "^/api/reviews/[^/]+/(analyze|chat)$" }
+  regular_expression { regex_string = "^/api/documents/extract$" }
+  regular_expression { regex_string = "^/api/admin/outreach/(generate|drafts/[^/]+/personalize)$" }
+  regular_expression { regex_string = "^/api/admin/leads/search$" }
+
+  tags = local.common_tags
+}
+
+resource "aws_wafv2_regex_pattern_set" "large_post_body_routes" {
+  count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
+  name  = "${local.fn_name}-large-post-body-routes"
+  scope = "CLOUDFRONT"
+
+  regular_expression { regex_string = "^/api/documents/extract$" }
+  regular_expression { regex_string = "^/api/ai/memo-builder-chat$" }
+  regular_expression { regex_string = "^/api/ai-approval-requests$" }
+  regular_expression { regex_string = "^/api/reviews$" }
+  regular_expression { regex_string = "^/api/reviews/[A-Za-z0-9_-]+/chat$" }
+
+  tags = local.common_tags
+}
+
+resource "aws_wafv2_regex_pattern_set" "large_patch_body_routes" {
+  count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
+  name  = "${local.fn_name}-large-patch-body-routes"
+  scope = "CLOUDFRONT"
+
+  regular_expression { regex_string = "^/api/reviews/[A-Za-z0-9_-]+$" }
+
+  tags = local.common_tags
+}
+
+resource "aws_wafv2_regex_pattern_set" "large_put_body_routes" {
+  count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
+  name  = "${local.fn_name}-large-put-body-routes"
+  scope = "CLOUDFRONT"
+
+  regular_expression { regex_string = "^/api/account/memo-builder/sessions/[A-Za-z0-9_-]+$" }
+
+  tags = local.common_tags
+}
+
 resource "aws_wafv2_web_acl" "app" {
   count = var.custom_domain == "" || !var.enable_waf ? 0 : 1
   name  = "${local.fn_name}-edge"
@@ -212,57 +418,94 @@ resource "aws_wafv2_web_acl" "app" {
     allow {}
   }
 
-  # Allow large POST bodies on authenticated API paths that routinely exceed
-  # WAF's 8 KB body-inspection limit: document extraction, the AI endpoints
-  # (memo-builder-chat, ai/review), and account-state saves (all memos).
-  # These paths all require session auth, so bypassing body-size inspection
-  # here is safe — the managed rules still apply to every other path.
+  # Preserve the managed rule's 8 KB body-size boundary everywhere except the
+  # exact method/path pairs that legitimately accept larger JSON. Every
+  # exception has an application-layer raw-byte ceiling in server/app.ts;
+  # CloudFront WAF cannot distinguish payload sizes beyond its inspection
+  # window, so the origin is the authoritative cap for those named routes.
+  # The managed group counts only SizeRestrictions_BODY, leaving every other
+  # managed and rate rule active for these requests.
+  # First block oversized bodies for every unsupported HTTP method. The next
+  # three rules then allow only the exact route set assigned to POST, PATCH, or
+  # PUT. This avoids a path-only exception accidentally admitting a large body
+  # on another verb while staying within WAF's logical-statement nesting rules.
   rule {
-    name     = "AllowLargeApiRequests"
+    name     = "BlockOversizeBodiesForUnsupportedMethods"
     priority = 0
 
     action {
-      allow {}
+      block {}
     }
 
     statement {
-      or_statement {
+      and_statement {
         statement {
-          byte_match_statement {
-            positional_constraint = "EXACTLY"
-            search_string         = "/api/documents/extract"
+          size_constraint_statement {
+            comparison_operator = "GT"
+            size                = 8192
+
             field_to_match {
-              uri_path {}
+              body {
+                oversize_handling = "MATCH"
+              }
             }
+
             text_transformation {
               priority = 0
               type     = "NONE"
             }
           }
         }
+
         statement {
-          byte_match_statement {
-            positional_constraint = "STARTS_WITH"
-            search_string         = "/api/ai/"
-            field_to_match {
-              uri_path {}
-            }
-            text_transformation {
-              priority = 0
-              type     = "NONE"
-            }
-          }
-        }
-        statement {
-          byte_match_statement {
-            positional_constraint = "STARTS_WITH"
-            search_string         = "/api/account/"
-            field_to_match {
-              uri_path {}
-            }
-            text_transformation {
-              priority = 0
-              type     = "NONE"
+          not_statement {
+            statement {
+              or_statement {
+                statement {
+                  byte_match_statement {
+                    positional_constraint = "EXACTLY"
+                    search_string         = "POST"
+
+                    field_to_match {
+                      method {}
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
+
+                statement {
+                  byte_match_statement {
+                    positional_constraint = "EXACTLY"
+                    search_string         = "PATCH"
+
+                    field_to_match {
+                      method {}
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
+
+                statement {
+                  byte_match_statement {
+                    positional_constraint = "EXACTLY"
+                    search_string         = "PUT"
+
+                    field_to_match {
+                      method {}
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -271,14 +514,104 @@ resource "aws_wafv2_web_acl" "app" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "${local.fn_name}-large-api-allow"
+      metric_name                = "${local.fn_name}-oversize-unsupported-method"
       sampled_requests_enabled   = true
+    }
+  }
+
+  dynamic "rule" {
+    for_each = {
+      POST = {
+        priority = 1
+        arn      = aws_wafv2_regex_pattern_set.large_post_body_routes[0].arn
+        metric   = "oversize-post-body"
+      }
+      PATCH = {
+        priority = 2
+        arn      = aws_wafv2_regex_pattern_set.large_patch_body_routes[0].arn
+        metric   = "oversize-patch-body"
+      }
+      PUT = {
+        priority = 3
+        arn      = aws_wafv2_regex_pattern_set.large_put_body_routes[0].arn
+        metric   = "oversize-put-body"
+      }
+    }
+    content {
+      name     = "BlockOversize${title(lower(rule.key))}BodiesOutsideLargeRoutes"
+      priority = rule.value.priority
+
+      action {
+        block {}
+      }
+
+      statement {
+        and_statement {
+          statement {
+            size_constraint_statement {
+              comparison_operator = "GT"
+              size                = 8192
+
+              field_to_match {
+                body {
+                  oversize_handling = "MATCH"
+                }
+              }
+
+              text_transformation {
+                priority = 0
+                type     = "NONE"
+              }
+            }
+          }
+
+          statement {
+            byte_match_statement {
+              positional_constraint = "EXACTLY"
+              search_string         = rule.key
+
+              field_to_match {
+                method {}
+              }
+              text_transformation {
+                priority = 0
+                type     = "NONE"
+              }
+            }
+          }
+
+          statement {
+            not_statement {
+              statement {
+                regex_pattern_set_reference_statement {
+                  arn = rule.value.arn
+
+                  field_to_match {
+                    uri_path {}
+                  }
+
+                  text_transformation {
+                    priority = 0
+                    type     = "NONE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${local.fn_name}-${rule.value.metric}"
+        sampled_requests_enabled   = true
+      }
     }
   }
 
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
-    priority = 1
+    priority = 4
 
     override_action {
       none {}
@@ -288,6 +621,14 @@ resource "aws_wafv2_web_acl" "app" {
       managed_rule_group_statement {
         name        = "AWSManagedRulesCommonRuleSet"
         vendor_name = "AWS"
+
+        rule_action_override {
+          name = "SizeRestrictions_BODY"
+
+          action_to_use {
+            count {}
+          }
+        }
       }
     }
 
@@ -300,7 +641,7 @@ resource "aws_wafv2_web_acl" "app" {
 
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
-    priority = 2
+    priority = 5
 
     override_action {
       none {}
@@ -397,6 +738,63 @@ resource "aws_wafv2_web_acl" "app" {
   }
 
   rule {
+    name     = "RateLimitAiRoutes"
+    priority = 12
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        aggregate_key_type = "IP"
+        limit              = var.waf_ai_rate_limit
+
+        scope_down_statement {
+          and_statement {
+            statement {
+              byte_match_statement {
+                positional_constraint = "EXACTLY"
+                search_string         = "POST"
+
+                field_to_match {
+                  method {}
+                }
+
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+              }
+            }
+
+            statement {
+              regex_pattern_set_reference_statement {
+                arn = aws_wafv2_regex_pattern_set.ai_routes[0].arn
+
+                field_to_match {
+                  uri_path {}
+                }
+
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-ai-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
     name     = "RateLimitAllRoutes"
     priority = 20
 
@@ -453,13 +851,9 @@ resource "aws_cloudfront_distribution" "app" {
   web_acl_id      = var.enable_waf ? aws_wafv2_web_acl.app[0].arn : null
 
   origin {
-    domain_name = local.fn_url_host
-    origin_id   = "lambda-fn-url"
-
-    custom_header {
-      name  = "x-rulix-edge-secret"
-      value = random_password.edge_shared_secret.result
-    }
+    domain_name              = local.fn_url_host
+    origin_id                = "lambda-fn-url"
+    origin_access_control_id = aws_cloudfront_origin_access_control.app[0].id
 
     custom_origin_config {
       http_port              = 80
@@ -495,4 +889,37 @@ resource "aws_cloudfront_distribution" "app" {
   }
 
   tags = local.common_tags
+}
+
+# AWS requires both permissions for new IAM-authenticated Function URLs. Each
+# statement is scoped to this one distribution, and ordinary principals receive
+# no direct URL or non-URL Lambda invocation capability.
+resource "aws_lambda_permission" "cloudfront_function_url" {
+  count = var.custom_domain == "" ? 0 : 1
+
+  statement_id           = "AllowCloudFrontFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.app.function_name
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.app[0].arn
+  function_url_auth_type = "AWS_IAM"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_lambda_permission" "cloudfront_invoke_function" {
+  count = var.custom_domain == "" ? 0 : 1
+
+  statement_id             = "AllowCloudFrontInvokeViaFunctionUrl"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.app.function_name
+  principal                = "cloudfront.amazonaws.com"
+  source_arn               = aws_cloudfront_distribution.app[0].arn
+  invoked_via_function_url = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

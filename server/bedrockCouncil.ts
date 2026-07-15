@@ -1,5 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
 import { officialCorpus } from "../src/data/corpus";
 import { analyzeMemo } from "../src/lib/eccnReview";
 import {
@@ -15,6 +13,17 @@ import type {
   ReviewResult,
   UsageCallType
 } from "../src/types";
+import {
+  AiEgressPolicyError,
+  dispatchAuthorizedAiRequest,
+  resolveBedrockLane,
+  resolveMemoBuilderLane,
+  type AiEgressContext,
+  type AiProviderClient,
+  type AiProviderLane,
+  type AiProviderResponse,
+  type AiProviderResponseBlock
+} from "./aiEgressGateway";
 
 export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
 export const DEFAULT_DEEP_BEDROCK_MODEL = "global.anthropic.claude-sonnet-4-6";
@@ -42,22 +51,30 @@ export interface UsageSample {
   latencyMs: number;
 }
 
-export interface CouncilProviderResponseBlock {
-  type: string;
-  name?: string;
-  input?: unknown;
-  text?: string;
+export type CouncilProviderResponseBlock = AiProviderResponseBlock;
+export type CouncilProviderResponse = AiProviderResponse;
+export type CouncilProviderClient = AiProviderClient;
+
+export type AiEgressCallerContext = Pick<
+  AiEgressContext,
+  "accountId" | "approvalId" | "dataClass" | "dispatchId" | "subject" | "trustedWorkflowGrant"
+>;
+
+/** Canonical semantic payloads shared by the approval boundary and provider caller. */
+export function councilApprovalPayload(memo: MemoRecord, depth: CouncilDepth) {
+  return { memo, depth };
 }
 
-export interface CouncilProviderResponse {
-  content: CouncilProviderResponseBlock[];
-  usage?: unknown;
+export function memoChatApprovalPayload(
+  memo: MemoRecord,
+  reviewerMessage: string,
+  history: MemoChatMessage[]
+) {
+  return { memo, reviewerMessage, history };
 }
 
-export interface CouncilProviderClient {
-  messages: {
-    create: (body: unknown, options?: unknown) => Promise<CouncilProviderResponse>;
-  };
+export function memoBuilderApprovalPayload(messages: MemoBuildChatMessage[]) {
+  return { messages };
 }
 
 interface CouncilOptions {
@@ -66,12 +83,15 @@ interface CouncilOptions {
   timeoutMs?: number;
   onUsage?: (sample: UsageSample) => void;
   providerClient?: CouncilProviderClient;
+  egress?: AiEgressCallerContext;
 }
 
 interface MemoChatOptions {
   model?: string;
   maxTokens?: number;
   onUsage?: (sample: UsageSample) => void;
+  providerClient?: CouncilProviderClient;
+  egress?: AiEgressCallerContext;
 }
 
 export interface MemoChatAiResult {
@@ -227,19 +247,15 @@ const MEMO_CHAT_SCHEMA = {
   }
 } as const;
 
-const PUBLIC_MEMO_DRAFT_PROMPT = `You are Rulix public-source memo drafting assistant.
-Draft a cautious ECCN self-classification memo for the requested item from general model knowledge only.
-Amazon Bedrock does not provide server-side public web search here. Do not claim live research was performed, do not invent URLs, and do not cite sources as verified.
-Do not make a final legal determination. Clearly list the manufacturer, official, and public-source facts that must be independently verified before relying on the memo.
-Return only valid JSON with title, memoText, and sources.
-The sources array must be empty.
-The memoText must be markdown and include: item, owner placeholder, proposed classification/review path, item description, unverified background assumptions, performance parameters to verify, software/technical data notes, use/end-use assumptions, order-of-review notes, self-classification rationale, information still needed, and verification checklist.`;
-
 export function getBedrockRuntime() {
+  const model = process.env.BEDROCK_MODEL?.trim() || DEFAULT_BEDROCK_MODEL;
+  const lane = resolveBedrockLane(model);
   return {
-    configured: process.env.BEDROCK_ENABLED?.trim().toLowerCase() === "true",
-    model: process.env.BEDROCK_MODEL?.trim() || DEFAULT_BEDROCK_MODEL,
-    deepModel: process.env.BEDROCK_DEEP_MODEL?.trim() || DEFAULT_DEEP_BEDROCK_MODEL
+    configured: Boolean(lane),
+    model,
+    deepModel: process.env.BEDROCK_DEEP_MODEL?.trim() || DEFAULT_DEEP_BEDROCK_MODEL,
+    provider: "amazon-bedrock" as const,
+    region: lane?.region
   };
 }
 
@@ -250,6 +266,83 @@ export function councilModelForDepth(
   return depth === "deep" ? runtime.deepModel : runtime.model;
 }
 
+export function councilMaxTokensForDepth(depth: CouncilDepth) {
+  return depth === "deep" ? 3600 : 2600;
+}
+
+export function buildCouncilProviderRequest(
+  memo: MemoRecord,
+  depth: CouncilDepth,
+  model: string,
+  maxTokens = councilMaxTokensForDepth(depth)
+) {
+  const computedBaseline = analyzeMemo(memo);
+  // `analyzeMemo` stamps wall-clock time. Provider approval must be
+  // reconstructable across the separate approve and dispatch requests, so
+  // bind prompt-only baseline timestamps to the immutable memo snapshot.
+  const baselineAt = memo.updatedAt || memo.createdAt || "1970-01-01T00:00:00.000Z";
+  const localResult: ReviewResult = {
+    ...computedBaseline,
+    generatedAt: baselineAt,
+    provider: {
+      ...computedBaseline.provider,
+      checkedAt: baselineAt
+    }
+  };
+  return {
+    localResult,
+    body: {
+      model,
+      max_tokens: maxTokens,
+      system: SYSTEM_PROMPT,
+      tools: [
+        {
+          name: "record_eccn_review",
+          description:
+            "Return the ECCN memo review as normalized structured data for the Rulix reviewer UI.",
+          input_schema: AI_REVIEW_SCHEMA
+        }
+      ],
+      tool_choice: { type: "tool", name: "record_eccn_review" },
+      messages: [
+        {
+          role: "user",
+          content: buildCouncilPrompt(memo, localResult, depth)
+        }
+      ]
+    }
+  };
+}
+
+export function buildMemoChatProviderRequest(
+  memo: MemoRecord,
+  reviewerMessage: string,
+  history: MemoChatMessage[],
+  model: string,
+  maxTokens = 1400
+) {
+  return {
+    model,
+    max_tokens: maxTokens,
+    system: MEMO_CHAT_SYSTEM_PROMPT,
+    tools: [
+      {
+        name: "record_memo_chat_response",
+        description:
+          "Choose whether to answer the reviewer or draft an updated memo, then return the response.",
+        input_schema: MEMO_CHAT_SCHEMA
+      }
+    ],
+    tool_choice: { type: "tool", name: "record_memo_chat_response" },
+    messages: [
+      {
+        role: "user",
+        content: buildMemoChatPrompt(memo, reviewerMessage, history)
+      }
+    ]
+  };
+}
+
 export async function runCouncilAnalysis(
   memo: MemoRecord,
   options: CouncilOptions = {}
@@ -257,42 +350,31 @@ export async function runCouncilAnalysis(
   const runtime = getBedrockRuntime();
   const depth = options.depth ?? "standard";
   const model = councilModelForDepth(depth, runtime);
+  const lane = resolveBedrockLane(model);
 
-  if (!runtime.configured) {
+  if (!runtime.configured || !lane) {
     throw new LiveCouncilUnavailableError(
       "Live AI analysis is not configured. No deterministic analysis was recorded."
     );
   }
 
-  const localResult = analyzeMemo(memo);
+  const request = buildCouncilProviderRequest(
+    memo,
+    depth,
+    model,
+    options.maxTokens ?? councilMaxTokensForDepth(depth)
+  );
+  const { localResult } = request;
   const startedAt = Date.now();
   try {
-    const client = options.providerClient ?? (new AnthropicBedrock() as CouncilProviderClient);
-    const response = await client.messages.create(
+    const response = await dispatchAuthorizedAiRequest(
+      requireEgressContext(options.egress, "council", councilApprovalPayload(memo, depth)),
+      lane,
+      request.body,
       {
-        model,
-        max_tokens: options.maxTokens ?? 2600,
-        system: SYSTEM_PROMPT,
-        tools: [
-          {
-            name: "record_eccn_review",
-            description:
-              "Return the ECCN memo review as normalized structured data for the Rulix reviewer UI.",
-            input_schema: AI_REVIEW_SCHEMA
-          }
-        ],
-        tool_choice: { type: "tool", name: "record_eccn_review" },
-        messages: [
-          {
-            role: "user",
-            content: buildCouncilPrompt(memo, localResult, depth)
-          }
-        ]
+        signal: AbortSignal.timeout(options.timeoutMs ?? bedrockDeadlineMs())
       },
-      {
-        signal: AbortSignal.timeout(options.timeoutMs ?? bedrockDeadlineMs()),
-        maxRetries: 0
-      }
+      options.providerClient
     );
     emitUsage(options.onUsage, model, "council", response.usage, Date.now() - startedAt);
 
@@ -322,6 +404,7 @@ export async function runCouncilAnalysis(
       latencyMs: Date.now() - startedAt
     });
   } catch (error) {
+    if (error instanceof AiEgressPolicyError) throw error;
     throw new LiveCouncilUnavailableError(
       `Live AI analysis failed (${safeError(error)}). No deterministic analysis was recorded.`
     );
@@ -336,30 +419,27 @@ export async function runMemoChatWithHaiku(
 ): Promise<MemoChatAiResult | undefined> {
   const runtime = getBedrockRuntime();
   const model = options.model ?? runtime.model;
-  if (!runtime.configured) return undefined;
+  const lane = resolveBedrockLane(model);
+  if (!runtime.configured || !lane) return undefined;
 
   const startedAt = Date.now();
-  const client = new AnthropicBedrock();
-  const response = await client.messages.create({
-    model,
-    max_tokens: options.maxTokens ?? 1400,
-    system: MEMO_CHAT_SYSTEM_PROMPT,
-    tools: [
-      {
-        name: "record_memo_chat_response",
-        description:
-          "Choose whether to answer the reviewer or draft an updated memo, then return the response.",
-        input_schema: MEMO_CHAT_SCHEMA
-      }
-    ],
-    tool_choice: { type: "tool", name: "record_memo_chat_response" },
-    messages: [
-      {
-        role: "user",
-        content: buildMemoChatPrompt(memo, reviewerMessage, history)
-      }
-    ]
-  });
+  const response = await dispatchAuthorizedAiRequest(
+    requireEgressContext(
+      options.egress,
+      "memo-chat",
+      memoChatApprovalPayload(memo, reviewerMessage, history)
+    ),
+    lane,
+    buildMemoChatProviderRequest(
+      memo,
+      reviewerMessage,
+      history,
+      model,
+      options.maxTokens ?? 1400
+    ),
+    undefined,
+    options.providerClient
+  );
   emitUsage(options.onUsage, model, "memo-chat", response.usage, Date.now() - startedAt);
 
   const toolBlock = response.content.find(
@@ -393,76 +473,25 @@ export async function runMemoChatWithHaiku(
   };
 }
 
-export async function draftMemoFromPublicWeb(
+export async function createLocalPublicMemoTemplate(
   item: string,
-  options: MemoChatOptions = {}
+  _options: MemoChatOptions = {}
 ): Promise<PublicMemoDraftResult> {
-  const runtime = getBedrockRuntime();
-  const model = options.model ?? runtime.model;
-  if (!runtime.configured) {
-    return {
-      title: `Public-source memo draft - ${item}`,
-      memoText: buildOfflinePublicDraft(item),
-      sources: [],
-      provider: {
-        configured: false,
-        model: "local-template",
-        live: false,
-        message: "Bedrock is not enabled, so a public-source draft could not be generated."
-      }
-    };
-  }
-
-  const client = new AnthropicBedrock();
-  const startedAt = Date.now();
-  try {
-    const response = await client.messages.create({
-      model,
-      max_tokens: options.maxTokens ?? 3200,
-      system: PUBLIC_MEMO_DRAFT_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            item,
-            task:
-              "Draft a cautious ECCN self-classification memo from model knowledge only. Do not claim web research was performed. Return sources as an empty array and list facts that must be independently verified."
-          })
-        }
-      ]
-    });
-    emitUsage(options.onUsage, model, "public-draft", response.usage, Date.now() - startedAt);
-    const rawText = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("\n")
-      .trim();
-    const payload = parseJsonPayload(rawText) as Record<string, unknown>;
-    return {
-      title: asString(payload.title, `Public-source memo draft - ${item}`),
-      memoText: asLongString(payload.memoText, buildOfflinePublicDraft(item), 12000),
-      sources: [],
-      provider: {
-        configured: true,
-        model,
-        live: true,
-        message:
-          "Drafted on Bedrock from model knowledge; public web search is unavailable on Bedrock, so all facts must be verified against manufacturer and official sources."
-      }
-    };
-  } catch (error) {
-    return {
-      title: `Public-source memo draft - ${item}`,
-      memoText: buildOfflinePublicDraft(item),
-      sources: [],
-      provider: {
-        configured: true,
-        model,
-        live: false,
-        message: `Public draft failed (${safeError(error)}).`
-      }
-    };
-  }
+  // A free-form item description has no server-verifiable public provenance.
+  // Keep this workflow deterministic and local until an authoritative source
+  // ingestion pipeline can bind exact source bytes and approval to the call.
+  return {
+    title: `Public-source memo template - ${item}`,
+    memoText: buildOfflinePublicDraft(item),
+    sources: [],
+    provider: {
+      configured: false,
+      model: "local-template",
+      live: false,
+      message:
+        "Created locally from a structured template. No AI provider or external source was contacted; attach and verify official public sources before analysis."
+    }
+  };
 }
 
 function buildOfflinePublicDraft(item: string) {
@@ -474,7 +503,7 @@ function buildOfflinePublicDraft(item: string) {
 
 ## Drafting Note
 
-Live Bedrock drafting was unavailable or failed in this backend session. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
+This template was created locally without an AI provider or web request. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
 
 ## Information Needed
 
@@ -806,47 +835,50 @@ export interface MemoBuildChatResult {
   draft?: MemoBuildDraft;
 }
 
+export function buildMemoBuilderProviderRequest(
+  messages: MemoBuildChatMessage[],
+  model: string
+) {
+  return {
+    model,
+    max_tokens: 3200,
+    system: `${MEMO_BUILDER_SYSTEM_PROMPT}${MEMO_BUILDER_QUALITY_APPENDIX}`,
+    tools: [
+      {
+        name: "finish_draft",
+        description: "Call when you have gathered enough information to produce a complete memo draft.",
+        input_schema: MEMO_BUILDER_DRAFT_SCHEMA
+      }
+    ],
+    messages: messages.map((message) => ({ role: message.role, content: message.content }))
+  };
+}
+
 export async function runMemoBuildChat(
   messages: MemoBuildChatMessage[],
-  options: { onUsage?: (sample: UsageSample) => void } = {}
+  options: {
+    onUsage?: (sample: UsageSample) => void;
+    providerClient?: CouncilProviderClient;
+    egress?: AiEgressCallerContext;
+  } = {}
 ): Promise<MemoBuildChatResult> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
-  const runtime = getBedrockRuntime();
-
-  let client: Anthropic;
-  let model: string;
-
-  if (anthropicKey) {
-    client = new Anthropic({ apiKey: anthropicKey });
-    model = "claude-sonnet-4-6";
-  } else if (runtime.configured) {
-    client = new AnthropicBedrock() as unknown as Anthropic;
-    model = runtime.deepModel;
-  } else {
+  const lane = resolveMemoBuilderProviderLane();
+  if (!lane) {
     throw new Error("No AI provider configured. Set ANTHROPIC_API_KEY or enable Bedrock.");
   }
+  const model = lane.model;
 
   const startedAt = Date.now();
-  let response: Awaited<ReturnType<Anthropic["messages"]["create"]>>;
+  let response: CouncilProviderResponse;
   try {
-    response = await client.messages.create(
+    response = await dispatchAuthorizedAiRequest(
+      requireEgressContext(options.egress, "memo-builder", memoBuilderApprovalPayload(messages)),
+      lane,
+      buildMemoBuilderProviderRequest(messages, model),
       {
-        model,
-        max_tokens: 3200,
-        system: `${MEMO_BUILDER_SYSTEM_PROMPT}${MEMO_BUILDER_QUALITY_APPENDIX}`,
-        tools: [
-          {
-            name: "finish_draft",
-            description: "Call when you have gathered enough information to produce a complete memo draft.",
-            input_schema: MEMO_BUILDER_DRAFT_SCHEMA as Parameters<Anthropic["messages"]["create"]>[0]["tools"][number]["input_schema"]
-          }
-        ],
-        messages: messages.map((m) => ({ role: m.role, content: m.content }))
+        timeout: MEMO_BUILDER_PROVIDER_TIMEOUT_MS
       },
-      {
-        timeout: MEMO_BUILDER_PROVIDER_TIMEOUT_MS,
-        maxRetries: 0
-      }
+      options.providerClient
     );
   } catch (error) {
     const message = safeError(error);
@@ -862,7 +894,7 @@ export async function runMemoBuildChat(
     (block) => block.type === "tool_use" && block.name === "finish_draft"
   );
   const textBlock = response.content.find((block) => block.type === "text");
-  const replyText = textBlock?.type === "text" ? textBlock.text.trim() : "";
+  const replyText = textBlock?.type === "text" ? textBlock.text?.trim() ?? "" : "";
 
   if (toolBlock?.type === "tool_use") {
     const input = toolBlock.input as Record<string, unknown>;
@@ -885,6 +917,28 @@ export async function runMemoBuildChat(
   return {
     reply: replyText || "Could you tell me more about the item you need to classify?"
   };
+}
+
+export function resolveMemoBuilderProviderLane(): AiProviderLane | undefined {
+  const runtime = getBedrockRuntime();
+  return resolveMemoBuilderLane({
+    anthropicModel: "claude-sonnet-4-6",
+    bedrockModel: runtime.deepModel
+  });
+}
+
+function requireEgressContext(
+  caller: AiEgressCallerContext | undefined,
+  purpose: AiEgressContext["purpose"],
+  payload: unknown
+): AiEgressContext {
+  if (!caller) {
+    throw new AiEgressPolicyError(
+      "ai_egress_context_required",
+      "A server-owned AI egress context is required for this content."
+    );
+  }
+  return { ...caller, purpose, payload };
 }
 
 function isValidDataClass(value: unknown): value is DataClass {

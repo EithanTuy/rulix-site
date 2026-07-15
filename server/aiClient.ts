@@ -1,36 +1,55 @@
-import Anthropic from "@anthropic-ai/sdk";
-import AnthropicBedrock from "@anthropic-ai/bedrock-sdk";
-
 export interface StoredOutreachConfig {
   provider: "bedrock" | "anthropic";
-  anthropicApiKey?: string;
 }
 
 export function defaultOutreachConfig(): StoredOutreachConfig {
-  return { provider: "bedrock" };
+  return { provider: deploymentOutreachProvider() };
+}
+
+/** Allow-list persisted configuration so legacy plaintext credentials are discarded. */
+export function sanitizeOutreachConfig(value: unknown): StoredOutreachConfig {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const provider = (value as { provider?: unknown }).provider;
+    if (provider === "bedrock" || provider === "anthropic") return { provider };
+  }
+  return defaultOutreachConfig();
 }
 
 export function outreachProviderReady(config: StoredOutreachConfig): boolean {
-  if (config.provider === "anthropic") {
-    return Boolean(config.anthropicApiKey?.trim());
+  const approvedProvider = process.env.RULIX_APPROVED_PROVIDER?.trim().toLowerCase() || "amazon-bedrock";
+  const approvedRegion = process.env.RULIX_APPROVED_REGION?.trim().toLowerCase();
+  if (approvedProvider === "anthropic-direct") {
+    return config.provider === "anthropic" &&
+      approvedRegion === "global" &&
+      Boolean(process.env.ANTHROPIC_API_KEY?.trim());
   }
-  return process.env.BEDROCK_ENABLED === "true";
+  const actualRegion = process.env.AWS_REGION?.trim().toLowerCase() ||
+    process.env.AWS_DEFAULT_REGION?.trim().toLowerCase();
+  return config.provider === "bedrock" &&
+    approvedProvider === "amazon-bedrock" &&
+    process.env.BEDROCK_ENABLED?.trim().toLowerCase() === "true" &&
+    Boolean(actualRegion) &&
+    (!approvedRegion || approvedRegion === actualRegion);
 }
 
-// Returns a client compatible with the Anthropic messages API.
-// Uses the direct Anthropic API when provider is "anthropic", otherwise Bedrock.
-export function createAIClient(config: StoredOutreachConfig): Anthropic {
-  if (config.provider === "anthropic" && config.anthropicApiKey?.trim()) {
-    return new Anthropic({ apiKey: config.anthropicApiKey.trim() });
-  }
-  if (!outreachProviderReady(config)) {
-    throw new Error(
-      config.provider === "anthropic"
-        ? "An Anthropic API key is not configured. Set one in the dashboard Settings tab."
-        : "Amazon Bedrock is not enabled for this deployment."
-    );
-  }
-  return new AnthropicBedrock() as unknown as Anthropic;
+export function deploymentOutreachProvider(): StoredOutreachConfig["provider"] {
+  return process.env.RULIX_APPROVED_PROVIDER?.trim().toLowerCase() === "anthropic-direct"
+    ? "anthropic"
+    : "bedrock";
+}
+
+export function outreachDeploymentStatus(config: StoredOutreachConfig) {
+  const deploymentProvider = deploymentOutreachProvider();
+  const credentialConfigured = deploymentProvider === "anthropic"
+    ? Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+    : process.env.BEDROCK_ENABLED?.trim().toLowerCase() === "true" &&
+      Boolean(process.env.AWS_REGION?.trim() || process.env.AWS_DEFAULT_REGION?.trim());
+  return {
+    provider: config.provider,
+    deploymentProvider,
+    credentialConfigured,
+    ready: outreachProviderReady(config)
+  };
 }
 
 // Strips Bedrock regional prefix and version suffix so the model ID is valid
@@ -40,11 +59,6 @@ export function createAIClient(config: StoredOutreachConfig): Anthropic {
 export function resolveModel(bedrockModelId: string, config: StoredOutreachConfig): string {
   if (config.provider !== "anthropic") return bedrockModelId;
   return bedrockModelId
-    .replace(/^(?:global|us)\.anthropic\./, "")
+    .replace(/^(?:global|us|eu|apac|jp)\.anthropic\./, "")
     .replace(/-v\d+(?::\d+)?$/, "");
-}
-
-export function maskApiKey(key: string): string {
-  if (key.length <= 12) return "****";
-  return `${key.slice(0, 8)}${"*".repeat(Math.min(20, key.length - 12))}${key.slice(-4)}`;
 }

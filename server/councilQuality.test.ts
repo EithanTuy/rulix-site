@@ -105,6 +105,79 @@ describe("council quality normalization", () => {
     )).toBe(true);
   });
 
+  it("does not let a same-title strong AI finding erase a deterministic blocker", () => {
+    const memo = fixture("fixture-camera-2026-0412");
+    const deterministic = analyzeMemo(memo).findings.find(
+      (finding) => finding.status === "missing" && finding.title.includes("Camera sensor parameters")
+    );
+    if (!deterministic) throw new Error("Fixture no longer produces the expected camera guardrail.");
+
+    const result = merge(memo, {
+      findings: [
+        {
+          ...deterministic,
+          id: "ai-claims-camera-guardrail-is-satisfied",
+          status: "strong",
+          claim: "The required camera parameters are complete.",
+          rationale: "The model claims the missing parameters are present.",
+          severity: "info"
+        }
+      ]
+    });
+
+    const sameTitle = result.findings.filter((finding) => finding.title === deterministic.title);
+    expect(sameTitle).toHaveLength(1);
+    expect(["missing", "conflict"]).toContain(sameTitle[0]?.status);
+    expect(sameTitle[0]?.severity).not.toBe("info");
+  });
+
+  it("does not deduplicate an unrelated AI finding over a guardrail that shares its source", () => {
+    const memo = fixture("fixture-camera-2026-0412");
+    const deterministic = analyzeMemo(memo).findings.find(
+      (finding) => finding.status === "missing" && finding.title.includes("Camera sensor parameters")
+    );
+    if (!deterministic) throw new Error("Fixture no longer produces the expected camera guardrail.");
+
+    const result = merge(memo, {
+      findings: [
+        {
+          ...deterministic,
+          id: "ai-unrelated-same-source",
+          title: "Unrelated camera documentation request",
+          claim: "Ask for a product brochure.",
+          rationale: "A brochure could provide general context."
+        }
+      ]
+    });
+
+    expect(result.findings.some((finding) => finding.title === deterministic.title)).toBe(true);
+    expect(result.findings.some((finding) => finding.id === "ai-unrelated-same-source")).toBe(true);
+  });
+
+  it("does not let AI format checks turn a deterministic failure into a pass", () => {
+    const memo: MemoRecord = {
+      ...fixture("fixture-vac-2026-0401"),
+      id: "fixture-format-guardrail",
+      memoText: "EAR99."
+    };
+
+    const result = merge(memo, {
+      formatChecks: [
+        {
+          key: "has-analysis",
+          label: "Analysis present",
+          pass: true,
+          note: "The model claims that analysis is present."
+        }
+      ]
+    });
+
+    expect(result.formatChecks?.find((check) => check.key === "has-analysis")).toMatchObject({
+      pass: false,
+      note: "Include reasoning, not only a final determination."
+    });
+  });
+
   it("downgrades generic procedural blockers for low-risk EAR99 memos", () => {
     const memo = fixture("fixture-vac-2026-0401");
     const result = merge(memo, {

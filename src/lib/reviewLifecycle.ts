@@ -22,7 +22,7 @@ export function createAuditEvent(
   actor = "Reviewer JW"
 ): AuditEvent {
   return {
-    id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `audit-${globalThis.crypto.randomUUID()}`,
     memoId,
     at: new Date().toISOString(),
     actor,

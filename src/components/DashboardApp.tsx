@@ -250,6 +250,8 @@ function DashboardDenied({ user, onSignOut }: { user: UserProfile; onSignOut: ()
 function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () => Promise<void> }) {
   const [metrics, setMetrics] = useState<AdminMetrics | undefined>();
   const [users, setUsers] = useState<UserAdminSummary[]>([]);
+  const [userCursor, setUserCursor] = useState<string | undefined>();
+  const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     const hash = window.location.hash.replace("#", "");
     return DASHBOARD_TABS.some((tab) => tab.id === hash) ? hash as DashboardTab : "overview";
@@ -262,15 +264,34 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
     setLoading(true);
     setError(undefined);
     try {
-      const [m, u] = await Promise.all([getAdminMetrics(rangeDays), listAdminUsers()]);
+      const [m, userPage] = await Promise.all([getAdminMetrics(rangeDays), listAdminUsers({ limit: 25 })]);
       setMetrics(m);
-      setUsers(u);
+      setUsers(userPage.items);
+      setUserCursor(userPage.nextCursor);
     } catch (loadError) {
       setError(toMessage(loadError, "Could not load operations data."));
     } finally {
       setLoading(false);
     }
   }, [rangeDays]);
+
+  const loadMoreUsers = useCallback(async () => {
+    if (!userCursor || loadingMoreUsers) return;
+    setLoadingMoreUsers(true);
+    setError(undefined);
+    try {
+      const page = await listAdminUsers({ limit: 25, cursor: userCursor });
+      setUsers((current) => [
+        ...current,
+        ...page.items.filter((candidate) => !current.some((user) => user.id === candidate.id))
+      ]);
+      setUserCursor(page.nextCursor);
+    } catch (loadError) {
+      setError(toMessage(loadError, "Could not load more accounts."));
+    } finally {
+      setLoadingMoreUsers(false);
+    }
+  }, [loadingMoreUsers, userCursor]);
 
   useEffect(() => {
     void load();
@@ -365,6 +386,14 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
         </div>
 
         {error && <div className="dash-error dash-banner">{error}</div>}
+        {metrics?.availability.status === "partial" && (
+          <div className="dash-notice dash-banner" role="status">
+            Usage and account totals are exact for {metrics.rangeStart} through {metrics.rangeEnd} UTC.
+            {metrics.availability.onlineUsers.status === "unavailable"
+              ? " Online presence is unavailable because Rulix will not scan every session to estimate it."
+              : ""}
+          </div>
+        )}
 
         <div className="dash-tab-content" key={activeTab}>
           {activeTab === "overview" && (
@@ -380,7 +409,9 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
                     <OverviewPanel
                       icon={<Users size={19} />}
                       title="Account access"
-                      detail={`${num(metrics.users.online)} online of ${num(metrics.users.total)} total accounts`}
+                      detail={metrics.users.online === null
+                        ? `${num(metrics.users.total)} total accounts; online presence unavailable`
+                        : `${num(metrics.users.online)} online of ${num(metrics.users.total)} total accounts`}
                       action="Open accounts"
                       onOpen={() => selectTab("accounts")}
                     />
@@ -419,7 +450,14 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
             </>
           )}
 
-          {activeTab === "accounts" && <UsersTable users={users} />}
+          {activeTab === "accounts" && (
+            <UsersTable
+              users={users}
+              hasMore={Boolean(userCursor)}
+              loadingMore={loadingMoreUsers}
+              onLoadMore={loadMoreUsers}
+            />
+          )}
           {activeTab === "invites" && <InvitePanel onChanged={load} />}
           {activeTab === "leads" && <LeadsPanel />}
           {activeTab === "review" && <LeadReviewQueue />}
@@ -464,7 +502,12 @@ function MetricCards({ metrics, rangeDays }: { metrics: AdminMetrics; rangeDays:
       <MetricCard icon={<Cpu size={20} />} label="Tokens processed" value={compact(metrics.totals.inputTokens + metrics.totals.outputTokens)} />
       <MetricCard icon={<Clock3 size={20} />} label="Average latency" value={`${num(metrics.totals.avgLatencyMs)} ms`} />
       <MetricCard icon={<Users size={20} />} label="Accounts" value={num(metrics.users.total)} />
-      <MetricCard icon={<Wifi size={20} />} label="Online now" value={num(metrics.users.online)} tone={metrics.users.online ? "green" : "default"} />
+      <MetricCard
+        icon={<Wifi size={20} />}
+        label="Online now"
+        value={metrics.users.online === null ? "Unavailable" : num(metrics.users.online)}
+        tone={metrics.users.online ? "green" : "default"}
+      />
     </section>
   );
 }
@@ -705,7 +748,17 @@ function CostTable({ title, buckets }: { title: string; buckets: MetricBucket[] 
   );
 }
 
-function UsersTable({ users }: { users: UserAdminSummary[] }) {
+function UsersTable({
+  users,
+  hasMore,
+  loadingMore,
+  onLoadMore
+}: {
+  users: UserAdminSummary[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => Promise<void>;
+}) {
   return (
     <div className="dash-panel">
       <div className="dash-panel-head">
@@ -741,6 +794,11 @@ function UsersTable({ users }: { users: UserAdminSummary[] }) {
           {users.length === 0 && <div className="dash-empty"><Users size={22} /><span>No accounts yet.</span></div>}
         </div>
       </div>
+      {hasMore && (
+        <button type="button" className="dash-primary" disabled={loadingMore} onClick={() => void onLoadMore()}>
+          {loadingMore ? "Loading…" : "Load more accounts"}
+        </button>
+      )}
     </div>
   );
 }
@@ -836,7 +894,6 @@ function InvitePanel({ onChanged }: { onChanged: () => Promise<void> }) {
 function ProviderSettingsPanel() {
   const [config, setConfig] = useState<OutreachProviderConfig | undefined>();
   const [provider, setProvider] = useState<"bedrock" | "anthropic">("bedrock");
-  const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -856,15 +913,11 @@ function ProviderSettingsPanel() {
     setError(undefined);
     setNotice(undefined);
     try {
-      const updated = await setOutreachProviderConfig({
-        provider,
-        anthropicApiKey: provider === "anthropic" ? apiKey || undefined : undefined
-      });
+      const updated = await setOutreachProviderConfig({ provider });
       setConfig(updated);
-      setApiKey("");
       setNotice(
         provider === "anthropic"
-          ? `Saved. Outreach and leads will now use the Anthropic API directly${updated.anthropicKeyMasked ? ` (key: ${updated.anthropicKeyMasked})` : ""}.`
+          ? "Saved. Outreach and leads will use the deployment-managed Anthropic connection."
           : "Saved. Outreach and leads will use Amazon Bedrock."
       );
     } catch (err) {
@@ -890,23 +943,17 @@ function ProviderSettingsPanel() {
         <label>
           <span>Provider</span>
           <select value={provider} onChange={(e) => { setProvider(e.target.value as "bedrock" | "anthropic"); setNotice(undefined); }}>
-            <option value="bedrock">Amazon Bedrock (default)</option>
-            <option value="anthropic">Anthropic API (direct)</option>
+            <option value="bedrock" disabled={config?.deploymentProvider === "anthropic"}>Amazon Bedrock</option>
+            <option value="anthropic" disabled={config?.deploymentProvider === "bedrock"}>Anthropic API (deployment-managed)</option>
           </select>
         </label>
 
         {provider === "anthropic" && (
-          <label>
-            <span>Anthropic API key{config?.anthropicKeyMasked ? ` (current: ${config.anthropicKeyMasked})` : ""}</span>
-            <input
-              type="password"
-              placeholder={config?.anthropicKeyMasked ? "Enter a new key to replace the current one" : "sk-ant-…"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              autoComplete="off"
-              required={!config?.anthropicKeyMasked || config.provider !== "anthropic"}
-            />
-          </label>
+          <div className={config?.credentialConfigured ? "dash-notice" : "dash-error"}>
+            {config?.credentialConfigured
+              ? "The Anthropic credential is configured in the deployment environment. Secret values are never stored or displayed by the app."
+              : "The deployment is missing its Anthropic credential. Configure ANTHROPIC_API_KEY in the deployment secret manager before selecting this provider."}
+          </div>
         )}
 
         {provider === "bedrock" && (
@@ -918,7 +965,17 @@ function ProviderSettingsPanel() {
         {notice && <div className="dash-notice">{notice}</div>}
         {error && <div className="dash-error">{error}</div>}
 
-        <button type="submit" className="dash-primary" disabled={busy || config === undefined}>
+        <button
+          type="submit"
+          className="dash-primary"
+          disabled={
+            busy ||
+            config === undefined ||
+            provider !== config.deploymentProvider ||
+            !config.credentialConfigured ||
+            !config.ready
+          }
+        >
           <Send size={16} /> {busy ? "Saving…" : "Save provider settings"}
         </button>
       </form>

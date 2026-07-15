@@ -7,6 +7,10 @@ import type {
   UserUsageSummary
 } from "../src/types";
 import { modelPrice, priceFamily, usageCostUsd } from "./bedrockPricing";
+import {
+  adminMetricsWindow,
+  isAdminMetricsRangeDays
+} from "./adminMetricsAggregates";
 
 export interface SessionSummary {
   userId: string;
@@ -28,8 +32,15 @@ export function buildAdminMetrics(input: {
   rangeDays?: number;
 }): AdminMetrics {
   const rangeDays = input.rangeDays && input.rangeDays > 0 ? input.rangeDays : DEFAULT_RANGE_DAYS;
-  const cutoff = Date.now() - rangeDays * 24 * 60 * 60 * 1000;
-  const events = input.usage.filter((event) => Date.parse(event.at) >= cutoff);
+  if (!isAdminMetricsRangeDays(rangeDays)) {
+    throw new Error("Admin metrics support only 7, 30, or 90 UTC calendar days.");
+  }
+  const generatedAt = new Date().toISOString();
+  const window = adminMetricsWindow(rangeDays, Date.parse(generatedAt));
+  const events = input.usage.filter((event) => {
+    const day = event.at.slice(0, 10);
+    return day >= window.start && day <= window.end;
+  });
 
   const totals = {
     costUsd: 0,
@@ -90,8 +101,17 @@ export function buildAdminMetrics(input: {
   totals.avgLatencyMs = latencyCount ? Math.round(latencySum / latencyCount) : 0;
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     rangeDays,
+    rangeStart: window.start,
+    rangeEnd: window.end,
+    availability: {
+      status: "complete",
+      usage: { status: "available", exact: true, asOf: generatedAt },
+      accountTotal: { status: "available", exact: true, asOf: generatedAt },
+      onlineUsers: { status: "available", exact: true, asOf: generatedAt },
+      topUsers: { status: "available", exact: true, asOf: generatedAt }
+    },
     totals,
     byModel: sortByCost(byModel),
     byCallType: sortByCost(byCallType),

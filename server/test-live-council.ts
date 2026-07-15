@@ -2,7 +2,25 @@ import { writeFileSync } from "node:fs";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import { verifyCitations } from "../src/lib/eccnReview";
 import type { AgentRole, MemoRecord, ReviewResult } from "../src/types";
-import { runCouncilAnalysis } from "./bedrockCouncil";
+import { createAiDispatchAdmissionHook } from "./aiAdmission";
+import {
+  currentAiApprovalPolicy,
+  deploymentDataClass,
+  resolveBedrockLane,
+  setAiDispatchAdmissionHook,
+  setAiDispatchAuthorizationHook
+} from "./aiEgressGateway";
+import {
+  buildCouncilProviderRequest,
+  councilApprovalPayload,
+  councilModelForDepth,
+  getBedrockRuntime,
+  runCouncilAnalysis
+} from "./bedrockCouncil";
+import { createStoreAiDispatchAuthorizationHook } from "./aiAuthorization";
+import { hashAiApprovalPayload } from "./domain/aiApproval";
+import { hashMemoContent } from "./domain/hashes";
+import { LocalAccountStore } from "./store";
 
 const EXPECTED_ROLES: AgentRole[] = [
   "memo-parser",
@@ -52,6 +70,13 @@ if (process.env.BEDROCK_ENABLED?.trim().toLowerCase() !== "true") {
   throw new Error("BEDROCK_ENABLED=true, AWS credentials, and AWS_REGION are required for the deep live Bedrock council test.");
 }
 
+const liveAccountId = process.env.RULIX_LIVE_TEST_ACCOUNT_ID?.trim() || "rulix-live-council-test";
+const liveStore = new LocalAccountStore({ persist: false });
+setAiDispatchAdmissionHook(createAiDispatchAdmissionHook({
+  store: liveStore
+}));
+setAiDispatchAuthorizationHook(createStoreAiDispatchAuthorizationHook({ store: liveStore }));
+
 const summaries: string[] = [];
 
 for (const memo of reviewFixtures) {
@@ -78,15 +103,55 @@ await new Promise((resolve) => setTimeout(resolve, 500));
 async function runLiveCouncilWithRetry(memo: MemoRecord) {
   let result = await runCouncilAnalysis(memo, {
     depth: "deep",
-    maxTokens: 3600
+    maxTokens: 3600,
+    egress: await liveEgressContext(memo)
   });
   if (result.provider.source !== "bedrock") {
     result = await runCouncilAnalysis(memo, {
       depth: "deep",
-      maxTokens: 3600
+      maxTokens: 3600,
+      egress: await liveEgressContext(memo)
     });
   }
   return result;
+}
+
+async function liveEgressContext(memo: MemoRecord) {
+  await liveStore.upsertReview(liveAccountId, memo);
+  const storedMemo = await liveStore.findReview(liveAccountId, memo.id);
+  if (!storedMemo) throw new Error("Live council memo could not be stored.");
+  const dataClass = deploymentDataClass();
+  const model = councilModelForDepth("deep", getBedrockRuntime());
+  const lane = resolveBedrockLane(model);
+  if (!lane) throw new Error("The approved Bedrock lane is unavailable.");
+  const subject = {
+    kind: "review" as const,
+    id: storedMemo.id,
+    revision: storedMemo.revision ?? 1,
+    version: storedMemo.version ?? storedMemo.revision ?? 1,
+    contentHash: storedMemo.contentHash ?? hashMemoContent(storedMemo)
+  };
+  const dispatchId = `live-${memo.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const approval = await liveStore.createAiApproval(liveAccountId, {
+    requestId: dispatchId,
+    purpose: "council",
+    subject,
+    payloadHash: hashAiApprovalPayload(councilApprovalPayload(storedMemo, "deep")),
+    providerRequestHashes: [
+      hashAiApprovalPayload(buildCouncilProviderRequest(storedMemo, "deep", model, 3600).body)
+    ],
+    dataClass,
+    policy: currentAiApprovalPolicy(lane, dataClass),
+    approvedBy: { id: "live-council-officer", role: "export-control-officer" },
+    dispatchLimit: 1
+  });
+  return {
+    accountId: liveAccountId,
+    dataClass,
+    approvalId: approval.id,
+    dispatchId,
+    subject
+  };
 }
 
 function assertQuality(memo: MemoRecord, result: ReviewResult) {
