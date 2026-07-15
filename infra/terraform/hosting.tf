@@ -307,8 +307,9 @@ resource "aws_cloudfront_origin_access_control" "app" {
 
 # ---- Edge security policy ----
 resource "aws_cloudfront_response_headers_policy" "app_security" {
-  count = var.custom_domain == "" ? 0 : 1
-  name  = "${local.fn_name}-security-headers"
+  count   = var.custom_domain == "" ? 0 : 1
+  name    = "${local.fn_name}-security-headers"
+  comment = "Security and noindex headers for Rulix app/dashboard"
 
   security_headers_config {
     content_security_policy {
