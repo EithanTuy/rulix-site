@@ -280,7 +280,10 @@ data "aws_iam_policy_document" "workspace_migration" {
 
   # DynamoDB decrypts the legacy table key on behalf of the migration role.
   # Bind that forward-access-session permission to this account, service, and
-  # exact source table so the role cannot use the tenant key directly.
+  # exact key so the role cannot use the tenant key directly. Normal DynamoDB
+  # table-key cache decrypts do not include the table-name/subscriber context
+  # that DynamoDB Streams supplies, so the data permission above provides the
+  # exact legacy-table boundary.
   statement {
     sid       = "DecryptLegacyAccountStateViaDynamoDB"
     actions   = ["kms:Decrypt"]
@@ -298,17 +301,6 @@ data "aws_iam_policy_document" "workspace_migration" {
       values   = [data.aws_caller_identity.current.account_id]
     }
 
-    condition {
-      test     = "StringEquals"
-      variable = "kms:EncryptionContext:aws:dynamodb:tableName"
-      values   = [aws_dynamodb_table.account_state.name]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "kms:EncryptionContext:aws:dynamodb:subscriberId"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
   }
 
   statement {
