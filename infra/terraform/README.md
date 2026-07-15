@@ -52,6 +52,27 @@ resources, skips addresses already present, and stops at the first failed
 import. New audit, normalized-workspace, alarm, OAC, and WAF support resources
 are not imported because Terraform must create them from the reviewed plan.
 
+### First private-origin cutover
+
+The one-time migration from a public Lambda Function URL plus shared header to
+CloudFront OAC must be staged. This keeps the current origin available until
+CloudFront has fully deployed signed requests. Run each apply with the reviewed
+production variables, and require `https://app.rulix.cloud/api/health` to return
+HTTP 200 after every numbered step:
+
+1. Apply `aws_cloudfront_origin_access_control.app[0]` only.
+2. Apply `aws_cloudfront_distribution.app[0]` only, then wait until the
+   distribution reports `Deployed`.
+3. Apply both `aws_lambda_permission.cloudfront_function_url[0]` and
+   `aws_lambda_permission.cloudfront_invoke_function[0]`. Their lifecycle
+   creates the scoped CloudFront statements before removing the public ones.
+4. Apply `aws_lambda_function_url.app` to switch it to `AWS_IAM`.
+5. Generate and review a fresh full plan, then apply all remaining resources.
+
+Do not combine steps 2 and 4 during the first cutover. Normal later applies are
+not subject to this bootstrap ordering because OAC and IAM auth are then already
+active.
+
 ## Example
 
 ```bash

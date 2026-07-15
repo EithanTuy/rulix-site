@@ -902,6 +902,10 @@ resource "aws_lambda_permission" "cloudfront_function_url" {
   principal              = "cloudfront.amazonaws.com"
   source_arn             = aws_cloudfront_distribution.app[0].arn
   function_url_auth_type = "AWS_IAM"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_lambda_permission" "cloudfront_invoke_function" {
@@ -913,4 +917,8 @@ resource "aws_lambda_permission" "cloudfront_invoke_function" {
   principal                = "cloudfront.amazonaws.com"
   source_arn               = aws_cloudfront_distribution.app[0].arn
   invoked_via_function_url = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
