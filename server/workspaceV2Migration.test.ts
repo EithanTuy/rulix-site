@@ -280,6 +280,31 @@ describe("workspace v2 migration", () => {
     });
   });
 
+  it("binds transaction idempotency tokens to exact materialized item payloads", async () => {
+    const plan = await planWorkspaceMigration("tenant", "user", sampleState());
+    const materialized = await materializeMigrationPlan(plan, new InMemoryWorkspaceContentStore());
+    const original = materialized.find((item) => "contentRef" in item)!;
+    const changed = structuredClone(original);
+    const contentRef = changed.contentRef as { versionId: string };
+    contentRef.versionId = `${contentRef.versionId}-retry`;
+    const tokens: Array<string | undefined> = [];
+    const doc = {
+      async send(command: unknown) {
+        if (!(command instanceof TransactWriteCommand)) throw new Error("unexpected command");
+        tokens.push(command.input.ClientRequestToken);
+        return {};
+      }
+    };
+    const backend = new DynamoWorkspaceMigrationBackend("workspace", "tenant", doc as never);
+
+    await backend.writeBatch(plan, [original]);
+    await backend.writeBatch(plan, [structuredClone(original)]);
+    await backend.writeBatch(plan, [changed]);
+
+    expect(tokens[0]).toBe(tokens[1]);
+    expect(tokens[2]).not.toBe(tokens[0]);
+  });
+
   it("atomically completes metadata and lease release without addressing one item twice", async () => {
     const plan = await planWorkspaceMigration("tenant", "user", sampleState());
     let transaction: TransactWriteCommand["input"] | undefined;

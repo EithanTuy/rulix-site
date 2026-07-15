@@ -558,7 +558,7 @@ export class DynamoWorkspaceMigrationBackend implements WorkspaceMigrationBacken
           tenantId: plan.tenantId,
           userId: plan.userId,
           migrationDigest: plan.migrationDigest,
-          keys: items.map((item) => item.sk)
+          itemDigests: items.map((item) => sha256Canonical(item))
         }).slice(0, 36)
       }));
     } catch (error) {
