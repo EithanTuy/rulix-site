@@ -6,7 +6,7 @@ infra/terraform/function.zip
 infra/terraform/audit-function.zip
 infra/terraform/.terraform/
 infra/terraform/*.tfstate*
-infra/terraform/tfplan.bin
+infra/terraform/*.bin
 infra/terraform/*.tfvars
 infra/terraform/*.auto.tfvars
 .rulix-workspace-v2-checkpoint.json*

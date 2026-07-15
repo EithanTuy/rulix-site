@@ -43,6 +43,11 @@ output "workspace_content_bucket" {
   value = aws_s3_bucket.workspace_content.bucket
 }
 
+output "workspace_kms_key_arn" {
+  description = "KMS key used by the normalized workspace table and immutable content objects."
+  value       = aws_kms_key.workspace.arn
+}
+
 output "workspace_migration_role_arn" {
   value = aws_iam_role.workspace_migration.arn
 }
