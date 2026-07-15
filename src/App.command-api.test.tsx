@@ -119,7 +119,9 @@ describe("rendered paged command workspace", () => {
     await waitFor(() => {
       expect(screen.queryByRole("heading", { name: "Loading review details" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("heading", { name: primary.title })).toBeInTheDocument();
+    // The rendered memo body may repeat its Markdown title at a lower heading
+    // level. Assert the workspace title specifically so the query is stable.
+    expect(screen.getByRole("heading", { name: primary.title, level: 1 })).toBeInTheDocument();
   });
 });
 
