@@ -51,13 +51,17 @@ variable "approved_model_ids" {
 }
 
 variable "bedrock_prices_json" {
-  description = "Optional non-secret JSON pricing table passed to the runtime for deterministic cost admission and reporting."
+  description = "Optional non-secret, non-empty JSON pricing table passed to the runtime for deterministic cost admission and reporting. Empty uses the runtime's conservative defaults."
   type        = string
-  default     = "{}"
+  default     = ""
 
   validation {
-    condition     = can(jsondecode(var.bedrock_prices_json)) && can(keys(jsondecode(var.bedrock_prices_json)))
-    error_message = "bedrock_prices_json must be a JSON object."
+    condition = var.bedrock_prices_json == "" || (
+      can(jsondecode(var.bedrock_prices_json))
+      && can(keys(jsondecode(var.bedrock_prices_json)))
+      && try(length(keys(jsondecode(var.bedrock_prices_json))) > 0, false)
+    )
+    error_message = "bedrock_prices_json must be empty or a non-empty JSON object."
   }
 }
 
@@ -399,17 +403,19 @@ variable "auth_session_ttl_hours" {
 }
 
 variable "app_reserved_concurrency" {
-  description = "Hard ceiling for concurrent app Lambda executions, preserving account capacity and bounding downstream load."
+  description = "Hard ceiling for concurrent app Lambda executions, preserving account capacity and bounding downstream load. Use -1 when the account quota cannot reserve capacity while retaining AWS's required unreserved minimum."
   type        = number
   default     = 40
 
   validation {
     condition = (
       floor(var.app_reserved_concurrency) == var.app_reserved_concurrency
-      && var.app_reserved_concurrency >= 2
-      && var.app_reserved_concurrency <= 1000
+      && (
+        var.app_reserved_concurrency == -1
+        || (var.app_reserved_concurrency >= 2 && var.app_reserved_concurrency <= 1000)
+      )
     )
-    error_message = "app_reserved_concurrency must be an integer from 2 through 1000."
+    error_message = "app_reserved_concurrency must be -1 (unreserved) or an integer from 2 through 1000."
   }
 }
 

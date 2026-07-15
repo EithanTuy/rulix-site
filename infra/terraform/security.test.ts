@@ -123,6 +123,7 @@ describe("Terraform security invariants", () => {
     expect(appLambda).toContain("reserved_concurrent_executions = var.app_reserved_concurrency");
     expect(distribution).toMatch(/origin_read_timeout\s*=\s*120/);
     expect(concurrency).toMatch(/default\s*=\s*40/);
+    expect(concurrency).toContain("var.app_reserved_concurrency == -1");
     expect(concurrency).toContain("var.app_reserved_concurrency >= 2");
     expect(concurrency).toContain("var.app_reserved_concurrency <= 1000");
 
@@ -287,6 +288,13 @@ describe("Terraform security invariants", () => {
         new RegExp(`${name}\\s*=\\s*${escapeRegExp(expression)}`)
       );
     }
+    const pricing = terraformVariable("bedrock_prices_json");
+    expect(pricing).toMatch(/default\s*=\s*""/);
+    expect(pricing).toContain('var.bedrock_prices_json == ""');
+    expect(pricing).toContain("length(keys(jsondecode(var.bedrock_prices_json))) > 0");
+    expect(appLambda).toContain(
+      'var.bedrock_prices_json == "" ? {} : { RULIX_BEDROCK_PRICES = var.bedrock_prices_json }'
+    );
     expect(appLambda.match(/precondition\s*\{/g)).toHaveLength(5);
     expect(appLambda).toContain(
       'var.approved_provider == "amazon-bedrock" && local.approved_ai_region == var.aws_region'

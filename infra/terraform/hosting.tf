@@ -204,7 +204,6 @@ resource "aws_lambda_function" "app" {
         BEDROCK_PERSONALIZATION_MODEL           = var.bedrock_personalization_model
         BEDROCK_LEAD_SEARCH_MODEL               = var.bedrock_lead_search_model
         RULIX_APPROVED_MODEL_IDS                = jsonencode(var.approved_model_ids)
-        RULIX_BEDROCK_PRICES                    = var.bedrock_prices_json
         RULIX_AI_DATA_CLASS                     = var.ai_data_class
         RULIX_APPROVED_PROVIDER                 = var.approved_provider
         RULIX_APPROVED_REGION                   = local.approved_ai_region
@@ -233,6 +232,7 @@ resource "aws_lambda_function" "app" {
         AUTH_RESET_TTL_MINUTES                  = tostring(var.auth_reset_ttl_minutes)
         AUTH_SESSION_TTL_HOURS                  = tostring(var.auth_session_ttl_hours)
       },
+      var.bedrock_prices_json == "" ? {} : { RULIX_BEDROCK_PRICES = var.bedrock_prices_json },
       var.auth_email_from == "" ? {} : { AUTH_EMAIL_FROM = var.auth_email_from },
       var.auth_bootstrap_secret == "" ? {} : { AUTH_BOOTSTRAP_SECRET = var.auth_bootstrap_secret }
     )
