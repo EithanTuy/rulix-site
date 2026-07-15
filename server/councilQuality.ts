@@ -84,24 +84,57 @@ export function mergeFindings(aiFindings: EvidenceFinding[], localFindings: Evid
   const localGuardrails = localFindings.filter(
     (finding) => finding.status === "missing" || finding.status === "conflict"
   );
-  return [
-    ...aiFindings,
-    ...localGuardrails.filter((localFinding) =>
-      !aiFindings.some((aiFinding) => isSimilarFinding(aiFinding, localFinding))
-    )
-  ].sort(sortMergedFindings);
+  const merged = [...aiFindings];
+
+  for (const localFinding of localGuardrails) {
+    const similarIndexes = merged.flatMap((finding, index) =>
+      isSimilarFinding(finding, localFinding) ? [index] : []
+    );
+    if (similarIndexes.length === 0) {
+      merged.push(localFinding);
+      continue;
+    }
+
+    const similarFindings = similarIndexes.map((index) => merged[index]);
+    const mostRestrictive = similarFindings.reduce((selected, candidate) =>
+      findingStatusWeight(candidate.status) > findingStatusWeight(selected.status) ? candidate : selected
+    );
+    const guardedFinding = findingStatusWeight(mostRestrictive.status) < findingStatusWeight(localFinding.status)
+      ? localFinding
+      : {
+          ...mostRestrictive,
+          severity: moreRestrictiveSeverity(mostRestrictive.severity, localFinding.severity)
+        };
+    const firstIndex = similarIndexes[0];
+    merged[firstIndex] = guardedFinding;
+    for (const duplicateIndex of similarIndexes.slice(1).reverse()) merged.splice(duplicateIndex, 1);
+  }
+
+  return merged.sort(sortMergedFindings);
 }
 
 function isSimilarFinding(a: EvidenceFinding, b: EvidenceFinding) {
+  const sameId = a.id.trim().toLowerCase() === b.id.trim().toLowerCase();
   const sameTitle = a.title.trim().toLowerCase() === b.title.trim().toLowerCase();
-  const sharedSource = a.sourceChunkIds.some((id) => b.sourceChunkIds.includes(id));
-  return sameTitle || (sharedSource && a.agent === b.agent && a.status === b.status);
+  return sameId || sameTitle;
 }
 
 function sortMergedFindings(a: EvidenceFinding, b: EvidenceFinding) {
   const weight = { conflict: 0, missing: 1, weak: 2, strong: 3 };
   if (weight[a.status] !== weight[b.status]) return weight[a.status] - weight[b.status];
   return (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER);
+}
+
+function findingStatusWeight(status: EvidenceFinding["status"]) {
+  return { strong: 0, weak: 1, missing: 2, conflict: 3 }[status];
+}
+
+function moreRestrictiveSeverity(
+  first: EvidenceFinding["severity"],
+  second: EvidenceFinding["severity"]
+) {
+  const weight = { info: 0, review: 1, escalate: 2 } as const;
+  return weight[first] >= weight[second] ? first : second;
 }
 
 function normalizeRecommendedCandidate(
@@ -374,7 +407,18 @@ function mergeFormatChecks(memoText: string, aiChecks: FormatCheck[] | undefined
   const deterministic = detectFormatChecks(memoText);
   if (!Array.isArray(aiChecks) || aiChecks.length === 0) return deterministic;
   const aiMap = new Map(aiChecks.map((c) => [c.key, c]));
-  const merged = deterministic.map((det) => aiMap.get(det.key) ?? det);
+  const merged = deterministic.map((det) => {
+    const aiCheck = aiMap.get(det.key);
+    if (!aiCheck) return det;
+    if (!det.pass) return det;
+    return aiCheck.pass
+      ? det
+      : {
+          ...det,
+          pass: false,
+          note: aiCheck.note || det.note
+        };
+  });
   for (const aiCheck of aiChecks) {
     if (!deterministic.some((d) => d.key === aiCheck.key)) merged.push(aiCheck);
   }

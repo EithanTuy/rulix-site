@@ -244,7 +244,19 @@ function compareMemos(a: MemoRecord, b: MemoRecord, sortMode: SortMode) {
   if (sortMode === "oldest") return a.updatedAt.localeCompare(b.updatedAt);
   if (sortMode === "title") return a.title.localeCompare(b.title);
   if (sortMode === "status") {
-    const rank = { conflict: 0, "needs-info": 1, draft: 2, ready: 3, "signed-off": 4 };
+    const rank: Record<MemoRecord["status"], number> = {
+      conflict: 0,
+      "needs-info": 1,
+      "changes-requested": 2,
+      "in-review": 3,
+      draft: 4,
+      ready: 5,
+      approved: 6,
+      "signed-off": 6,
+      rejected: 7,
+      superseded: 8,
+      archived: 9
+    };
     return rank[a.status] - rank[b.status] || b.updatedAt.localeCompare(a.updatedAt);
   }
   return b.updatedAt.localeCompare(a.updatedAt);

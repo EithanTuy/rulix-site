@@ -5,9 +5,29 @@ export type ReviewStatus =
   | "ready"
   | "needs-info"
   | "conflict"
-  | "signed-off";
+  | "signed-off"
+  | "in-review"
+  | "changes-requested"
+  | "approved"
+  | "rejected"
+  | "superseded"
+  | "archived";
 
 export type DataClass = "public" | "proprietary" | "export-controlled" | "itar-risk" | "cui";
+
+export type ReviewLifecycleStage =
+  | "draft"
+  | "needs-information"
+  | "ready-for-analysis"
+  | "in-review"
+  | "changes-requested"
+  | "ready-for-decision"
+  | "approved"
+  | "rejected"
+  | "superseded"
+  | "archived";
+
+export type CasePriority = "low" | "normal" | "high" | "urgent";
 
 export type AppView = "reviews" | "controls" | "evidence" | "corpus" | "users" | "settings" | "memo-builder";
 
@@ -26,6 +46,14 @@ export interface SourceDocument {
   authority: "EAR" | "ITAR" | "BIS" | "ITA";
   url: string;
   snapshotDate: string;
+  retrievedAt?: string;
+  effectiveAt?: string;
+  contentHash?: string;
+  parserVersion?: string;
+  approvalStatus?: "pending" | "approved" | "superseded" | "withdrawn";
+  approvedAt?: string;
+  approvedBy?: string;
+  supersedesDocumentId?: string;
 }
 
 export interface SourceChunk {
@@ -36,6 +64,9 @@ export interface SourceChunk {
   url: string;
   text: string;
   tags: string[];
+  textHash?: string;
+  exactQuote?: boolean;
+  approvalStatus?: "pending" | "approved" | "superseded" | "withdrawn";
 }
 
 export interface CorpusSnapshot {
@@ -43,6 +74,11 @@ export interface CorpusSnapshot {
   label: string;
   generatedAt: string;
   checksum: string;
+  schemaVersion?: number;
+  sourceKind?: "verified-primary" | "reference" | "seed";
+  approvalStatus?: "pending" | "approved" | "superseded" | "withdrawn";
+  approvedAt?: string;
+  approvedBy?: string;
   documents: SourceDocument[];
   chunks: SourceChunk[];
 }
@@ -63,6 +99,17 @@ export interface MemoRecord {
   intendedUse?: string;
   archivedAt?: string;
   archivedBy?: string;
+  revision?: number;
+  contentHash?: string;
+  createdAt?: string;
+  createdBy?: string;
+  ownerId?: string;
+  lifecycleStage?: ReviewLifecycleStage;
+  priority?: CasePriority;
+  assignedTo?: string;
+  dueAt?: string;
+  tags?: string[];
+  version?: number;
 }
 
 export interface ClassificationCandidate {
@@ -135,13 +182,29 @@ export interface ReviewResult {
   infoRequests: string[];
   agents: CouncilAgentRun[];
   formatChecks?: FormatCheck[];
+  id?: string;
+  memoRevision?: number;
+  inputHash?: string;
+  resultHash?: string;
+  corpusChecksum?: string;
+  promptVersion?: string;
+  createdBy?: string;
 }
 
 export interface ReviewerDecision {
+  id?: string;
   action: "accept" | "request-info" | "override";
   notes: string;
   signedBy?: string;
   signedAt?: string;
+  signerId?: string;
+  memoRevision?: number;
+  memoHash?: string;
+  analysisId?: string;
+  analysisHash?: string;
+  corpusId?: string;
+  corpusChecksum?: string;
+  createdAt?: string;
 }
 
 export interface AuditEvent {
@@ -152,6 +215,11 @@ export interface AuditEvent {
   action: string;
   detail: string;
   severity: "info" | "review" | "escalate";
+  actorId?: string;
+  organizationId?: string;
+  previousHash?: string;
+  eventHash?: string;
+  metadata?: Record<string, string | number | boolean | undefined>;
 }
 
 export interface UserProfile {
@@ -160,6 +228,72 @@ export interface UserProfile {
   name: string;
   role: "export-control-officer" | "reviewer" | "submitter" | "counsel";
   createdAt: string;
+  organizationId?: string;
+  organizationName?: string;
+}
+
+export interface OrganizationProfile {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface OrganizationPolicy {
+  allowedDataClasses: DataClass[];
+  controlledDataMode: "blocked" | "approved";
+  approvedProvider?: string;
+  approvedRegion?: string;
+  retentionDays: number;
+  requireLiveAnalysisForSignoff: boolean;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+export interface MemoRevision {
+  id: string;
+  memoId: string;
+  revision: number;
+  contentHash: string;
+  memoText: string;
+  title: string;
+  itemFamily: string;
+  manufacturer?: string;
+  intendedUse?: string;
+  dataClass: DataClass;
+  sourcePath?: MemoRecord["sourcePath"];
+  createdAt: string;
+  createdBy: string;
+  reason: "created" | "edited" | "suggestion-applied" | "restored" | "migration";
+}
+
+export interface CaseComment {
+  id: string;
+  memoId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  mentions: string[];
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export interface WorkspaceNotification {
+  id: string;
+  userId: string;
+  memoId?: string;
+  kind: "assignment" | "mention" | "request-info" | "decision" | "due-date" | "system";
+  title: string;
+  detail: string;
+  createdAt: string;
+  readAt?: string;
+}
+
+export interface WorkspacePreferences {
+  selectedMemoId?: string;
+  onboardingCompletedAt?: string;
+  dismissedHelp?: string[];
+  savedReviewFilter?: string;
 }
 
 export interface MemoChatMessage {
@@ -293,12 +427,20 @@ export interface OutreachDraft {
 }
 
 export interface AccountReviewState {
+  schemaVersion?: number;
+  version?: number;
+  organization?: OrganizationProfile;
+  policy?: OrganizationPolicy;
+  preferences?: WorkspacePreferences;
   memos: MemoRecord[];
   selectedMemoId?: string;
   decisions: Record<string, ReviewerDecision>;
   auditEvents: AuditEvent[];
   analysisResults: Record<string, ReviewResult>;
   chatMessages: Record<string, MemoChatMessage[]>;
+  memoRevisions?: Record<string, MemoRevision[]>;
+  comments?: Record<string, CaseComment[]>;
+  notifications?: WorkspaceNotification[];
   memoBuilder?: {
     activeSessionId?: string;
     sessions?: MemoBuilderSession[];
@@ -370,6 +512,10 @@ export interface NewReviewInput {
   sourcePath: MemoRecord["sourcePath"];
   memoText: string;
   attachments: string[];
+  priority?: CasePriority;
+  assignedTo?: string;
+  dueAt?: string;
+  tags?: string[];
 }
 
 export type UsageCallType =

@@ -32,7 +32,8 @@ import {
   type MemoBuildChatMessage,
   type UsageSample
 } from "./bedrockCouncil";
-import { extractDocumentText } from "./documentExtraction";
+import { DocumentValidationError, extractDocumentText } from "./documentExtraction";
+import { hashMemoContent, hashReviewResult } from "./domain/hashes";
 import {
   StoreError,
   createAccountStore,
@@ -405,6 +406,10 @@ export function createApp(options: CreateAppOptions = {}) {
       await store.replaceAccountState(res.locals.user.id, state);
       res.json({ lead, draft: personalized });
     } catch (error) {
+      if (error instanceof DocumentValidationError) {
+        res.status(error.status).json({ code: error.code, error: error.message });
+        return;
+      }
       res.status(502).json({
         error: error instanceof Error ? error.message : "Personalization failed."
       });
@@ -677,8 +682,11 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.put("/api/account/state", requireAuth(store), requireCsrf, async (req, res) => {
-    await store.replaceAccountState(res.locals.user.id, req.body?.state as AccountReviewState);
-    res.json({ state: await store.getAccountState(res.locals.user.id) });
+    void req;
+    res.status(410).json({
+      code: "client_upgrade_required",
+      error: "Review records, analysis, decisions, and audit history are server-owned. Refresh Rulix to use the current command API."
+    });
   });
 
   app.get("/api/reviews", requireAuth(store), async (_req, res) => {
@@ -686,7 +694,9 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/reviews", requireAuth(store), requireCsrf, async (req, res) => {
-    const memo = createMemoRecord(req.body as Partial<NewReviewInput>, res.locals.user.name);
+    const input = req.body as Partial<NewReviewInput>;
+    if (!enforceDataClass(res, input.dataClass)) return;
+    const memo = createMemoRecord(input, res.locals.user);
     try {
       await store.upsertReview(res.locals.user.id, memo);
       await store.appendAuditEvent(
@@ -735,12 +745,16 @@ export function createApp(options: CreateAppOptions = {}) {
       return;
     }
 
-    const updatedMemo = {
+    const updatedMemo: MemoRecord = {
       ...memo,
       memoText,
       updatedAt: new Date().toISOString().slice(0, 10),
-      status: "draft" as const
+      status: "draft",
+      lifecycleStage: "draft",
+      revision: (memo.revision ?? 1) + 1,
+      version: (memo.version ?? 1) + 1
     };
+    updatedMemo.contentHash = hashMemoContent(updatedMemo);
     await store.updateReview(res.locals.user.id, updatedMemo);
     await store.appendAuditEvent(
       res.locals.user.id,
@@ -755,12 +769,18 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json({ review: updatedMemo });
   });
 
-  app.post("/api/reviews/:id/analyze", requireAuth(store), requireCsrf, async (req, res) => {
+  app.post(
+    "/api/reviews/:id/analyze",
+    requireAuth(store),
+    requireCsrf,
+    requireRoles("export-control-officer", "reviewer", "counsel"),
+    async (req, res) => {
     const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
+    if (!enforceDataClass(res, memo.dataClass)) return;
 
     const state = await store.getAccountState(res.locals.user.id);
     const depth = coerceReviewDepth(req.body?.depth);
@@ -775,6 +795,7 @@ export function createApp(options: CreateAppOptions = {}) {
       sendCouncilError(res, error);
       return;
     }
+    result = bindReviewResult(result, memo, res.locals.user.id);
     const updatedMemo = {
       ...memo,
       status: deriveReviewStatus(result, state.decisions[memo.id])
@@ -793,14 +814,21 @@ export function createApp(options: CreateAppOptions = {}) {
       result,
       auditEvents: await memoAuditEvents(store, res.locals.user.id, memo.id)
     });
-  });
+    }
+  );
 
-  app.post("/api/ai/review", requireAuth(store), requireCsrf, async (req, res) => {
+  app.post(
+    "/api/ai/review",
+    requireAuth(store),
+    requireCsrf,
+    requireRoles("export-control-officer", "reviewer", "counsel"),
+    async (req, res) => {
     const memo = coerceMemo(req.body?.memo ?? req.body);
     if (!memo) {
       res.status(400).json({ error: "Request body must include a memo with memoText." });
       return;
     }
+    if (!enforceDataClass(res, memo.dataClass)) return;
 
     const depth = coerceReviewDepth(req.body?.depth);
     let result: ReviewResult;
@@ -814,8 +842,10 @@ export function createApp(options: CreateAppOptions = {}) {
       sendCouncilError(res, error);
       return;
     }
+    result = bindReviewResult(result, memo, res.locals.user.id);
     res.json({ result });
-  });
+    }
+  );
 
   app.post("/api/public-memo-draft", requireAuth(store), requireCsrf, async (req, res) => {
     const item = normalizeText(req.body?.item, "");
@@ -834,6 +864,7 @@ export function createApp(options: CreateAppOptions = {}) {
     const fileName = normalizeText(req.body?.fileName, "attached-document");
     const mediaType = normalizeText(req.body?.mediaType, "application/octet-stream");
     const dataBase64 = normalizeText(req.body?.dataBase64, "");
+    if (!enforceDataClass(res, req.body?.dataClass)) return;
     if (!dataBase64) {
       res.status(400).json({ error: "Document data is required." });
       return;
@@ -853,6 +884,7 @@ export function createApp(options: CreateAppOptions = {}) {
   });
 
   app.post("/api/ai/memo-builder-chat", requireAuth(store), requireCsrf, async (req, res) => {
+    if (!enforceDataClass(res, req.body?.dataClass)) return;
     const raw = req.body?.messages;
     if (!Array.isArray(raw) || raw.length === 0) {
       res.status(400).json({ error: "messages array is required." });
@@ -911,24 +943,57 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   });
 
-  app.post("/api/reviews/:id/decision", requireAuth(store), requireCsrf, async (req, res) => {
+  app.post(
+    "/api/reviews/:id/decision",
+    requireAuth(store),
+    requireCsrf,
+    requireRoles("export-control-officer", "reviewer", "counsel"),
+    async (req, res) => {
     const memo = await store.findReview(res.locals.user.id, reviewId(req));
     if (!memo) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
-    const decision = coerceDecision(req.body);
+    const state = await store.getAccountState(res.locals.user.id);
+    const result = state.analysisResults[memo.id];
+    if ((req.body?.action === "accept" || req.body?.action === "override") && !result) {
+      res.status(409).json({
+        code: "analysis_required",
+        error: "Run analysis against the current memo revision before recording this decision."
+      });
+      return;
+    }
+    if (result && result.inputHash && result.inputHash !== (memo.contentHash ?? hashMemoContent(memo))) {
+      res.status(409).json({
+        code: "stale_analysis",
+        error: "The memo changed after analysis. Run analysis again before recording a decision."
+      });
+      return;
+    }
+    if (res.locals.user.role === "counsel" && req.body?.action !== "request-info") {
+      res.status(403).json({
+        code: "forbidden",
+        error: "Counsel can request information but cannot approve or override a classification decision."
+      });
+      return;
+    }
+
+    const decision = coerceDecision(req.body, res.locals.user, memo, result);
     if (!decision) {
       res.status(400).json({ error: "Decision requires action and notes." });
       return;
     }
 
-    const state = await store.getAccountState(res.locals.user.id);
-    const result = state.analysisResults[memo.id] ?? analyzeMemo(memo);
+    const statusResult = result ?? analyzeMemo(memo);
     const updatedMemo = {
       ...memo,
-      status: deriveReviewStatus(result, decision)
+      status: deriveReviewStatus(statusResult, decision),
+      lifecycleStage: decision.action === "accept"
+        ? "approved" as const
+        : decision.action === "request-info"
+          ? "needs-information" as const
+          : "changes-requested" as const
     };
     const decisionAuditEvent = createAuditEvent(
       memo.id,
@@ -940,7 +1005,8 @@ export function createApp(options: CreateAppOptions = {}) {
     await store.setDecision(res.locals.user.id, updatedMemo, decision, decisionAuditEvent);
 
     res.json({ review: updatedMemo, decision });
-  });
+    }
+  );
 
   // Serve the built frontend (Vite `dist/`) so the whole app runs as one
   // service in production (e.g. AWS App Runner). No-op in dev/tests where
@@ -1090,13 +1156,15 @@ async function memoAuditEvents(store: AccountStore, userId: string, memoId: stri
   return (await store.getAccountState(userId)).auditEvents.filter((event) => event.memoId === memoId);
 }
 
-function createMemoRecord(input: Partial<NewReviewInput>, owner = "API User"): MemoRecord {
-  const now = new Date().toISOString().slice(0, 10);
-  return {
+function createMemoRecord(input: Partial<NewReviewInput>, owner: UserProfile): MemoRecord {
+  const createdAt = new Date().toISOString();
+  const now = createdAt.slice(0, 10);
+  const memo: MemoRecord = {
     id: `review-${Date.now()}`,
     title: normalizeText(input.title, "New ECCN Classification Memo"),
     itemFamily: normalizeText(input.itemFamily, "Research equipment"),
-    owner,
+    owner: owner.name,
+    ownerId: owner.id,
     updatedAt: now,
     documentCode: `API-${now.replaceAll("-", "")}`,
     status: "draft",
@@ -1105,8 +1173,19 @@ function createMemoRecord(input: Partial<NewReviewInput>, owner = "API User"): M
     dataClass: input.dataClass ?? "proprietary",
     sourcePath: input.sourcePath ?? "self-classification",
     manufacturer: normalizeOptional(input.manufacturer),
-    intendedUse: normalizeOptional(input.intendedUse)
+    intendedUse: normalizeOptional(input.intendedUse),
+    revision: 1,
+    createdAt,
+    createdBy: owner.id,
+    lifecycleStage: "draft",
+    priority: input.priority ?? "normal",
+    assignedTo: normalizeOptional(input.assignedTo),
+    dueAt: normalizeOptional(input.dueAt),
+    tags: Array.isArray(input.tags) ? input.tags.filter(isString).slice(0, 12) : [],
+    version: 1
   };
+  memo.contentHash = hashMemoContent(memo);
+  return memo;
 }
 
 function coerceMemo(value: unknown): MemoRecord | undefined {
@@ -1132,7 +1211,12 @@ function coerceMemo(value: unknown): MemoRecord | undefined {
   };
 }
 
-function coerceDecision(value: unknown): ReviewerDecision | undefined {
+function coerceDecision(
+  value: unknown,
+  user: UserProfile,
+  memo: MemoRecord,
+  result: ReviewResult | undefined
+): ReviewerDecision | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const input = value as Partial<ReviewerDecision>;
   if (
@@ -1144,12 +1228,37 @@ function coerceDecision(value: unknown): ReviewerDecision | undefined {
   }
   if (!input.notes?.trim()) return undefined;
 
-  return {
+  const createdAt = new Date().toISOString();
+  const decision: ReviewerDecision = {
+    id: `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     action: input.action,
     notes: input.notes.trim(),
-    signedBy: input.action === "accept" ? input.signedBy ?? "API Reviewer" : input.signedBy,
-    signedAt: input.action === "accept" ? input.signedAt ?? new Date().toISOString() : input.signedAt
+    signerId: user.id,
+    signedBy: user.name,
+    signedAt: createdAt,
+    createdAt,
+    memoRevision: memo.revision ?? 1,
+    memoHash: memo.contentHash ?? hashMemoContent(memo),
+    analysisId: result?.id,
+    analysisHash: result?.resultHash ?? (result ? hashReviewResult(result) : undefined),
+    corpusId: result?.corpusId,
+    corpusChecksum: result?.corpusChecksum
   };
+  return decision;
+}
+
+function bindReviewResult(result: ReviewResult, memo: MemoRecord, userId: string): ReviewResult {
+  const bound: ReviewResult = {
+    ...result,
+    id: result.id ?? `analysis-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    memoRevision: memo.revision ?? 1,
+    inputHash: memo.contentHash ?? hashMemoContent(memo),
+    corpusChecksum: result.corpusChecksum ?? officialCorpus.checksum,
+    promptVersion: result.promptVersion ?? "rulix-council-v2",
+    createdBy: userId
+  };
+  bound.resultHash = hashReviewResult(bound);
+  return bound;
 }
 
 function reviewId(req: Request) {
@@ -1191,6 +1300,42 @@ function requireAdmin(_req: Request, res: Response, next: NextFunction) {
     return;
   }
   next();
+}
+
+function requireRoles(...roles: UserProfile["role"][]) {
+  const allowed = new Set(roles);
+  return (_req: Request, res: Response, next: NextFunction) => {
+    const user = res.locals.user as UserProfile | undefined;
+    if (!user || !allowed.has(user.role)) {
+      res.status(403).json({ code: "forbidden", error: "Your workspace role cannot perform this action." });
+      return;
+    }
+    next();
+  };
+}
+
+function enforceDataClass(res: Response, value: unknown) {
+  const dataClass = coerceDataClass(value);
+  if (dataClass === "public" || dataClass === "proprietary") return true;
+  const approved = process.env.RULIX_CONTROLLED_DATA_MODE === "approved" &&
+    Boolean(process.env.RULIX_APPROVED_PROVIDER?.trim()) &&
+    Boolean(process.env.RULIX_APPROVED_REGION?.trim());
+  if (approved) return true;
+  res.status(422).json({
+    code: "data_class_not_allowed",
+    error: "This environment is limited to public and proprietary data. Do not submit export-controlled, ITAR-risk, or CUI content."
+  });
+  return false;
+}
+
+function coerceDataClass(value: unknown): NonNullable<MemoRecord["dataClass"]> {
+  return value === "public" ||
+    value === "proprietary" ||
+    value === "export-controlled" ||
+    value === "itar-risk" ||
+    value === "cui"
+    ? value
+    : "proprietary";
 }
 
 function requireCsrf(_req: Request, res: Response, next: NextFunction) {

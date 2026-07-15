@@ -3,7 +3,8 @@
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { reviewFixtures } from "../src/test/reviewFixtures";
-import type { AccountReviewState, UserProfile } from "../src/types";
+import type { UserProfile } from "../src/types";
+import { analyzeMemo } from "../src/lib/eccnReview";
 import { createApp } from "./app";
 import { createAccountStore, emptyAccountState, type AccountStore } from "./store";
 
@@ -242,6 +243,22 @@ describe("Rulix ECCN API", () => {
       .expect(200);
   });
 
+  it("invalidates every older password-reset link when a new one is issued", async () => {
+    const { app, store } = await signedInAgent("reset-single-use@example.com");
+    const first = await store.requestPasswordReset("reset-single-use@example.com");
+    const second = await store.requestPasswordReset("reset-single-use@example.com");
+
+    await request(app)
+      .post("/api/auth/password-reset/complete")
+      .send({ token: first.rawToken, password: "Rejected-Horse-2026" })
+      .expect(410);
+
+    await request(app)
+      .post("/api/auth/password-reset/complete")
+      .send({ token: second.rawToken, password: "Accepted-Horse-2026" })
+      .expect(200);
+  });
+
   it("locks out repeated failed logins and clears the lockout after reset", async () => {
     const { app, store } = await signedInAgent("lockout@example.com");
     for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -272,6 +289,71 @@ describe("Rulix ECCN API", () => {
       .post("/api/ai/review")
       .send({ memo: reviewFixtures[0] })
       .expect(403);
+  });
+
+  it("does not accept client-authored reviews, decisions, analysis, or audit history", async () => {
+    const { agent, csrfToken } = await signedInAgent("authoritative-state@example.com");
+    const forged = {
+      ...emptyAccountState(),
+      memos: [reviewFixtures[0]],
+      decisions: {
+        [reviewFixtures[0].id]: {
+          action: "accept",
+          notes: "Forged in the browser",
+          signedBy: "Mallory",
+          signedAt: new Date().toISOString()
+        }
+      },
+      auditEvents: [{
+        id: "forged-event",
+        memoId: reviewFixtures[0].id,
+        at: new Date().toISOString(),
+        actor: "Mallory",
+        action: "Forged approval",
+        detail: "Client-authored",
+        severity: "info"
+      }]
+    };
+
+    const response = await agent
+      .put("/api/account/state")
+      .set("x-rulix-csrf", csrfToken)
+      .send({ state: forged })
+      .expect(410);
+
+    expect(response.body.error).toContain("server-owned");
+  });
+
+  it("blocks submitters from running council analysis or recording decisions", async () => {
+    const submitter = await signedInAgent("submitter-boundary@example.com", "submitter");
+    const created = await submitter.agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", submitter.csrfToken)
+      .send(validReviewInput())
+      .expect(201);
+
+    await submitter.agent
+      .post(`/api/reviews/${created.body.review.id}/analyze`)
+      .set("x-rulix-csrf", submitter.csrfToken)
+      .send({ depth: "standard" })
+      .expect(403);
+
+    await submitter.agent
+      .post(`/api/reviews/${created.body.review.id}/decision`)
+      .set("x-rulix-csrf", submitter.csrfToken)
+      .send({ action: "request-info", notes: "Attempted submitter decision" })
+      .expect(403);
+  });
+
+  it("rejects controlled-data cases until an approved data lane is configured", async () => {
+    const reviewer = await signedInAgent("controlled-boundary@example.com", "reviewer");
+    const response = await reviewer.agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", reviewer.csrfToken)
+      .send({ ...validReviewInput(), dataClass: "cui" })
+      .expect(422);
+
+    expect(response.body.code).toBe("data_class_not_allowed");
   });
 
   it("extracts uploaded text documents through the authenticated document endpoint", async () => {
@@ -325,28 +407,23 @@ describe("Rulix ECCN API", () => {
     expect(response.body.error).toContain("No deterministic analysis was recorded");
   });
 
-  it("preserves server-side audit events across later client state saves", async () => {
+  it("preserves server-side audit events after a revision is created", async () => {
     const { agent, csrfToken } = await signedInAgent("audit-merge@example.com");
-    await saveState(agent, csrfToken, {
-      ...emptyAccountState(),
-      memos: [reviewFixtures[0]],
-      selectedMemoId: reviewFixtures[0].id
-    });
+    const created = await agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", csrfToken)
+      .send(validReviewInput())
+      .expect(201);
+    const memoId = created.body.review.id;
 
     const editedMemoText = `${reviewFixtures[0].memoText}\n\nReviewer note: confirm model number before signoff.`;
     const editResponse = await agent
-      .patch(`/api/reviews/${reviewFixtures[0].id}`)
+      .patch(`/api/reviews/${memoId}`)
       .set("x-rulix-csrf", csrfToken)
       .send({ memoText: editedMemoText })
       .expect(200);
 
     expect(editResponse.body.review.memoText).toBe(editedMemoText);
-
-    await saveState(agent, csrfToken, {
-      ...emptyAccountState(),
-      memos: [reviewFixtures[0]],
-      selectedMemoId: reviewFixtures[0].id
-    });
 
     const stateResponse = await agent.get("/api/account/state").expect(200);
     expect(
@@ -356,14 +433,14 @@ describe("Rulix ECCN API", () => {
 
   it("records a reviewer decision under the signed-in account", async () => {
     const { agent, csrfToken } = await signedInAgent("decision@example.com");
-    await saveState(agent, csrfToken, {
-      ...emptyAccountState(),
-      memos: [reviewFixtures[0]],
-      selectedMemoId: reviewFixtures[0].id
-    });
+    const created = await agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", csrfToken)
+      .send(validReviewInput())
+      .expect(201);
 
     const response = await agent
-      .post(`/api/reviews/${reviewFixtures[0].id}/decision`)
+      .post(`/api/reviews/${created.body.review.id}/decision`)
       .set("x-rulix-csrf", csrfToken)
       .send({ action: "request-info", notes: "Need vendor parameter mapping." })
       .expect(200);
@@ -372,17 +449,81 @@ describe("Rulix ECCN API", () => {
     expect(response.body.decision.notes).toContain("vendor parameter");
   });
 
+  it("derives signer identity on the server and invalidates approval after a memo edit", async () => {
+    const reviewer = await signedInAgent("server-signer@example.com", "reviewer");
+    const created = await reviewer.agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", reviewer.csrfToken)
+      .send(validReviewInput())
+      .expect(201);
+    const memo = created.body.review;
+    const accountId = workspaceId(reviewer.user);
+    const result = analyzeMemo(memo);
+    await reviewer.store.setAnalysisResult(accountId, { ...memo, status: "ready" }, result);
+
+    const accepted = await reviewer.agent
+      .post(`/api/reviews/${memo.id}/decision`)
+      .set("x-rulix-csrf", reviewer.csrfToken)
+      .send({
+        action: "accept",
+        notes: "Evidence reviewed.",
+        signedBy: "Mallory",
+        signedAt: "1999-01-01T00:00:00.000Z"
+      })
+      .expect(200);
+
+    expect(accepted.body.decision.signedBy).toBe(reviewer.user.name);
+    expect(accepted.body.decision.signerId).toBe(reviewer.user.id);
+    expect(accepted.body.decision.signedAt).not.toBe("1999-01-01T00:00:00.000Z");
+    expect(accepted.body.decision.memoHash).toEqual(expect.any(String));
+    expect(accepted.body.decision.analysisHash).toEqual(expect.any(String));
+
+    await reviewer.agent
+      .patch(`/api/reviews/${memo.id}`)
+      .set("x-rulix-csrf", reviewer.csrfToken)
+      .send({ memoText: `${memo.memoText}\n\nMaterial change after approval.` })
+      .expect(200);
+
+    const refreshed = await reviewer.agent.get(`/api/reviews/${memo.id}`).expect(200);
+    expect(refreshed.body.decision).toBeUndefined();
+    expect(refreshed.body.result).toBeUndefined();
+    expect(refreshed.body.review.revision).toBe(2);
+  });
+
+  it("round-trips versioned Memo Builder sessions through account normalization", async () => {
+    const user = await signedInAgent("builder-persistence@example.com");
+    const accountId = workspaceId(user.user);
+    await user.store.replaceAccountState(accountId, {
+      ...emptyAccountState(),
+      memoBuilder: {
+        activeSessionId: "builder-session-1",
+        messages: [],
+        sessions: [{
+          id: "builder-session-1",
+          title: "Cryogenic controller memo",
+          updatedAt: "2026-07-13T12:00:00.000Z",
+          pendingInput: "Preserve this draft",
+          messages: [{ role: "user", content: "Help me build this memo" }]
+        }]
+      }
+    });
+
+    const restored = await user.store.getAccountState(accountId);
+    expect(restored.memoBuilder?.activeSessionId).toBe("builder-session-1");
+    expect(restored.memoBuilder?.sessions?.[0]?.pendingInput).toBe("Preserve this draft");
+  });
+
   it("isolates memo records between accounts", async () => {
     const userA = await signedInAgent("user-a@example.com");
     const userB = await signedInAgent("user-b@example.com");
-    await saveState(userA.agent, userA.csrfToken, {
-      ...emptyAccountState(),
-      memos: [reviewFixtures[0]],
-      selectedMemoId: reviewFixtures[0].id
-    });
+    const created = await userA.agent
+      .post("/api/reviews")
+      .set("x-rulix-csrf", userA.csrfToken)
+      .send(validReviewInput())
+      .expect(201);
 
-    await userA.agent.get(`/api/reviews/${reviewFixtures[0].id}`).expect(200);
-    await userB.agent.get(`/api/reviews/${reviewFixtures[0].id}`).expect(404);
+    await userA.agent.get(`/api/reviews/${created.body.review.id}`).expect(200);
+    await userB.agent.get(`/api/reviews/${created.body.review.id}`).expect(404);
   });
 
   it("blocks non-admins from the admin dashboard endpoints", async () => {
@@ -566,14 +707,19 @@ async function signedInAgent(email: string, role: UserProfile["role"] = "reviewe
   };
 }
 
-async function saveState(
-  agent: ReturnType<typeof request.agent>,
-  csrfToken: string,
-  state: AccountReviewState
-) {
-  await agent
-    .put("/api/account/state")
-    .set("x-rulix-csrf", csrfToken)
-    .send({ state })
-    .expect(200);
+function validReviewInput() {
+  return {
+    title: "RLX-200 controller review",
+    itemFamily: "Cryogenic controller",
+    manufacturer: "Rulix Test Instruments",
+    intendedUse: "University research laboratory",
+    dataClass: "proprietary",
+    sourcePath: "self-classification",
+    memoText: reviewFixtures[0].memoText,
+    attachments: []
+  };
+}
+
+function workspaceId(user: UserProfile) {
+  return (user as UserProfile & { organizationId?: string }).organizationId ?? user.id;
 }

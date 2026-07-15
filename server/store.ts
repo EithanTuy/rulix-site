@@ -8,19 +8,22 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
-  QueryCommand
+  QueryCommand,
+  TransactWriteCommand
 } from "@aws-sdk/lib-dynamodb";
 import type {
   AccountReviewState,
   AuditEvent,
   MemoChatMessage,
   MemoRecord,
+  MemoRevision,
   ReviewResult,
   ReviewerDecision,
   UsageEvent,
   UserProfile
 } from "../src/types";
 import { defaultOutreachConfig, type StoredOutreachConfig } from "./aiClient";
+import { hashMemoContent, hashReviewResult } from "./domain/hashes";
 
 const PASSWORD_ITERATIONS = 210_000;
 const DEFAULT_SESSION_TTL_HOURS = 8;
@@ -36,6 +39,7 @@ export interface UserRecord extends UserProfile {
   passwordIterations: number;
   failedAttempts: number;
   lockedUntil?: string;
+  passwordResetGeneration?: number;
 }
 
 export interface SessionRecord {
@@ -73,6 +77,7 @@ export interface ResetRecord {
   expiresAt: string;
   expiresAtEpoch: number;
   usedAt?: string;
+  generation?: number;
 }
 
 interface LockoutRecord {
@@ -302,6 +307,13 @@ export class LocalAccountStore implements AccountStore {
     const user = this.findUserByEmail(email);
     if (!user) return { email };
 
+    const generation = (user.passwordResetGeneration ?? 0) + 1;
+    user.passwordResetGeneration = generation;
+    for (const [tokenHash, existing] of this.resets.entries()) {
+      if (existing.userId === user.id && existing.status === "pending") {
+        this.resets.set(tokenHash, { ...existing, status: "expired" });
+      }
+    }
     const rawToken = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + resetTtlMs()).toISOString();
     const reset: ResetRecord = {
@@ -312,8 +324,10 @@ export class LocalAccountStore implements AccountStore {
       status: "pending",
       createdAt: new Date().toISOString(),
       expiresAt,
-      expiresAtEpoch: toEpochSeconds(expiresAt)
+      expiresAtEpoch: toEpochSeconds(expiresAt),
+      generation
     };
+    this.users.set(user.id, user);
     this.resets.set(reset.tokenHash, reset);
     this.persist();
     return { email, rawToken, resetLink: resetLink(rawToken), expiresAt };
@@ -321,6 +335,8 @@ export class LocalAccountStore implements AccountStore {
 
   async getPasswordResetByToken(rawToken: string): Promise<PasswordResetPublicInfo> {
     const reset = validateReset(this.resets.get(hashToken(rawToken)));
+    const user = this.users.get(reset.userId);
+    validateResetGeneration(reset, user);
     return { email: reset.userEmail, expiresAt: reset.expiresAt, status: reset.status };
   }
 
@@ -330,9 +346,11 @@ export class LocalAccountStore implements AccountStore {
     validatePassword(password);
     const user = this.users.get(reset.userId);
     if (!user) throw new StoreError(404, "Password reset link is invalid or expired.");
+    validateResetGeneration(reset, user);
 
     setUserPassword(user, password);
     clearFailedAttempts(user);
+    user.passwordResetGeneration = (user.passwordResetGeneration ?? 0) + 1;
     reset.status = "used";
     reset.usedAt = new Date().toISOString();
     this.resets.set(tokenHash, reset);
@@ -394,14 +412,31 @@ export class LocalAccountStore implements AccountStore {
 
   async upsertReview(userId: string, memo: MemoRecord) {
     const state = await this.getAccountState(userId);
-    state.memos = [memo, ...state.memos.filter((item) => item.id !== memo.id)];
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = [securedMemo, ...state.memos.filter((item) => item.id !== memo.id)];
     state.selectedMemoId = memo.id;
+    const revisions = state.memoRevisions ??= {};
+    revisions[memo.id] = mergeById(
+      [memoRevisionFromRecord(securedMemo, securedMemo.createdBy ?? userId, "created")],
+      revisions[memo.id] ?? []
+    );
     await this.replaceAccountState(userId, state);
   }
 
   async updateReview(userId: string, memo: MemoRecord) {
     const state = await this.getAccountState(userId);
-    state.memos = state.memos.map((item) => (item.id === memo.id ? memo : item));
+    const previous = state.memos.find((item) => item.id === memo.id);
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = state.memos.map((item) => (item.id === memo.id ? securedMemo : item));
+    if (previous && reviewContentChanged(previous, securedMemo)) {
+      delete state.analysisResults[memo.id];
+      delete state.decisions[memo.id];
+      const revisions = state.memoRevisions ??= {};
+      revisions[memo.id] = mergeById(
+        [memoRevisionFromRecord(securedMemo, securedMemo.createdBy ?? userId, "edited")],
+        revisions[memo.id] ?? []
+      );
+    }
     await this.replaceAccountState(userId, state);
   }
 
@@ -411,8 +446,9 @@ export class LocalAccountStore implements AccountStore {
 
   async setAnalysisResult(userId: string, memo: MemoRecord, result: ReviewResult) {
     const state = await this.getAccountState(userId);
-    state.memos = state.memos.map((item) => (item.id === memo.id ? memo : item));
-    state.analysisResults[result.memoId] = result;
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = state.memos.map((item) => (item.id === memo.id ? securedMemo : item));
+    state.analysisResults[result.memoId] = ensureAnalysisIntegrity(result, securedMemo, userId);
     await this.replaceAccountState(userId, state);
   }
 
@@ -655,6 +691,8 @@ export class DynamoAccountStore implements AccountStore {
     const email = normalizeEmail(emailInput);
     const user = await this.findUserByEmail(email);
     if (!user) return { email };
+    const expectedGeneration = user.passwordResetGeneration ?? 0;
+    const generation = expectedGeneration + 1;
     const rawToken = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + resetTtlMs()).toISOString();
     const reset: ResetRecord = {
@@ -665,14 +703,46 @@ export class DynamoAccountStore implements AccountStore {
       status: "pending",
       createdAt: new Date().toISOString(),
       expiresAt,
-      expiresAtEpoch: toEpochSeconds(expiresAt)
+      expiresAtEpoch: toEpochSeconds(expiresAt),
+      generation
     };
-    await this.putAuthItem(resetKey(reset.tokenHash), reset);
+    const updatedUser = { ...user, passwordResetGeneration: generation };
+    try {
+      await this.doc.send(new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: this.authTable,
+              Item: this.authItem(userKey(user.email), updatedUser),
+              ConditionExpression:
+                "attribute_not_exists(#record.#generation) OR #record.#generation = :expectedGeneration",
+              ExpressionAttributeNames: {
+                "#record": "record",
+                "#generation": "passwordResetGeneration"
+              },
+              ExpressionAttributeValues: { ":expectedGeneration": expectedGeneration }
+            }
+          },
+          {
+            Put: {
+              TableName: this.authTable,
+              Item: this.authItem(resetKey(reset.tokenHash), reset),
+              ConditionExpression: "attribute_not_exists(#pk)",
+              ExpressionAttributeNames: { "#pk": "pk" }
+            }
+          }
+        ]
+      }));
+    } catch {
+      throw new StoreError(409, "A newer password-reset request was issued. Request another link.");
+    }
     return { email, rawToken, resetLink: resetLink(rawToken), expiresAt };
   }
 
   async getPasswordResetByToken(rawToken: string): Promise<PasswordResetPublicInfo> {
     const reset = validateReset(await this.getAuthRecord<ResetRecord>(resetKey(hashToken(rawToken))));
+    const user = await this.getUserById(reset.userId);
+    validateResetGeneration(reset, user);
     return { email: reset.userEmail, expiresAt: reset.expiresAt, status: reset.status };
   }
 
@@ -682,13 +752,43 @@ export class DynamoAccountStore implements AccountStore {
     validatePassword(password);
     const user = await this.getUserById(reset.userId);
     if (!user) throw new StoreError(404, "Password reset link is invalid or expired.");
+    validateResetGeneration(reset, user);
 
     setUserPassword(user, password);
     clearFailedAttempts(user);
+    const expectedGeneration = user.passwordResetGeneration ?? 0;
+    user.passwordResetGeneration = expectedGeneration + 1;
     reset.status = "used";
     reset.usedAt = new Date().toISOString();
-    await this.putAuthItem(userKey(user.email), user);
-    await this.putAuthItem(resetKey(tokenHash), reset);
+    try {
+      await this.doc.send(new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: this.authTable,
+              Item: this.authItem(userKey(user.email), user),
+              ConditionExpression: "#record.#generation = :expectedGeneration",
+              ExpressionAttributeNames: {
+                "#record": "record",
+                "#generation": "passwordResetGeneration"
+              },
+              ExpressionAttributeValues: { ":expectedGeneration": expectedGeneration }
+            }
+          },
+          {
+            Put: {
+              TableName: this.authTable,
+              Item: this.authItem(resetKey(tokenHash), reset),
+              ConditionExpression: "#record.#status = :pending",
+              ExpressionAttributeNames: { "#record": "record", "#status": "status" },
+              ExpressionAttributeValues: { ":pending": "pending" }
+            }
+          }
+        ]
+      }));
+    } catch {
+      throw new StoreError(410, "Password reset link is invalid or expired.");
+    }
     await this.deleteAuthItem(lockoutKey(user.email));
     await this.revokeUserSessions(user.id);
     return this.createSession(user);
@@ -741,14 +841,31 @@ export class DynamoAccountStore implements AccountStore {
 
   async upsertReview(userId: string, memo: MemoRecord) {
     const state = await this.getAccountState(userId);
-    state.memos = [memo, ...state.memos.filter((item) => item.id !== memo.id)];
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = [securedMemo, ...state.memos.filter((item) => item.id !== memo.id)];
     state.selectedMemoId = memo.id;
+    const revisions = state.memoRevisions ??= {};
+    revisions[memo.id] = mergeById(
+      [memoRevisionFromRecord(securedMemo, securedMemo.createdBy ?? userId, "created")],
+      revisions[memo.id] ?? []
+    );
     await this.putAccountState(userId, state);
   }
 
   async updateReview(userId: string, memo: MemoRecord) {
     const state = await this.getAccountState(userId);
-    state.memos = state.memos.map((item) => (item.id === memo.id ? memo : item));
+    const previous = state.memos.find((item) => item.id === memo.id);
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = state.memos.map((item) => (item.id === memo.id ? securedMemo : item));
+    if (previous && reviewContentChanged(previous, securedMemo)) {
+      delete state.analysisResults[memo.id];
+      delete state.decisions[memo.id];
+      const revisions = state.memoRevisions ??= {};
+      revisions[memo.id] = mergeById(
+        [memoRevisionFromRecord(securedMemo, securedMemo.createdBy ?? userId, "edited")],
+        revisions[memo.id] ?? []
+      );
+    }
     await this.putAccountState(userId, state);
   }
 
@@ -758,8 +875,9 @@ export class DynamoAccountStore implements AccountStore {
 
   async setAnalysisResult(userId: string, memo: MemoRecord, result: ReviewResult) {
     const state = await this.getAccountState(userId);
-    state.memos = state.memos.map((item) => (item.id === memo.id ? memo : item));
-    state.analysisResults[result.memoId] = result;
+    const securedMemo = ensureMemoIntegrity(memo);
+    state.memos = state.memos.map((item) => (item.id === memo.id ? securedMemo : item));
+    state.analysisResults[result.memoId] = ensureAnalysisIntegrity(result, securedMemo, userId);
     await this.putAccountState(userId, state);
   }
 
@@ -880,13 +998,17 @@ export class DynamoAccountStore implements AccountStore {
   private async putAuthItem(key: string, record: unknown) {
     await this.doc.send(new PutCommand({
       TableName: this.authTable,
-      Item: {
-        pk: tenantKey(this.tenantId),
-        sk: key,
-        record,
-        expiresAtEpoch: isRecord(record) && typeof record.expiresAtEpoch === "number" ? record.expiresAtEpoch : undefined
-      }
+      Item: this.authItem(key, record)
     }));
+  }
+
+  private authItem(key: string, record: unknown) {
+    return {
+      pk: tenantKey(this.tenantId),
+      sk: key,
+      record,
+      expiresAtEpoch: isRecord(record) && typeof record.expiresAtEpoch === "number" ? record.expiresAtEpoch : undefined
+    };
   }
 
   private async deleteAuthItem(key: string) {
@@ -938,11 +1060,16 @@ export function createAccountStore(options?: CreateStoreOptions): AccountStore {
 
 export function emptyAccountState(): AccountReviewState {
   return {
+    schemaVersion: 2,
+    version: 0,
     memos: [],
     decisions: {},
     auditEvents: [],
     analysisResults: {},
     chatMessages: {},
+    memoRevisions: {},
+    comments: {},
+    notifications: [],
     memoBuilder: { messages: [] },
     outreachDrafts: {},
     discoveredLeads: [],
@@ -985,7 +1112,8 @@ function createUserRecord(email: string, name: string, role: UserProfile["role"]
     passwordHash: hashPassword(password, salt, PASSWORD_ITERATIONS),
     passwordSalt: salt,
     passwordIterations: PASSWORD_ITERATIONS,
-    failedAttempts: 0
+    failedAttempts: 0,
+    passwordResetGeneration: 0
   };
 }
 
@@ -1028,6 +1156,12 @@ function validateReset(reset: ResetRecord | undefined) {
   return reset;
 }
 
+function validateResetGeneration(reset: ResetRecord, user: UserRecord | undefined) {
+  if (!user || (reset.generation ?? 0) !== (user.passwordResetGeneration ?? 0)) {
+    throw new StoreError(410, "Password reset link is invalid or expired.");
+  }
+}
+
 function summarizeInvite(invite: InviteRecord): InviteSummary {
   return {
     id: invite.id,
@@ -1060,6 +1194,13 @@ function normalizeAccountState(state: Partial<AccountReviewState> | undefined): 
     : memos[0]?.id;
 
   return {
+    schemaVersion: 2,
+    version: typeof state?.version === "number" && Number.isInteger(state.version) && state.version >= 0
+      ? state.version
+      : 0,
+    organization: isRecord(state?.organization) ? state.organization as AccountReviewState["organization"] : undefined,
+    policy: isRecord(state?.policy) ? state.policy as AccountReviewState["policy"] : undefined,
+    preferences: isRecord(state?.preferences) ? state.preferences as AccountReviewState["preferences"] : undefined,
     memos,
     selectedMemoId,
     decisions: isRecord(state?.decisions) ? state.decisions as Record<string, ReviewerDecision> : {},
@@ -1068,12 +1209,50 @@ function normalizeAccountState(state: Partial<AccountReviewState> | undefined): 
       ? state.analysisResults as Record<string, ReviewResult>
       : {},
     chatMessages: normalizeChatMessages(state?.chatMessages),
+    memoBuilder: normalizeMemoBuilder(state?.memoBuilder),
+    memoRevisions: normalizeMemoRevisions(state?.memoRevisions, memoIds),
+    comments: isRecord(state?.comments) ? state.comments as NonNullable<AccountReviewState["comments"]> : {},
+    notifications: Array.isArray(state?.notifications) ? state.notifications : [],
     outreachDrafts: isRecord(state?.outreachDrafts) ? state.outreachDrafts : {},
     discoveredLeads: Array.isArray(state?.discoveredLeads) ? state.discoveredLeads : [],
     leadSearchRuns: Array.isArray(state?.leadSearchRuns) ? state.leadSearchRuns : [],
     leadWorkflows: isRecord(state?.leadWorkflows) ? state.leadWorkflows : {},
     outreachJobs: Array.isArray(state?.outreachJobs) ? state.outreachJobs : []
   };
+}
+
+function normalizeMemoBuilder(value: AccountReviewState["memoBuilder"] | undefined): AccountReviewState["memoBuilder"] {
+  if (!value || !isRecord(value)) return { messages: [] };
+  const messages = Array.isArray(value.messages)
+    ? value.messages.filter(isMemoBuildMessage).map((message) => ({ ...message }))
+    : [];
+  const sessions = Array.isArray(value.sessions)
+    ? value.sessions.filter(isMemoBuilderSession).map((session) => cloneAccountState(session))
+    : [];
+  const activeSessionId = typeof value.activeSessionId === "string" && sessions.some((session) => session.id === value.activeSessionId)
+    ? value.activeSessionId
+    : sessions[0]?.id;
+  return {
+    activeSessionId,
+    sessions,
+    messages,
+    draft: isRecord(value.draft) ? cloneAccountState(value.draft) : undefined
+  } as AccountReviewState["memoBuilder"];
+}
+
+function isMemoBuildMessage(value: unknown): value is { role: "user" | "assistant"; content: string } {
+  return isRecord(value) &&
+    (value.role === "user" || value.role === "assistant") &&
+    typeof value.content === "string";
+}
+
+function isMemoBuilderSession(value: unknown): value is NonNullable<NonNullable<AccountReviewState["memoBuilder"]>["sessions"]>[number] {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.title === "string" &&
+    typeof value.updatedAt === "string" &&
+    Array.isArray(value.messages) &&
+    value.messages.every(isMemoBuildMessage);
 }
 
 function mergeAccountState(existing: AccountReviewState, incoming: AccountReviewState): AccountReviewState {
@@ -1113,8 +1292,92 @@ function mergeChatMessages(
   );
 }
 
-function cloneAccountState(state: AccountReviewState) {
-  return JSON.parse(JSON.stringify(state)) as AccountReviewState;
+function ensureMemoIntegrity(memo: MemoRecord): MemoRecord {
+  const secured = cloneAccountState(memo);
+  secured.revision = Number.isSafeInteger(secured.revision) && (secured.revision ?? 0) > 0
+    ? secured.revision
+    : 1;
+  secured.version = Number.isSafeInteger(secured.version) && (secured.version ?? 0) > 0
+    ? secured.version
+    : secured.revision;
+  secured.createdAt ??= new Date().toISOString();
+  secured.lifecycleStage ??= secured.status === "signed-off" ? "approved" : "draft";
+  secured.priority ??= "normal";
+  secured.contentHash = hashMemoContent(secured);
+  return secured;
+}
+
+function ensureAnalysisIntegrity(result: ReviewResult, memo: MemoRecord, userId: string): ReviewResult {
+  const bound: ReviewResult = {
+    ...cloneAccountState(result),
+    id: result.id ?? `analysis-${randomBytes(12).toString("base64url")}`,
+    memoRevision: memo.revision ?? 1,
+    inputHash: memo.contentHash ?? hashMemoContent(memo),
+    createdBy: result.createdBy ?? userId,
+    promptVersion: result.promptVersion ?? "rulix-council-v2"
+  };
+  bound.resultHash = hashReviewResult(bound);
+  return bound;
+}
+
+function reviewContentChanged(previous: MemoRecord, next: MemoRecord) {
+  return (previous.contentHash ?? hashMemoContent(previous)) !== (next.contentHash ?? hashMemoContent(next));
+}
+
+function memoRevisionFromRecord(
+  memo: MemoRecord,
+  createdBy: string,
+  reason: MemoRevision["reason"]
+): MemoRevision {
+  const revision = memo.revision ?? 1;
+  return {
+    id: `revision-${memo.id}-${revision}`,
+    memoId: memo.id,
+    revision,
+    contentHash: memo.contentHash ?? hashMemoContent(memo),
+    memoText: memo.memoText,
+    title: memo.title,
+    itemFamily: memo.itemFamily,
+    manufacturer: memo.manufacturer,
+    intendedUse: memo.intendedUse,
+    dataClass: memo.dataClass ?? "proprietary",
+    sourcePath: memo.sourcePath,
+    createdAt: new Date().toISOString(),
+    createdBy,
+    reason
+  };
+}
+
+function normalizeMemoRevisions(
+  value: AccountReviewState["memoRevisions"] | undefined,
+  memoIds: Set<string>
+): NonNullable<AccountReviewState["memoRevisions"]> {
+  if (!isRecord(value)) return {};
+  const output: NonNullable<AccountReviewState["memoRevisions"]> = {};
+  for (const [memoId, revisions] of Object.entries(value)) {
+    if (!memoIds.has(memoId) || !Array.isArray(revisions)) continue;
+    output[memoId] = revisions
+      .filter(isMemoRevision)
+      .sort((a, b) => b.revision - a.revision);
+  }
+  return output;
+}
+
+function isMemoRevision(value: unknown): value is MemoRevision {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.memoId === "string" &&
+    typeof value.revision === "number" &&
+    typeof value.contentHash === "string" &&
+    typeof value.memoText === "string" &&
+    typeof value.title === "string" &&
+    typeof value.itemFamily === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.createdBy === "string";
+}
+
+function cloneAccountState<T>(state: T): T {
+  return JSON.parse(JSON.stringify(state)) as T;
 }
 
 function normalizeChatMessages(value: unknown) {
