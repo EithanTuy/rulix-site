@@ -128,8 +128,9 @@ Sitemap: https://rulix.cloud/sitemap.xml
 ## Hosted-App Hardening Shipped in This Repo
 
 - Removed model IDs from `/api/health`.
-- Restricted CORS in production to `app.rulix.cloud` and
-  `dashboard.rulix.cloud` unless `RULIX_ALLOWED_ORIGINS` is set.
+- Restricted CORS in production to the trusted Rulix app, dashboard, and
+  marketing origins. Configured origins extend this fixed allowlist; they do
+  not remove the production Rulix origins.
 - Added app security headers and noindex behavior for app/dashboard hosts.
 - Added dashboard/app `robots.txt` and `sitemap.xml` behavior that prevents
   private surfaces from being indexed.
@@ -144,6 +145,13 @@ Sitemap: https://rulix.cloud/sitemap.xml
 
 - Static marketing deploys can use `public/_redirects` for SPA routing on the
   SEO pages.
+- The Netlify marketing hosts submit access requests directly to
+  `https://app.rulix.cloud/api/access-requests`. Do not send those JSON
+  requests to the Netlify SPA fallback: it returns HTML with a successful HTTP
+  status and cannot persist the DynamoDB-backed lead record.
+- `marketing_origins` is the Terraform source of truth for public origins that
+  may call the unauthenticated access-request endpoint. The API still applies
+  strict field bounds, a honeypot, and its dedicated WAF POST rate limit.
 - Express/Lambda deploys use host-aware `robots.txt`, `sitemap.xml`, noindex,
   and route metadata injection from `server/app.ts`.
 - If `rulix.cloud` is moved from a separate Netlify deployment to the AWS

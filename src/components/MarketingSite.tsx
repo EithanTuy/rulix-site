@@ -61,6 +61,7 @@ type AccessFormStatus = "idle" | "submitting" | "success" | "error";
 
 const CONTACT_EMAIL = "security@rulix.cloud";
 const SECTION_IDS = ["product", "review-loop", "trust", "use-cases", "request-access"] as const;
+const NETLIFY_MARKETING_HOSTS = new Set(["rulix.cloud", "www.rulix.cloud"]);
 
 const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
   home: {
@@ -388,7 +389,7 @@ export function MarketingSite() {
     setAccessError("");
 
     try {
-      const response = await fetch("/api/access-requests", {
+      const response = await fetch(marketingAccessRequestEndpoint(window.location.hostname), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1141,6 +1142,12 @@ export function isMarketingPath(pathname: string) {
 
 export function marketingMetaForPath(pathname: string) {
   return PAGE_BY_PATH.get(pathname) ?? MARKETING_PAGES.home;
+}
+
+export function marketingAccessRequestEndpoint(hostname: string) {
+  return NETLIFY_MARKETING_HOSTS.has(hostname.trim().toLowerCase())
+    ? "https://app.rulix.cloud/api/access-requests"
+    : "/api/access-requests";
 }
 
 function pageForLocation() {

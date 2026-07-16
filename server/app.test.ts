@@ -133,15 +133,28 @@ describe("Rulix ECCN API", () => {
     expect(await store.listAccessRequests()).toEqual([]);
   });
 
-  it("limits production CORS to trusted app origins", async () => {
+  it("limits production CORS to trusted app and marketing origins", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
+    const originalAllowedOrigins = process.env.RULIX_ALLOWED_ORIGINS;
     process.env.NODE_ENV = "production";
+    process.env.RULIX_ALLOWED_ORIGINS = "https://app.rulix.cloud,https://dashboard.rulix.cloud";
     try {
       const allowed = await request(testApp())
         .get("/api/health")
         .set("Origin", "https://app.rulix.cloud")
         .expect(200);
       expect(allowed.headers["access-control-allow-origin"]).toBe("https://app.rulix.cloud");
+
+      for (const origin of ["https://rulix.cloud", "https://www.rulix.cloud"]) {
+        const marketing = await request(testApp())
+          .options("/api/access-requests")
+          .set("Origin", origin)
+          .set("Access-Control-Request-Method", "POST")
+          .set("Access-Control-Request-Headers", "content-type")
+          .expect(204);
+        expect(marketing.headers["access-control-allow-origin"]).toBe(origin);
+        expect(marketing.headers["access-control-allow-methods"]).toContain("POST");
+      }
 
       const rejected = await request(testApp())
         .get("/api/health")
@@ -153,6 +166,11 @@ describe("Rulix ECCN API", () => {
         delete process.env.NODE_ENV;
       } else {
         process.env.NODE_ENV = originalNodeEnv;
+      }
+      if (originalAllowedOrigins === undefined) {
+        delete process.env.RULIX_ALLOWED_ORIGINS;
+      } else {
+        process.env.RULIX_ALLOWED_ORIGINS = originalAllowedOrigins;
       }
     }
   });

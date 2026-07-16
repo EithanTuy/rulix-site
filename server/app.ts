@@ -130,7 +130,9 @@ const DEVELOPMENT_SESSION_COOKIE = "rulix_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-rulix_session";
 const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://app.rulix.cloud",
-  "https://dashboard.rulix.cloud"
+  "https://dashboard.rulix.cloud",
+  "https://rulix.cloud",
+  "https://www.rulix.cloud"
 ]);
 const PUBLIC_SITE_HOSTS = new Set(["rulix.cloud", "www.rulix.cloud"]);
 const ACCESS_REQUEST_VOLUMES = new Set([
@@ -2421,7 +2423,7 @@ function allowedCorsOrigins() {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...configured]);
 }
 
 function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: Set<string>) {

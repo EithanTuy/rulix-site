@@ -228,11 +228,14 @@ resource "aws_lambda_function" "app" {
         RULIX_WORKSPACE_CURSOR_ACTIVE_KID       = var.workspace_cursor_key_id
         RULIX_WORKSPACE_CURSOR_KEYS_JSON        = jsonencode(local.workspace_cursor_keys)
         RULIX_TENANT_ID                         = var.tenant_slug
-        RULIX_ALLOWED_ORIGINS                   = join(",", compact([var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"]))
-        APP_BASE_URL                            = var.app_base_url
-        AUTH_INVITE_TTL_HOURS                   = tostring(var.auth_invite_ttl_hours)
-        AUTH_RESET_TTL_MINUTES                  = tostring(var.auth_reset_ttl_minutes)
-        AUTH_SESSION_TTL_HOURS                  = tostring(var.auth_session_ttl_hours)
+        RULIX_ALLOWED_ORIGINS = join(",", distinct(compact(concat(
+          [var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"],
+          var.marketing_origins
+        ))))
+        APP_BASE_URL           = var.app_base_url
+        AUTH_INVITE_TTL_HOURS  = tostring(var.auth_invite_ttl_hours)
+        AUTH_RESET_TTL_MINUTES = tostring(var.auth_reset_ttl_minutes)
+        AUTH_SESSION_TTL_HOURS = tostring(var.auth_session_ttl_hours)
       },
       var.bedrock_prices_json == "" ? {} : { RULIX_BEDROCK_PRICES = var.bedrock_prices_json },
       var.auth_email_from == "" ? {} : { AUTH_EMAIL_FROM = var.auth_email_from },

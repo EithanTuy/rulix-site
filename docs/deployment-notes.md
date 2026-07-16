@@ -119,8 +119,9 @@ configuration from this repo:
   traffic.
 - `X-Robots-Tag: noindex, nofollow` and app/dashboard `robots.txt` handling.
 - `/api/health` exposing provider configured status without model IDs.
-- Production CORS restricted to `app.rulix.cloud` and `dashboard.rulix.cloud`
-  by default.
+- Production CORS restricted to the trusted app, dashboard, and configured
+  marketing origins. Netlify access-request submissions use the
+  `app.rulix.cloud` API rather than the static site's SPA fallback.
 - Real Lambda log group `/aws/lambda/rulix-prod-app` imported into Terraform,
   encrypted with the tenant KMS key, and retained for `log_retention_days`.
 

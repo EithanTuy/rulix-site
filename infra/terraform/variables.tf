@@ -371,6 +371,20 @@ variable "app_base_url" {
   default     = "https://app.rulix.cloud"
 }
 
+variable "marketing_origins" {
+  description = "Trusted public marketing origins allowed to submit unauthenticated access requests to the app API."
+  type        = list(string)
+  default     = ["https://rulix.cloud", "https://www.rulix.cloud"]
+
+  validation {
+    condition = alltrue([
+      for origin in var.marketing_origins :
+      can(regex("^https://[A-Za-z0-9.-]+$", origin))
+    ])
+    error_message = "marketing_origins must contain only HTTPS origins without paths, query strings, fragments, or trailing slashes."
+  }
+}
+
 variable "auth_email_from" {
   description = "Verified SES sender address for invite and password reset emails. Empty disables email delivery while still creating invite/reset tokens."
   type        = string
