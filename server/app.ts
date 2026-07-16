@@ -81,6 +81,7 @@ import {
   sessionTtlMs,
   type AccountStore,
   type AuthSession,
+  type CreateAccessRequestInput,
   type DecisionExpectedBindings,
   type SessionRecord,
   type StoredMemoBuilderSession
@@ -132,6 +133,12 @@ const DEFAULT_ALLOWED_ORIGINS = new Set([
   "https://dashboard.rulix.cloud"
 ]);
 const PUBLIC_SITE_HOSTS = new Set(["rulix.cloud", "www.rulix.cloud"]);
+const ACCESS_REQUEST_VOLUMES = new Set([
+  "1-5 reviews / month",
+  "6-20 reviews / month",
+  "21-50 reviews / month",
+  "50+ reviews / month"
+]);
 const MARKETING_SITE_PAGES = [
   {
     path: "/",
@@ -295,6 +302,39 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json(officialCorpus);
   });
 
+  app.post("/api/access-requests", async (req, res) => {
+    if (normalizeOptional(req.body?.website)) {
+      res.status(201).json({
+        received: true,
+        message: "Thanks. Your request has been received."
+      });
+      return;
+    }
+
+    const parsed = parseAccessRequest(req.body);
+    if ("error" in parsed) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+
+    try {
+      const accessRequest = await store.createAccessRequest(parsed.input);
+      res.status(201).json({
+        request: {
+          id: accessRequest.id,
+          createdAt: accessRequest.createdAt
+        },
+        message: "Request received. We will reply within one business day."
+      });
+    } catch (error) {
+      if (error instanceof StoreError) {
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
+      res.status(500).json({ error: "We could not save your request. Please try again." });
+    }
+  });
+
   app.get("/robots.txt", (req, res) => {
     if (isPublicMarketingHost(req)) {
       res
@@ -390,6 +430,10 @@ export function createApp(options: CreateAppOptions = {}) {
     } catch (error) {
       sendStoreError(res, error);
     }
+  });
+
+  app.get("/api/admin/access-requests", requireAuth(store), requireAdmin, async (_req, res) => {
+    res.json({ requests: await store.listAccessRequests() });
   });
 
   app.get("/api/admin/outreach-config", requireAuth(store), requireAdmin, async (_req, res) => {
@@ -3820,6 +3864,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeOptional(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function parseAccessRequest(value: unknown):
+  | { input: CreateAccessRequestInput }
+  | { error: string } {
+  const body = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const email = normalizeText(body.email, "");
+  const organization = normalizeText(body.organization, "");
+  const role = normalizeText(body.role, "");
+  const volume = normalizeText(body.volume, "");
+  const review = normalizeOptional(body.review);
+  const requestedPath = normalizeOptional(body.sourcePath);
+  const sourcePath = requestedPath?.startsWith("/") ? requestedPath : "/";
+
+  if (!email || !organization || !role || !volume) {
+    return { error: "Work email, organization, role, and review volume are required." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return { error: "Enter a valid work email address." };
+  }
+  if (!ACCESS_REQUEST_VOLUMES.has(volume)) {
+    return { error: "Choose a valid review volume." };
+  }
+  if (organization.length > 160 || role.length > 120 || (review?.length ?? 0) > 1_200 || sourcePath.length > 200) {
+    return { error: "One or more fields are too long." };
+  }
+
+  return {
+    input: {
+      email,
+      organization,
+      role,
+      volume,
+      review,
+      sourcePath
+    }
+  };
 }
 
 function coerceOptionalBoundedString(value: unknown, maximum: number): string | undefined | null {

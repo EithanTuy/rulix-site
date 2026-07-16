@@ -797,6 +797,64 @@ resource "aws_wafv2_web_acl" "app" {
   }
 
   rule {
+    name     = "RateLimitAccessRequests"
+    priority = 13
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        aggregate_key_type = "IP"
+        limit              = var.waf_auth_rate_limit
+
+        scope_down_statement {
+          and_statement {
+            statement {
+              byte_match_statement {
+                positional_constraint = "EXACTLY"
+                search_string         = "POST"
+
+                field_to_match {
+                  method {}
+                }
+
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+              }
+            }
+
+            statement {
+              byte_match_statement {
+                positional_constraint = "EXACTLY"
+                search_string         = "/api/access-requests"
+
+                field_to_match {
+                  uri_path {}
+                }
+
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.fn_name}-access-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
     name     = "RateLimitAllRoutes"
     priority = 20
 

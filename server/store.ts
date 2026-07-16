@@ -237,6 +237,18 @@ export interface ResetRecord {
   generation?: number;
 }
 
+export interface AccessRequestRecord {
+  id: string;
+  email: string;
+  organization: string;
+  role: string;
+  volume: string;
+  review?: string;
+  sourcePath: string;
+  status: "new";
+  createdAt: string;
+}
+
 interface InviteEmailReservation {
   email: string;
   tokenHash: string;
@@ -254,6 +266,7 @@ interface PersistedStore {
   accounts: Record<string, AccountReviewState>;
   usage: UsageEvent[];
   outreachConfig?: StoredOutreachConfig;
+  accessRequests?: AccessRequestRecord[];
   aiAdmission?: Record<string, AiAdmissionStateRecord>;
   aiApprovals?: Record<string, AiApprovalRecord>;
   aiApprovalRevocations?: Record<string, AiApprovalRevocation>;
@@ -286,6 +299,15 @@ export interface CreateInviteInput {
   role?: UserProfile["role"];
   invitedBy?: string;
   expiresAt?: string;
+}
+
+export interface CreateAccessRequestInput {
+  email: string;
+  organization: string;
+  role: string;
+  volume: string;
+  review?: string;
+  sourcePath?: string;
 }
 
 export interface InviteSummary {
@@ -699,6 +721,8 @@ export interface UpsertMemoBuilderSessionCommand {
 }
 
 export interface AccountStore {
+  createAccessRequest(input: CreateAccessRequestInput): Promise<AccessRequestRecord>;
+  listAccessRequests(): Promise<AccessRequestRecord[]>;
   createInvite(input: CreateInviteInput): Promise<InviteCreationResult>;
   listInvites(): Promise<InviteSummary[]>;
   getInviteByToken(rawToken: string): Promise<InvitePublicInfo>;
@@ -838,6 +862,7 @@ export class LocalAccountStore implements AccountStore {
   private aiApprovalRequestPreviews = new Map<string, AiApprovalRequestEncryptedPreview>();
   private aiApprovalRequestPendingPointers = new Map<string, AiApprovalRequestPendingPointer>();
   private outreachConfig: StoredOutreachConfig = defaultOutreachConfig();
+  private accessRequests: AccessRequestRecord[] = [];
   private workspacePreferences = new Map<string, WorkspacePreferenceRecord>();
   private memoBuilderSessions = new Map<string, Map<string, StoredMemoBuilderSession>>();
 
@@ -847,6 +872,17 @@ export class LocalAccountStore implements AccountStore {
     if (this.persistEnabled) {
       this.load();
     }
+  }
+
+  async createAccessRequest(input: CreateAccessRequestInput) {
+    const request = createAccessRequestRecord(input);
+    this.accessRequests = [request, ...this.accessRequests].slice(0, 2_000);
+    this.persist();
+    return request;
+  }
+
+  async listAccessRequests() {
+    return this.accessRequests.map((request) => ({ ...request }));
   }
 
   async createInvite(input: CreateInviteInput): Promise<InviteCreationResult> {
@@ -2197,6 +2233,7 @@ export class LocalAccountStore implements AccountStore {
       this.aiApprovalRequestPreviews = new Map(Object.entries(parsed.aiApprovalRequestPreviews ?? {}));
       this.aiApprovalRequestPendingPointers = new Map(Object.entries(parsed.aiApprovalRequestPendingPointers ?? {}));
       this.outreachConfig = sanitizeOutreachConfig(parsed.outreachConfig);
+      this.accessRequests = Array.isArray(parsed.accessRequests) ? parsed.accessRequests : [];
       this.workspacePreferences = new Map(Object.entries(parsed.workspacePreferences ?? {}));
       this.memoBuilderSessions = new Map(
         Object.entries(parsed.memoBuilderSessions ?? {}).map(([userId, sessions]) => [
@@ -2225,6 +2262,7 @@ export class LocalAccountStore implements AccountStore {
       this.aiApprovalRequestPreviews = new Map();
       this.aiApprovalRequestPendingPointers = new Map();
       this.outreachConfig = defaultOutreachConfig();
+      this.accessRequests = [];
       this.workspacePreferences = new Map();
       this.memoBuilderSessions = new Map();
     }
@@ -2252,6 +2290,7 @@ export class LocalAccountStore implements AccountStore {
       aiApprovalRequestPreviews: Object.fromEntries(this.aiApprovalRequestPreviews.entries()),
       aiApprovalRequestPendingPointers: Object.fromEntries(this.aiApprovalRequestPendingPointers.entries()),
       outreachConfig: this.outreachConfig,
+      accessRequests: this.accessRequests,
       workspacePreferences: Object.fromEntries(this.workspacePreferences.entries()),
       memoBuilderSessions: Object.fromEntries(
         [...this.memoBuilderSessions.entries()].map(([userId, sessions]) => [
@@ -2313,6 +2352,20 @@ export class DynamoAccountStore implements AccountStore {
         ExpressionAttributeNames: { "#pk": "pk" }
       }
     }));
+  }
+
+  async createAccessRequest(input: CreateAccessRequestInput) {
+    const request = createAccessRequestRecord(input);
+    await this.putAuthItem(accessRequestKey(request.createdAt, request.id), request);
+    return request;
+  }
+
+  async listAccessRequests() {
+    const items = await this.queryAuthByPrefix("ACCESS_REQUEST#");
+    return items
+      .map((item) => item.record as AccessRequestRecord)
+      .filter(Boolean)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async createInvite(input: CreateInviteInput): Promise<InviteCreationResult> {
@@ -6197,6 +6250,21 @@ function resetTtlMs() {
   return readPositiveNumberEnv("AUTH_RESET_TTL_MINUTES", DEFAULT_RESET_TTL_MINUTES) * 60 * 1000;
 }
 
+function createAccessRequestRecord(input: CreateAccessRequestInput): AccessRequestRecord {
+  const createdAt = new Date().toISOString();
+  return {
+    id: `access-${randomBytes(12).toString("base64url")}`,
+    email: normalizeEmail(input.email),
+    organization: input.organization.trim(),
+    role: input.role.trim(),
+    volume: input.volume.trim(),
+    review: input.review?.trim() || undefined,
+    sourcePath: input.sourcePath?.trim() || "/",
+    status: "new",
+    createdAt
+  };
+}
+
 function createUserRecord(email: string, name: string, role: UserProfile["role"], password: string): UserRecord {
   const salt = randomBytes(16).toString("base64url");
   return {
@@ -9239,6 +9307,10 @@ function lockoutKey(email: string) {
 
 function usageKey(at: string, id: string) {
   return `USAGE#${at}#${id}`;
+}
+
+function accessRequestKey(at: string, id: string) {
+  return `ACCESS_REQUEST#${at}#${id}`;
 }
 
 function usageReceiptKey(id: string) {

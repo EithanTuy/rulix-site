@@ -1,25 +1,31 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
-  AlertTriangle,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode
+} from "react";
+import {
   ArrowRight,
-  CheckCircle2,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  CircleCheck,
   ClipboardCheck,
-  ClipboardList,
-  Eye,
   FileCheck2,
   FileSearch,
   GitBranch,
-  Link2,
   LockKeyhole,
-  Mail,
+  Menu,
   SearchCheck,
   ShieldCheck,
-  UploadCloud,
   UsersRound,
+  X,
   type LucideIcon
 } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import { ThemeToggle } from "./ThemeToggle";
+import "../marketing-v2.css";
 
 type MarketingPageKey =
   | "home"
@@ -38,27 +44,23 @@ interface PageMeta {
   heroCopy: string;
 }
 
-interface RequestAccessForm {
+type DemoKey = "find" | "resolve" | "export";
+type ComparisonKey = "reasoning" | "evidence" | "reviewer" | "trail";
+type TrustKey = "human" | "sources" | "data" | "history";
+type UseCaseKey = "officers" | "industry" | "research";
+
+interface AccessFormState {
   email: string;
-  company: string;
+  organization: string;
   role: string;
   volume: string;
-  sampleReady: boolean;
+  review: string;
 }
+
+type AccessFormStatus = "idle" | "submitting" | "success" | "error";
 
 const CONTACT_EMAIL = "security@rulix.cloud";
-
-type DemoMediaKey = "findMissingReasoning" | "resolveReviewGaps" | "exportReviewRecord";
-type UseCaseKey = "legal" | "compliance" | "founders" | "operations" | "universities";
-
-interface DemoMedia {
-  title: string;
-  duration: string;
-  poster: string;
-  video: string;
-  still: string;
-  buyerQuestionAnswered: string;
-}
+const SECTION_IDS = ["product", "review-loop", "trust", "use-cases", "request-access"] as const;
 
 const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
   home: {
@@ -66,20 +68,20 @@ const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
     path: "/",
     title: "Rulix - Export-control memo review",
     description:
-      "Rulix helps export-control, legal, and compliance teams review memo reasoning, surface gaps, and prepare clear decision records.",
-    heroTitle: "Export-control memo review, organized.",
+      "Rulix maps export-control memo claims to evidence, surfaces gaps, and preserves reviewer decisions in an exportable record.",
+    heroTitle: "Find the weak link in every export-control memo.",
     heroCopy:
-      "Rulix helps reviewers find gaps, ask better evidence questions, and prepare a clean record before final signoff."
+      "Rulix maps claims to evidence, flags what is still missing, and keeps every reviewer decision in one exportable record."
   },
   "export-control-memo-review": {
     key: "export-control-memo-review",
     path: "/export-control-memo-review",
     title: "Export-control memo review software | Rulix",
     description:
-      "Review classification memos for weak reasoning, evidence gaps, reviewer questions, and signoff.",
-    heroTitle: "Review export-control memos with a clear trail.",
+      "Review classification memos for unsupported reasoning, evidence gaps, reviewer questions, and signoff.",
+    heroTitle: "Find the weak link before an export-control memo reaches signoff.",
     heroCopy:
-      "Test classification logic, spot unsupported claims, and document the evidence behind each decision."
+      "Map claims to evidence, surface unanswered questions, and keep each reviewer decision in one exportable record."
   },
   "eccn-classification-assistant": {
     key: "eccn-classification-assistant",
@@ -87,9 +89,9 @@ const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
     title: "ECCN classification assistant for reviewers | Rulix",
     description:
       "Structure ECCN review, evidence gaps, and human signoff without replacing expert judgment.",
-    heroTitle: "ECCN review support for human reviewers.",
+    heroTitle: "Make every ECCN conclusion show its work.",
     heroCopy:
-      "Turn draft classification memos into structured work: claims, assumptions, missing evidence, and signoff notes."
+      "Rulix ties draft classification reasoning to evidence, flags what is missing, and keeps final judgment with your reviewer."
   },
   "ai-export-compliance-review": {
     key: "ai-export-compliance-review",
@@ -97,366 +99,265 @@ const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
     title: "AI export compliance review with human signoff | Rulix",
     description:
       "Use AI support to spot memo gaps while keeping final determinations with trained reviewers.",
-    heroTitle: "AI-assisted export review, kept in human hands.",
+    heroTitle: "Use AI to find the gap—not make the final call.",
     heroCopy:
-      "Pressure-test reasoning, surface questions, and organize evidence while expert reviewers stay in charge."
+      "Rulix organizes findings, evidence questions, and reviewer decisions without turning software into the authority."
   },
   "university-export-control-review": {
     key: "university-export-control-review",
     path: "/university-export-control-review",
     title: "University export-control memo review | Rulix",
     description:
-      "Help universities and research teams triage public or sanitized memo drafts before final reviewer time.",
-    heroTitle: "Memo triage for research teams.",
+      "Help research teams triage public or sanitized memo drafts before final reviewer time.",
+    heroTitle: "Give research review drafts a stronger first pass.",
     heroCopy:
-      "Prepare cleaner drafts, isolate missing technical facts, and keep reviewer questions organized."
+      "Separate technical unknowns from conclusions, collect the right evidence, and preserve the path to human signoff."
   },
   "manufacturer-eccn-review": {
     key: "manufacturer-eccn-review",
     path: "/manufacturer-eccn-review",
     title: "Manufacturer ECCN review support | Rulix",
     description:
-      "Help manufacturers and labs reduce back-and-forth on ECCN evidence, product specs, and reviewer questions.",
-    heroTitle: "ECCN review packets for manufacturers and labs.",
+      "Reduce back-and-forth on ECCN evidence, product specifications, and reviewer questions.",
+    heroTitle: "Turn product facts into a review-ready ECCN record.",
     heroCopy:
-      "Catch missing specs and unsupported claims before final classification review."
+      "Catch missing specifications and unsupported claims before the classification memo reaches final review."
   }
 };
 
 const PAGE_BY_PATH = new Map(Object.values(MARKETING_PAGES).map((page) => [page.path, page]));
 
-const proofChips = [
-  { label: "Find missing evidence", icon: SearchCheck },
-  { label: "Keep reviewers in control", icon: UsersRound },
-  { label: "Export a clean record", icon: ClipboardCheck }
-];
-
-const problemCards = [
-  {
-    title: "Manual review is slow",
-    copy: "Teams lose time checking claims, citations, assumptions, and missing context across drafts and comments.",
-    icon: ClipboardList
-  },
-  {
-    title: "Review risk hides in details",
-    copy: "Small gaps in end-use, jurisdiction, classification logic, or party context can surface late.",
-    icon: AlertTriangle
-  },
-  {
-    title: "Clear records take work",
-    copy: "Final memos need a trace of conclusions, changes, and supporting evidence.",
-    icon: ShieldCheck
-  }
-];
-
-const demoSteps = [
-  {
-    title: "Upload memo",
-    label: "Draft uploaded",
-    copy: "A sanitized memo and context enter the workspace.",
-    detail: "Rulix separates claims, cited sources, assumptions, and visible facts."
-  },
-  {
-    title: "Analyze reasoning",
-    label: "Reasoning mapped",
-    copy: "The review pass highlights unsupported assertions and missing logic.",
-    detail: "Weak jurisdiction analysis, incomplete ECCN reasoning, and end-user gaps are surfaced for review."
-  },
-  {
-    title: "Resolve gaps",
-    label: "Checklist created",
-    copy: "Findings become a checklist with evidence requests and owner-ready notes.",
-    detail: "Each note stays tied to the memo location, risk context, and needed evidence."
-  },
-  {
-    title: "Export record",
-    label: "Record prepared",
-    copy: "Resolved findings become a clean internal record.",
-    detail: "The summary preserves findings, responses, evidence links, and trail events."
-  }
-];
-
-const demoMediaCatalog: Record<"hero" | DemoMediaKey, DemoMedia> = {
-  hero: {
-    title: "Rulix review loop",
-    duration: "10s",
-    poster: "/marketing/demos/hero-rulix-review-loop.webp",
-    video: "/marketing/demos/hero-rulix-review-loop.mp4",
-    still: "/marketing/demos/hero-rulix-review-loop.png",
-    buyerQuestionAnswered: "How does a memo move from draft to review record?"
-  },
-  findMissingReasoning: {
-    title: "Find missing reasoning",
-    duration: "6s",
-    poster: "/marketing/demos/demo-find-missing-reasoning.webp",
-    video: "/marketing/demos/demo-find-missing-reasoning.mp4",
-    still: "/marketing/demos/demo-find-missing-reasoning.png",
-    buyerQuestionAnswered: "Where is the memo reasoning weak?"
-  },
-  resolveReviewGaps: {
-    title: "Resolve review gaps",
-    duration: "6s",
-    poster: "/marketing/demos/demo-resolve-review-gaps.webp",
-    video: "/marketing/demos/demo-resolve-review-gaps.mp4",
-    still: "/marketing/demos/demo-resolve-review-gaps.png",
-    buyerQuestionAnswered: "Can teams close gaps without losing context?"
-  },
-  exportReviewRecord: {
-    title: "Export a clear record",
-    duration: "6s",
-    poster: "/marketing/demos/demo-export-review-record.webp",
-    video: "/marketing/demos/demo-export-review-record.mp4",
-    still: "/marketing/demos/demo-export-review-record.png",
-    buyerQuestionAnswered: "Can the team export the review trail?"
-  }
-};
-
-const demoModules: Array<{
-  key: DemoMediaKey;
+const DEMOS: Array<{
+  key: DemoKey;
+  label: string;
   title: string;
-  shortTitle: string;
   copy: string;
-  proof: string[];
   outcome: string;
+  video: string;
+  poster: string;
+  still: string;
 }> = [
   {
-    key: "findMissingReasoning",
-    title: "Find missing reasoning",
-    shortTitle: "Find gaps",
-    copy: "Analysis and Evidence Map show unsupported jurisdiction, ECCN, and end-use reasoning beside the memo.",
-    proof: ["Analysis panel", "Evidence Map", "Memo highlights"],
-    outcome: "Reviewers see the weak link before signoff."
+    key: "find",
+    label: "Find unsupported reasoning",
+    title: "Find the claim that needs another look.",
+    copy:
+      "Rulix highlights weak or missing reasoning beside the memo, while the surrounding text stays in view.",
+    outcome: "Finding flagged",
+    video: "/marketing/demos/demo-find-missing-reasoning.mp4",
+    poster: "/marketing/demos/demo-find-missing-reasoning.webp",
+    still: "/marketing/demos/demo-find-missing-reasoning.png"
   },
   {
-    key: "resolveReviewGaps",
-    title: "Resolve review gaps",
-    shortTitle: "Resolve gaps",
-    copy: "Highlighted findings become actions: accept, request more information, or override with notes.",
-    proof: ["Finding selection", "Decision tab", "Reviewer checklist"],
-    outcome: "Fits workflows that need a human decision trail."
+    key: "resolve",
+    label: "Resolve with evidence",
+    title: "Turn a gap into the next reviewer action.",
+    copy:
+      "Accept the finding, request more information, or override it with a note that stays tied to the memo.",
+    outcome: "Reviewer action captured",
+    video: "/marketing/demos/demo-resolve-review-gaps.mp4",
+    poster: "/marketing/demos/demo-resolve-review-gaps.webp",
+    still: "/marketing/demos/demo-resolve-review-gaps.png"
   },
   {
-    key: "exportReviewRecord",
-    title: "Export a clear record",
-    shortTitle: "Export record",
-    copy: "The export view preserves intake, analysis, reviewer decisions, and report generation.",
-    proof: ["Audit tab", "Decision note", "Report export"],
-    outcome: "Teams get an internal record they can explain."
+    key: "export",
+    label: "Export the decision trail",
+    title: "Keep the reasoning, response, and final decision together.",
+    copy:
+      "The export preserves intake, analysis, reviewer notes, resolved findings, and the final review record.",
+    outcome: "Record ready",
+    video: "/marketing/demos/demo-export-review-record.mp4",
+    poster: "/marketing/demos/demo-export-review-record.webp",
+    still: "/marketing/demos/demo-export-review-record.png"
   }
 ];
 
-const workflowSteps = [
+const WORKFLOW = [
   {
     title: "Add the memo",
-    copy: "Upload or paste memo content, support docs, classifications, and context.",
-    panel: "Memo, attachments, item facts"
+    copy: "Upload a public, sanitized, or approved draft and the context your reviewer already has.",
+    media: "/marketing/demos/hero-rulix-review-loop.webp"
   },
   {
     title: "Map the reasoning",
-    copy: "Rulix identifies claims, assumptions, missing evidence, and decision logic.",
-    panel: "Claims, sources, assumptions"
+    copy: "Rulix identifies claims, cited support, assumptions, and the gaps between them.",
+    media: "/marketing/demos/demo-find-missing-reasoning.webp"
   },
   {
-    title: "Flag review risk",
-    copy: "Gaps are grouped by what a reviewer needs to inspect.",
-    panel: "Jurisdiction, ECCN, end use"
+    title: "Resolve the gaps",
+    copy: "Reviewers accept, request, annotate, or override findings while the memo stays in view.",
+    media: "/marketing/demos/demo-resolve-review-gaps.webp"
   },
   {
     title: "Generate the record",
-    copy: "Export the summary, checklist, and review trail for final signoff.",
-    panel: "Findings, responses, audit trail"
+    copy: "Export a reviewer-signed trail of the findings, evidence, notes, and final decisions.",
+    media: "/marketing/demos/demo-export-review-record.webp"
   }
 ];
 
-const comparisonRows = [
+const COMPARISON_ROWS: Array<{
+  key: ComparisonKey;
+  label: string;
+  generic: string;
+  rulix: string;
+  inspect: string;
+}> = [
   {
-    dimension: "Workflow shape",
-    chatbot: "Unstructured conversation",
-    manual: "Scattered comments",
-    rulix: "Structured memo review"
+    key: "reasoning",
+    label: "Reasoning",
+    generic: "Returns an answer without showing the review path.",
+    rulix: "Shows the claim, relevant controls, and the reasoning behind the finding.",
+    inspect: "The memo remains the source of truth while Rulix points to the exact claim that needs review."
   },
   {
-    dimension: "Traceability",
-    chatbot: "Hard to audit",
-    manual: "Depends on reviewer notes",
-    rulix: "Findings tied to reasoning"
+    key: "evidence",
+    label: "Evidence",
+    generic: "May cite sources, but does not keep them tied to specific claims.",
+    rulix: "Links each claim to evidence and makes the missing support visible.",
+    inspect: "Evidence questions stay attached to the memo passage and the reason the reviewer needs them."
   },
   {
-    dimension: "Context retention",
-    chatbot: "Easy to lose",
-    manual: "Split across tools",
-    rulix: "Memo, evidence, and trail together"
+    key: "reviewer",
+    label: "Reviewer action",
+    generic: "Has no durable place for requests, overrides, or decision notes.",
+    rulix: "Captures requests, resolutions, notes, and final reviewer control.",
+    inspect: "Every finding becomes an explicit reviewer action instead of disappearing into another chat thread."
   },
   {
-    dimension: "Review output",
-    chatbot: "Free-form answer",
-    manual: "Variable quality",
-    rulix: "Reviewer-ready record"
+    key: "trail",
+    label: "Decision trail",
+    generic: "A conversation is hard to hand off, explain, or audit.",
+    rulix: "Exports a reviewer-ready record of the complete workflow.",
+    inspect: "The final record preserves what changed, why it changed, and who made the decision."
   }
 ];
 
-const trustItems = [
+const TRUST_ITEMS: Array<{
+  key: TrustKey;
+  title: string;
+  summary: string;
+  detail: string;
+  icon: LucideIcon;
+  media: string;
+}> = [
   {
-    title: "Human review stays central",
-    copy: "Rulix supports expert reviewers. It does not replace legal or compliance judgment.",
-    icon: UsersRound
+    key: "human",
+    title: "Human decision required",
+    summary: "Rulix finds gaps and suggests questions. Reviewers make the call.",
+    detail:
+      "No finding becomes a determination on its own. Accept, request more information, or override with a note before the record moves forward.",
+    icon: UsersRound,
+    media: "/marketing/demos/demo-resolve-review-gaps.webp"
   },
   {
-    title: "Suggestions with context",
-    copy: "Findings point back to memo sections, rationale gaps, and the evidence needed to resolve them.",
-    icon: GitBranch
+    key: "sources",
+    title: "Source-linked findings",
+    summary: "Every finding points back to the claim and the evidence it still needs.",
+    detail:
+      "Reviewers can see the memo passage, the reason for the finding, and the next evidence question in the same surface.",
+    icon: GitBranch,
+    media: "/marketing/demos/demo-find-missing-reasoning.webp"
   },
   {
-    title: "Clear review history",
-    copy: "Comments, decisions, and exports are organized so teams can explain how the memo changed.",
-    icon: ClipboardCheck
+    key: "data",
+    title: "Public, sanitized, or approved data",
+    summary: "The hosted workspace has a clear input boundary.",
+    detail:
+      "Use public, sanitized, or organization-approved content unless your policy and deployment explicitly permit something else.",
+    icon: LockKeyhole,
+    media: "/marketing/demos/hero-rulix-review-loop.webp"
+  },
+  {
+    key: "history",
+    title: "Exportable review history",
+    summary: "Decisions, responses, notes, and evidence move together.",
+    detail:
+      "The record is built for handoff and final signoff, so the team can explain what changed without reconstructing the process.",
+    icon: ClipboardCheck,
+    media: "/marketing/demos/demo-export-review-record.webp"
   }
 ];
 
-const buyerUseCases: Array<{
+const USE_CASES: Array<{
   key: UseCaseKey;
   label: string;
   title: string;
-  who: string;
-  outcome: string;
-  fit: string;
+  copy: string;
+  preview: string;
   icon: LucideIcon;
 }> = [
   {
-    key: "legal",
-    label: "Legal",
-    title: "Pressure-test memo reasoning before signoff",
-    who: "Counsel and legal operations",
-    outcome: "See missing jurisdiction, classification, and evidence support before final review.",
-    fit: "Best when legal wants structured notes, not a model making the decision.",
-    icon: FileSearch
-  },
-  {
-    key: "compliance",
-    label: "Compliance",
-    title: "Standardize export-control review",
-    who: "Export-control and compliance teams",
-    outcome: "Turn drafts into evidence findings, reviewer actions, and a clean record.",
-    fit: "Best when the team needs repeatable review across memo owners.",
+    key: "officers",
+    label: "Export-control officers",
+    title: "Audit-ready review without losing the memo.",
+    copy:
+      "Find unsupported jurisdiction, classification, and end-use reasoning while preserving the reviewer’s decision trail.",
+    preview: "Self-classification memo",
     icon: SearchCheck
   },
   {
-    key: "founders",
-    label: "Founders",
-    title: "Get cleaner review packets before escalation",
-    who: "Founders and executives handling technical trade decisions",
-    outcome: "Find missing facts before asking counsel or outside advisors for final review.",
-    fit: "Best when the company has technical facts but needs a clearer packet.",
+    key: "industry",
+    label: "Manufacturers and labs",
+    title: "Turn product facts into answerable review questions.",
+    copy:
+      "Spot missing specifications, end-use context, and technical support before the memo starts another round of email.",
+    preview: "Component classification memo",
     icon: FileCheck2
   },
   {
-    key: "operations",
-    label: "Operations",
-    title: "Reduce back-and-forth on memo evidence",
-    who: "Operations, product, and engineering teams",
-    outcome: "Collect missing specs, party context, and end-use support before review stalls.",
-    fit: "Best when non-lawyers prepare the facts and reviewers need a consistent packet.",
-    icon: UsersRound
-  },
-  {
-    key: "universities",
-    label: "Universities/Labs",
-    title: "Triage public or sanitized research review drafts",
-    who: "University export-control offices and research operations",
-    outcome: "Separate technical unknowns from review conclusions before final reviewer time.",
-    fit: "Best when data is public, sanitized, or approved for the workspace.",
+    key: "research",
+    label: "Universities and research offices",
+    title: "Prepare cleaner drafts before licensed reviewer time.",
+    copy:
+      "Separate technical unknowns from review conclusions and keep every follow-up tied to the research memo.",
+    preview: "Research equipment memo",
     icon: ShieldCheck
   }
 ];
 
-const fitCards = [
+const FAQS = [
   {
-    title: "Rulix fits when",
-    copy: "Your team reviews memo drafts, needs evidence-aware gap finding, and keeps final judgment with people.",
-    icon: CheckCircle2,
-    tone: "fit"
+    question: "Does Rulix make the final classification?",
+    answer:
+      "No. Rulix is review support. It surfaces gaps, evidence needs, and decision history so qualified people can document the final call."
   },
   {
-    title: "Data boundary",
-    copy: "Use only public, sanitized, or approved data in the hosted workspace unless your policy allows more.",
-    icon: LockKeyhole,
-    tone: "boundary"
+    question: "What data can we use?",
+    answer:
+      "Use public, sanitized, or organization-approved information in the hosted workspace unless your policy and deployment allow a different boundary."
   },
   {
-    title: "Rulix is not a fit when",
-    copy: "You need guaranteed classifications, autonomous legal decisions, or a place for unmanaged sensitive data.",
-    icon: AlertTriangle,
-    tone: "not-fit"
+    question: "How is this different from a general AI assistant?",
+    answer:
+      "Rulix keeps the memo, findings, evidence questions, reviewer actions, and export record in one structured workflow instead of a free-form conversation."
+  },
+  {
+    question: "What comes out of a review?",
+    answer:
+      "A structured set of findings and evidence questions, the reviewer’s responses and decisions, and an exportable record for final signoff."
   }
-];
-
-const faqItems = [
-  {
-    question: "How should we use Rulix for regulatory work?",
-    answer:
-      "Use it as review support. Rulix surfaces gaps, evidence needs, and decision history so qualified humans can document the final call."
-  },
-  {
-    question: "What if AI gets something wrong?",
-    answer:
-      "Model output is treated as a finding to review, not final truth. Analysis stays tied to memo passages, source context, and human signoff."
-  },
-  {
-    question: "How is this different from generic AI?",
-    answer:
-      "Generic chat is free-form. Rulix keeps intake, evidence gaps, decisions, audit trail, and export records in one workflow."
-  },
-  {
-    question: "Does Rulix replace counsel or compliance reviewers?",
-    answer:
-      "No. Rulix assists expert review; it does not make legal guarantees or regulatory determinations."
-  },
-  {
-    question: "What data can we put into it?",
-    answer:
-      "Use public, sanitized, or approved data in the hosted app unless your organization has approved a different boundary."
-  }
-];
-
-const securityItems = [
-  {
-    title: "Data handling",
-    copy: "Use public, sanitized, or approved data in the hosted workspace unless your policy allows more.",
-    icon: LockKeyhole
-  },
-  {
-    title: "Access control",
-    copy: "Account-based workspaces and invite-only team access.",
-    icon: ShieldCheck
-  },
-  {
-    title: "Review history",
-    copy: "Memos, decisions, comments, and exports are organized around the review record.",
-    icon: ClipboardCheck
-  }
-];
-
-const seoLinks = [
-  MARKETING_PAGES["export-control-memo-review"],
-  MARKETING_PAGES["eccn-classification-assistant"],
-  MARKETING_PAGES["ai-export-compliance-review"],
-  MARKETING_PAGES["university-export-control-review"],
-  MARKETING_PAGES["manufacturer-eccn-review"]
 ];
 
 export function MarketingSite() {
   const page = useMemo(() => pageForLocation(), []);
   const reducedMotion = usePrefersReducedMotion();
-  const [activeDemo, setActiveDemo] = useState<DemoMediaKey>("findMissingReasoning");
-  const [activeUseCase, setActiveUseCase] = useState<UseCaseKey>("compliance");
+  const { activeSection, scrolled } = useSectionState();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [activeDemo, setActiveDemo] = useState<DemoKey>("find");
+  const [demoPaused, setDemoPaused] = useState(false);
+  const [activeWorkflow, setActiveWorkflow] = useState(0);
+  const [activeComparison, setActiveComparison] = useState<ComparisonKey>("reasoning");
+  const [activeTrust, setActiveTrust] = useState<TrustKey>("human");
+  const [activeUseCase, setActiveUseCase] = useState<UseCaseKey>("officers");
   const [activeFaq, setActiveFaq] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState<RequestAccessForm>({
+  const [accessStatus, setAccessStatus] = useState<AccessFormStatus>("idle");
+  const [accessError, setAccessError] = useState("");
+  const [form, setForm] = useState<AccessFormState>({
     email: "",
-    company: "",
+    organization: "",
     role: "",
-    volume: "1-5 reviews/month",
-    sampleReady: false
+    volume: "1-5 reviews / month",
+    review: ""
   });
 
   useEffect(() => {
@@ -470,180 +371,313 @@ export function MarketingSite() {
   }, [page]);
 
   useEffect(() => {
-    if (reducedMotion) {
-      return;
-    }
-
-    const rotation = window.setInterval(() => {
-      setActiveDemo((currentDemo) => {
-        const currentIndex = demoModules.findIndex((demo) => demo.key === currentDemo);
-        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % demoModules.length;
-        return demoModules[nextIndex].key;
+    if (reducedMotion || demoPaused) return;
+    const timer = window.setInterval(() => {
+      setActiveDemo((current) => {
+        const index = DEMOS.findIndex((demo) => demo.key === current);
+        return DEMOS[(index + 1) % DEMOS.length].key;
       });
-    }, 6200);
+    }, 6000);
+    return () => window.clearInterval(timer);
+  }, [demoPaused, reducedMotion]);
 
-    return () => window.clearInterval(rotation);
-  }, [reducedMotion]);
-
-  const submitLead = (event: FormEvent<HTMLFormElement>) => {
+  const submitLead = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    const subject = encodeURIComponent("Rulix access request");
-    const body = encodeURIComponent(
-      [
-        "I'd like to request access to Rulix.",
-        "",
-        `Work email: ${form.email}`,
-        `Company: ${form.company}`,
-        `Role: ${form.role}`,
-        `Expected review volume: ${form.volume}`,
-        `Redacted memo sample ready: ${form.sampleReady ? "yes" : "not yet"}`,
-        "",
-        "Please send available times and access next steps."
-      ].join("\n")
-    );
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+    const website = String(new FormData(event.currentTarget).get("website") ?? "");
+    setAccessStatus("submitting");
+    setAccessError("");
+
+    try {
+      const response = await fetch("/api/access-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          website,
+          sourcePath: window.location.pathname
+        })
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "We could not save your request.");
+      }
+      setAccessStatus("success");
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : "We could not save your request.");
+      setAccessStatus("error");
+    }
+  };
+
+  const updateAccessForm = (nextForm: AccessFormState) => {
+    setForm(nextForm);
+    if (accessStatus === "error") {
+      setAccessStatus("idle");
+      setAccessError("");
+    }
   };
 
   return (
-    <div className="marketing-site">
-      <header className="site-header">
-        <a className="site-brand" href="/" aria-label="Rulix home">
-          <BrandLogo tone="adaptive" size="compact" />
-        </a>
-        <nav className="site-nav" aria-label="Primary">
-          <a href="#product-demo">Product</a>
-          <a href="#fit-check">Fit check</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#trust">Trust</a>
-          <a href="#use-cases">Use cases</a>
-        </nav>
-        <div className="site-header-actions">
-          <ThemeToggle className="theme-toggle--site" />
-          <MarketingButton href="#request-access" variant="primary" className="site-header-cta">
-            Request access
-          </MarketingButton>
-        </div>
-      </header>
-
+    <div className="rulix-site">
+      <SiteHeader
+        activeSection={activeSection}
+        mobileNavOpen={mobileNavOpen}
+        onMobileNavChange={setMobileNavOpen}
+        scrolled={scrolled}
+      />
       <main>
         <Hero page={page} reducedMotion={reducedMotion} />
-        <ProblemCards />
-        <ProductDemo activeDemo={activeDemo} onDemoChange={setActiveDemo} reducedMotion={reducedMotion} />
-        <FitCheck />
-        <HowItWorks />
-        <ComparisonSection />
-        <TrustSection />
+        <ProductProof
+          activeDemo={activeDemo}
+          paused={demoPaused}
+          reducedMotion={reducedMotion}
+          onDemoChange={setActiveDemo}
+          onPauseChange={setDemoPaused}
+        />
+        <ReviewLoop
+          activeStep={activeWorkflow}
+          onStepChange={setActiveWorkflow}
+        />
+        <Comparison
+          activeRow={activeComparison}
+          onRowChange={setActiveComparison}
+        />
+        <TrustSection activeItem={activeTrust} onItemChange={setActiveTrust} />
         <UseCases activeUseCase={activeUseCase} onUseCaseChange={setActiveUseCase} />
-        <CredibilitySection />
-        <SecuritySection />
-        <FaqSection activeFaq={activeFaq} onFaqChange={setActiveFaq} />
-        <RequestAccessSection
+        <FitCheck />
+        <ConversionSection
+          activeFaq={activeFaq}
+          accessError={accessError}
+          accessStatus={accessStatus}
           form={form}
-          submitted={submitted}
-          onFormChange={setForm}
+          onFaqChange={setActiveFaq}
+          onFormChange={updateAccessForm}
           onSubmit={submitLead}
         />
-        <SeoSection />
       </main>
-
-      <footer className="site-footer">
-        <BrandLogo tone="adaptive" size="compact" />
-        <p>Export-control memo review with human signoff.</p>
-        <div>
-          <a href="#product-demo">Product</a>
-          <a href="#trust">Trust</a>
-          <a href="https://app.rulix.cloud">Sign in to app</a>
-          <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
+  );
+}
+
+function SiteHeader({
+  activeSection,
+  mobileNavOpen,
+  onMobileNavChange,
+  scrolled
+}: {
+  activeSection: string;
+  mobileNavOpen: boolean;
+  onMobileNavChange: (open: boolean) => void;
+  scrolled: boolean;
+}) {
+  const nav = [
+    ["product", "Product"],
+    ["review-loop", "Review loop"],
+    ["trust", "Trust"],
+    ["use-cases", "Use cases"]
+  ];
+
+  return (
+    <header className={["rulix-header", scrolled ? "is-compact" : "", mobileNavOpen ? "is-open" : ""].join(" ")}>
+      <a className="rulix-header__brand" href="/" aria-label="Rulix home">
+        <BrandLogo tone="dark" size="compact" />
+      </a>
+      <nav className="rulix-header__nav" aria-label="Primary">
+        {nav.map(([id, label]) => (
+          <a
+            href={`#${id}`}
+            aria-current={activeSection === id ? "page" : undefined}
+            key={id}
+            onClick={() => onMobileNavChange(false)}
+          >
+            {label}
+          </a>
+        ))}
+        <a href="https://app.rulix.cloud">Sign in</a>
+      </nav>
+      <div className="rulix-header__actions">
+        <a className="rulix-button rulix-button--primary rulix-header__cta" href="#request-access">
+          Request access
+        </a>
+        <button
+          className="rulix-menu-button"
+          type="button"
+          aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={mobileNavOpen}
+          onClick={() => onMobileNavChange(!mobileNavOpen)}
+        >
+          {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+    </header>
   );
 }
 
 function Hero({ page, reducedMotion }: { page: PageMeta; reducedMotion: boolean }) {
   return (
-    <section className="site-hero" id="top">
-      <div className="site-container site-hero-grid">
-        <div className="site-hero-copy">
-          <p className="site-eyebrow">
-            <span aria-hidden="true" />
-            For export-control, legal, and compliance teams
-          </p>
-          <h1>{page.heroTitle}</h1>
-          <p className="site-hero-subcopy">{page.heroCopy}</p>
-          <div className="site-actions">
-            <MarketingButton href="#request-access" variant="primary">
+    <section className="rulix-hero" id="top">
+      <div className="rulix-shell rulix-hero__grid">
+        <div className="rulix-hero__copy">
+          <h1>
+            {page.key === "home" ? (
+              <>
+                <span className="rulix-hero-line">Find the weak link</span>
+                <span className="rulix-hero-line">
+                  in every <span className="rulix-no-break">export-control</span>
+                </span>
+                <span className="rulix-hero-line">memo.</span>
+              </>
+            ) : (
+              page.heroTitle
+            )}
+          </h1>
+          <p>{page.heroCopy}</p>
+          <div className="rulix-hero__actions">
+            <a className="rulix-button rulix-button--primary" href="#request-access">
               Request access
-              <ArrowRight size={18} aria-hidden="true" />
-            </MarketingButton>
-            <MarketingButton href="#product-demo" variant="text">
-              See how it works
-              <ArrowRight size={16} aria-hidden="true" />
-            </MarketingButton>
+              <ArrowRight size={17} aria-hidden="true" />
+            </a>
+            <a className="rulix-button rulix-button--secondary" href="#product">
+              Review a sample memo
+            </a>
           </div>
-          <div className="site-proof-row" aria-label="Rulix review strengths">
-            {proofChips.map((chip) => (
-              <span key={chip.label}>
-                <chip.icon size={17} aria-hidden="true" />
-                {chip.label}
-              </span>
-            ))}
-          </div>
-          <p className="site-hero-note">
-            Review support only. Final judgment stays with qualified people.
-          </p>
         </div>
-        <HeroProductProof reducedMotion={reducedMotion} />
+        <ProductMedia
+          autoPlay
+          className="rulix-hero__media"
+          label="Rulix export-control memo review workspace"
+          poster="/marketing/demos/demo-find-missing-reasoning.webp"
+          reducedMotion={reducedMotion}
+          video="/marketing/demos/demo-find-missing-reasoning.mp4"
+        />
+      </div>
+      <div className="rulix-shell evidence-rail" aria-label="Rulix review path">
+        {["Claim", "Evidence gap", "Reviewer decision", "Record"].map((item) => (
+          <span key={item}>
+            <i aria-hidden="true" />
+            {item}
+          </span>
+        ))}
       </div>
     </section>
   );
 }
 
-function HeroProductProof({ reducedMotion }: { reducedMotion: boolean }) {
-  const media = demoMediaCatalog.hero;
+function ProductProof({
+  activeDemo,
+  paused,
+  reducedMotion,
+  onDemoChange,
+  onPauseChange
+}: {
+  activeDemo: DemoKey;
+  paused: boolean;
+  reducedMotion: boolean;
+  onDemoChange: (demo: DemoKey) => void;
+  onPauseChange: (paused: boolean) => void;
+}) {
+  const active = DEMOS.find((demo) => demo.key === activeDemo) ?? DEMOS[0];
 
   return (
-    <div className="product-proof-frame hero-product-proof" aria-label="Rulix product proof video">
-      <div className="product-proof-top">
-        <span>Product in action</span>
-        <strong>{media.duration}</strong>
+    <section
+      className="rulix-band rulix-band--dark product-proof"
+      id="product"
+      onFocusCapture={() => onPauseChange(true)}
+      onBlurCapture={() => onPauseChange(false)}
+      onMouseEnter={() => onPauseChange(true)}
+      onMouseLeave={() => onPauseChange(false)}
+    >
+      <div className="rulix-shell product-proof__grid">
+        <div className="product-proof__story">
+          <h2>See the gap.<br />Ask the question.<br />Keep the decision.</h2>
+          <p>
+            Rulix stays beside the memo, so every finding has context and every resolution leaves a trail.
+          </p>
+          <div className="product-proof__active-copy" aria-live="polite">
+            <strong>{active.title}</strong>
+            <span>{active.copy}</span>
+          </div>
+          <div className="demo-clock" aria-label={paused ? "Demo paused" : "Demo playing"}>
+            <span>Demo</span>
+            <time>00:00 / 00:06</time>
+            <div className="demo-clock__track">
+              <i key={`${active.key}-${paused}`} className={paused ? "is-paused" : ""} />
+            </div>
+          </div>
+        </div>
+        <div className="product-proof__stage">
+          <div className="demo-tabs" role="tablist" aria-label="Rulix product demos">
+            {DEMOS.map((demo) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={demo.key === activeDemo}
+                aria-controls={`demo-panel-${demo.key}`}
+                className={demo.key === activeDemo ? "is-active" : ""}
+                id={`demo-tab-${demo.key}`}
+                key={demo.key}
+                onClick={() => onDemoChange(demo.key)}
+              >
+                {demo.label}
+              </button>
+            ))}
+          </div>
+          <div
+            className="product-proof__panel"
+            id={`demo-panel-${active.key}`}
+            role="tabpanel"
+            aria-labelledby={`demo-tab-${active.key}`}
+          >
+            <ProductMedia
+              autoPlay
+              key={active.key}
+              label={`${active.label} Rulix product demo`}
+              poster={active.poster}
+              reducedMotion={reducedMotion}
+              video={active.video}
+            />
+            <div className="product-proof__outcome">
+              <i aria-hidden="true" />
+              Outcome: {active.outcome}
+            </div>
+          </div>
+        </div>
       </div>
-      <ProductVideo media={media} reducedMotion={reducedMotion} autoPlay />
-      <div className="proof-hotspots" aria-label="What the product preview shows">
-        <span>
-          <SearchCheck size={16} aria-hidden="true" />
-          Unsupported claim flagged
-        </span>
-        <span>
-          <GitBranch size={16} aria-hidden="true" />
-          Evidence trail mapped
-        </span>
-        <span>
-          <ClipboardCheck size={16} aria-hidden="true" />
-          Review record prepared
-        </span>
-      </div>
-      <div className="proof-caption">
-        <strong>{media.title}</strong>
-        <span>{media.buyerQuestionAnswered}</span>
-      </div>
-    </div>
+    </section>
   );
 }
 
-function ProblemCards() {
+function ReviewLoop({ activeStep, onStepChange }: { activeStep: number; onStepChange: (step: number) => void }) {
+  const active = WORKFLOW[activeStep];
+
   return (
-    <section className="site-section problem-section">
-      <div className="site-container">
-        <SectionHeader
-          label="The review gap"
-          title="Reviews slow down when reasoning is scattered."
-          copy="Export-control review slows when teams cannot see which assumptions, evidence, and questions support the final memo."
-        />
-        <div className="problem-grid">
-          {problemCards.map((card) => (
-            <FeatureCard key={card.title} title={card.title} copy={card.copy} icon={card.icon} />
+    <section className="rulix-band review-loop" id="review-loop">
+      <div className="rulix-shell review-loop__grid">
+        <div className="review-loop__visual">
+          <h2>A review that moves<br />like your reviewers do.</h2>
+          <p>A structured workflow that keeps the memo, the evidence, and the decision in one place.</p>
+          <div className="review-loop__media" key={active.title}>
+            <img src={active.media} alt={`${active.title} in the Rulix workspace`} />
+          </div>
+        </div>
+        <div className="review-loop__steps" role="list" aria-label="Rulix review workflow">
+          {WORKFLOW.map((step, index) => (
+            <button
+              className={index === activeStep ? "is-active" : ""}
+              type="button"
+              role="listitem"
+              aria-pressed={index === activeStep}
+              key={step.title}
+              onClick={() => onStepChange(index)}
+              onFocus={() => onStepChange(index)}
+              onMouseEnter={() => onStepChange(index)}
+            >
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <div>
+                <strong>{step.title}</strong>
+                <p>{step.copy}</p>
+              </div>
+            </button>
           ))}
         </div>
       </div>
@@ -651,63 +685,42 @@ function ProblemCards() {
   );
 }
 
-function ProductDemo({
-  activeDemo,
-  onDemoChange,
-  reducedMotion
-}: {
-  activeDemo: DemoMediaKey;
-  onDemoChange: (demo: DemoMediaKey) => void;
-  reducedMotion: boolean;
-}) {
-  const active = demoModules.find((demo) => demo.key === activeDemo) ?? demoModules[0];
-  const activeMedia = demoMediaCatalog[active.key];
+function Comparison({ activeRow, onRowChange }: { activeRow: ComparisonKey; onRowChange: (row: ComparisonKey) => void }) {
+  const active = COMPARISON_ROWS.find((row) => row.key === activeRow) ?? COMPARISON_ROWS[0];
 
   return (
-    <section className="site-section product-demo-section" id="product-demo">
-      <div className="site-container product-demo-grid">
-        <div>
-          <SectionHeader
-            label="Product in action"
-            title="See what Rulix helps reviewers catch."
-            copy="The product stays close to the memo: analysis, evidence gaps, reviewer actions, audit trail, and export state."
-          />
-          <div className="demo-stepper demo-module-tabs" role="tablist" aria-label="Rulix product demos">
-            {demoModules.map((demo) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeDemo === demo.key}
-                aria-controls={`demo-panel-${demo.key}`}
-                aria-label={`${demo.shortTitle} demo, ${demoMediaCatalog[demo.key].duration}`}
-                className={activeDemo === demo.key ? "is-active" : ""}
-                id={`demo-tab-${demo.key}`}
-                key={demo.key}
-                onClick={() => onDemoChange(demo.key)}
-              >
-                <span>{demoMediaCatalog[demo.key].duration}</span>
-                {demo.shortTitle}
-              </button>
-            ))}
-          </div>
+    <section className="rulix-band rulix-band--dark comparison-section">
+      <div className="rulix-shell comparison-section__grid">
+        <div className="comparison-section__copy">
+          <h2>Not another answer.<br />A review record.</h2>
+          <p>Rulix keeps the why, the what, and the decision in one place.</p>
         </div>
-        <div
-          className="demo-proof-panel"
-          id={`demo-panel-${active.key}`}
-          role="tabpanel"
-          aria-labelledby={`demo-tab-${active.key}`}
-        >
-          <ProductVideo media={activeMedia} reducedMotion={reducedMotion} autoPlay />
-          <div className="demo-proof-copy">
-            <span>{activeMedia.buyerQuestionAnswered}</span>
-            <h3>{active.title}</h3>
-            <p>{active.copy}</p>
-            <div className="demo-proof-pills">
-              {active.proof.map((item) => (
-                <span key={item}>{item}</span>
-              ))}
-            </div>
-            <strong>{active.outcome}</strong>
+        <div className="comparison-table" role="table" aria-label="Generic AI chat compared with Rulix review">
+          <div className="comparison-table__row comparison-table__head" role="row">
+            <span role="columnheader">Review need</span>
+            <span role="columnheader">Generic AI chat</span>
+            <span role="columnheader">Rulix review</span>
+          </div>
+          {COMPARISON_ROWS.map((row) => (
+            <button
+              className={row.key === activeRow ? "comparison-table__row is-active" : "comparison-table__row"}
+              type="button"
+              role="row"
+              aria-pressed={row.key === activeRow}
+              key={row.key}
+              onClick={() => onRowChange(row.key)}
+            >
+              <strong role="cell">{row.label}</strong>
+              <span role="cell">{row.generic}</span>
+              <span role="cell">
+                {row.rulix}
+                <ArrowRight size={16} aria-hidden="true" />
+              </span>
+            </button>
+          ))}
+          <div className="comparison-table__inspect" aria-live="polite">
+            <SearchCheck size={18} aria-hidden="true" />
+            <p><strong>{active.label}:</strong> {active.inspect}</p>
           </div>
         </div>
       </div>
@@ -715,213 +728,179 @@ function ProductDemo({
   );
 }
 
-function ProductVideo({
-  media,
-  reducedMotion,
-  autoPlay
-}: {
-  media: DemoMedia;
-  reducedMotion: boolean;
-  autoPlay?: boolean;
-}) {
-  if (reducedMotion) {
-    return (
-      <div className="proof-video is-still">
-        <img src={media.still} alt={`${media.title} still`} loading="lazy" />
-      </div>
-    );
-  }
+function TrustSection({ activeItem, onItemChange }: { activeItem: TrustKey; onItemChange: (item: TrustKey) => void }) {
+  const active = TRUST_ITEMS.find((item) => item.key === activeItem) ?? TRUST_ITEMS[0];
 
   return (
-    <div className="proof-video">
-      <video
-        key={media.video}
-        muted
-        loop
-        playsInline
-        autoPlay={autoPlay}
-        preload="metadata"
-        poster={media.poster}
-        aria-label={`${media.title} product demo video`}
-      >
-        <source src={media.video} type="video/mp4" />
-      </video>
-    </div>
+    <section className="rulix-band trust-section" id="trust">
+      <div className="rulix-shell trust-section__grid">
+        <div className="trust-section__copy">
+          <h2>Clear boundaries,<br />visible at every step.</h2>
+          <p>Rulix is built for reviewer control and an auditable trail—not autonomous legal judgment.</p>
+          <a href="#review-loop">Learn how the review works <ArrowRight size={15} aria-hidden="true" /></a>
+        </div>
+        <div className="trust-accordion">
+          {TRUST_ITEMS.map((item) => {
+            const expanded = item.key === activeItem;
+            const Icon = item.icon;
+            return (
+              <article className={expanded ? "trust-item is-open" : "trust-item"} key={item.key}>
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={`trust-panel-${item.key}`}
+                  onClick={() => onItemChange(item.key)}
+                >
+                  <span><Icon size={17} aria-hidden="true" /></span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <small>{item.summary}</small>
+                  </div>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </button>
+                {expanded ? <p id={`trust-panel-${item.key}`}>{item.detail}</p> : null}
+              </article>
+            );
+          })}
+        </div>
+        <figure className="trust-preview" key={active.key}>
+          <div className="trust-preview__top">
+            <span>Inspecting</span>
+            <strong>{active.title}</strong>
+          </div>
+          <img src={active.media} alt={`${active.title} shown in Rulix`} />
+          <figcaption>{active.detail}</figcaption>
+        </figure>
+      </div>
+    </section>
+  );
+}
+
+function UseCases({ activeUseCase, onUseCaseChange }: { activeUseCase: UseCaseKey; onUseCaseChange: (item: UseCaseKey) => void }) {
+  const active = USE_CASES.find((item) => item.key === activeUseCase) ?? USE_CASES[0];
+  const ActiveIcon = active.icon;
+
+  return (
+    <section className="rulix-band use-cases" id="use-cases">
+      <div className="rulix-shell use-cases__grid">
+        <div className="use-cases__copy">
+          <h2>Built for the people<br />who have to show<br />their work.</h2>
+          <p>Different teams. The same outcome: clearer reasoning, defensible decisions, and a record that survives handoff.</p>
+        </div>
+        <div className="use-cases__stage">
+          <div className="use-case-tabs" role="tablist" aria-label="Rulix use cases">
+            {USE_CASES.map((item) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={item.key === activeUseCase}
+                aria-controls={`use-case-panel-${item.key}`}
+                className={item.key === activeUseCase ? "is-active" : ""}
+                id={`use-case-tab-${item.key}`}
+                key={item.key}
+                onClick={() => onUseCaseChange(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <article
+            className="use-case-panel"
+            id={`use-case-panel-${active.key}`}
+            role="tabpanel"
+            aria-labelledby={`use-case-tab-${active.key}`}
+            key={active.key}
+          >
+            <div className="use-case-panel__copy">
+              <ActiveIcon size={22} aria-hidden="true" />
+              <h3>{active.title}</h3>
+              <p>{active.copy}</p>
+              <span>Previewing: {active.preview}</span>
+            </div>
+            <img src="/marketing/demos/demo-resolve-review-gaps.webp" alt={`${active.preview} in Rulix`} />
+          </article>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function FitCheck() {
   return (
-    <section className="site-section fit-check-section" id="fit-check">
-      <div className="site-container">
-        <SectionHeader
-          label="Fit check"
-          title="Know when Rulix belongs in the workflow."
-          copy="Rulix supports memo review. It is not autopilot legal judgment, guaranteed classification, or a place for unmanaged sensitive data."
+    <section className="rulix-band rulix-band--dark fit-check" id="fit-check">
+      <div className="rulix-shell fit-check__grid">
+        <h2>Rulix belongs where review needs structure—not autopilot.</h2>
+        <FitList
+          title="A fit when"
+          items={[
+            "You need reviewer-owned workflows.",
+            "You want evidence-aware gap finding.",
+            "You use public, sanitized, or approved data.",
+            "You need an exportable review record."
+          ]}
         />
-        <div className="fit-check-grid">
-          {fitCards.map((card) => (
-            <article className={`fit-card ${card.tone}`} tabIndex={0} key={card.title}>
-              <card.icon size={22} aria-hidden="true" />
-              <h3>{card.title}</h3>
-              <p>{card.copy}</p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section className="site-section" id="how-it-works">
-      <div className="site-container">
-        <SectionHeader
-          label="How it works"
-          title="From draft memo to review-ready record."
-          copy="The workflow turns scattered draft analysis into a record reviewers can inspect, revise, and approve."
+        <FitList
+          muted
+          title="Not a fit when"
+          items={[
+            "You want the system to make legal determinations.",
+            "You cannot provide context or evidence.",
+            "You need a general-purpose chat assistant.",
+            "You cannot define your review process."
+          ]}
         />
-        <div className="workflow-grid">
-          {workflowSteps.map((step, index) => (
-            <article className="workflow-card" key={step.title}>
-              <span className="step-number">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{step.title}</h3>
-              <p>{step.copy}</p>
-              <div>{step.panel}</div>
-            </article>
-          ))}
-        </div>
       </div>
     </section>
   );
 }
 
-function ComparisonSection() {
+function FitList({ title, items, muted = false }: { title: string; items: string[]; muted?: boolean }) {
   return (
-    <section className="site-section comparison-section">
-      <div className="site-container comparison-grid">
-        <SectionHeader
-          label="Why Rulix"
-          title="Built for structured review, not generic chat."
-          copy="Rulix is built around export-control memo work: findings, evidence requests, reviewer resolution, and record export."
-        />
-        <div className="comparison-table" role="table" aria-label="Rulix comparison">
-          <div className="comparison-row comparison-head" role="row">
-            <span>Need</span>
-            <span>Generic AI chatbot</span>
-            <span>Manual review</span>
-            <span>Rulix</span>
-          </div>
-          {comparisonRows.map((row) => (
-            <div className="comparison-row" role="row" key={row.dimension}>
-              <span>{row.dimension}</span>
-              <span>{row.chatbot}</span>
-              <span>{row.manual}</span>
-              <strong>{row.rulix}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+    <div className={muted ? "fit-list is-muted" : "fit-list"}>
+      <strong>{title}</strong>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>
+            {muted ? <X size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
-function TrustSection() {
-  return (
-    <section className="site-section trust-section" id="trust">
-      <div className="site-container trust-grid">
-        <div>
-          <SectionHeader
-            label="Trust"
-            title="Human judgment stays in control."
-            copy="Rulix gives reviewers structured findings and traceable suggestions without turning software into the final authority."
-          />
-          <MarketingButton href="#request-access" variant="secondary">
-            Talk through your workflow
-            <ArrowRight size={16} aria-hidden="true" />
-          </MarketingButton>
-        </div>
-        <div className="trust-list">
-          {trustItems.map((item) => (
-            <FeatureCard key={item.title} title={item.title} copy={item.copy} icon={item.icon} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function UseCases({
-  activeUseCase,
-  onUseCaseChange
-}: {
-  activeUseCase: UseCaseKey;
-  onUseCaseChange: (useCase: UseCaseKey) => void;
-}) {
-  const active = buyerUseCases.find((item) => item.key === activeUseCase) ?? buyerUseCases[0];
-
-  return (
-    <section className="site-section" id="use-cases">
-      <div className="site-container">
-        <SectionHeader
-          label="Use cases"
-          title="For teams who own export-control review."
-          copy="Each team gets a shared review surface while final regulatory judgment stays with qualified reviewers."
-        />
-        <div className="use-case-selector" role="tablist" aria-label="Buyer use cases">
-          {buyerUseCases.map((item) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeUseCase === item.key}
-              aria-controls={`use-case-panel-${item.key}`}
-              className={activeUseCase === item.key ? "is-active" : ""}
-              id={`use-case-tab-${item.key}`}
-              onClick={() => onUseCaseChange(item.key)}
-              key={item.key}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <article
-          className="use-case-proof-card"
-          id={`use-case-panel-${active.key}`}
-          role="tabpanel"
-          aria-labelledby={`use-case-tab-${active.key}`}
-        >
-          <active.icon size={26} aria-hidden="true" />
-          <div>
-            <span>{active.who}</span>
-            <h3>{active.title}</h3>
-            <p>{active.outcome}</p>
-            <strong>{active.fit}</strong>
-          </div>
-        </article>
-      </div>
-    </section>
-  );
-}
-
-function FaqSection({
+function ConversionSection({
+  accessError,
+  accessStatus,
   activeFaq,
-  onFaqChange
+  form,
+  onFaqChange,
+  onFormChange,
+  onSubmit
 }: {
+  accessError: string;
+  accessStatus: AccessFormStatus;
   activeFaq: number;
+  form: AccessFormState;
   onFaqChange: (faq: number) => void;
+  onFormChange: (form: AccessFormState) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const isSubmitting = accessStatus === "submitting";
+
   return (
-    <section className="site-section faq-section" id="faq">
-      <div className="site-container faq-grid">
-        <SectionHeader
-          label="FAQ"
-          title="Plain answers for careful buyers."
-          copy="Rulix helps reviewers work faster and explain decisions better. It does not replace qualified judgment."
-        />
+    <section className="rulix-band conversion-section" id="request-access">
+      <div className="rulix-shell conversion-section__grid">
+        <div className="conversion-section__copy">
+          <h2>Bring a memo. Leave with the questions that matter.</h2>
+          <p>
+            Use a public, sanitized, or approved sample. We’ll show you where the reasoning holds, where it breaks, and what your reviewer should ask next.
+          </p>
+        </div>
         <div className="faq-list">
-          {faqItems.map((item, index) => {
-            const expanded = activeFaq === index;
+          {FAQS.map((item, index) => {
+            const expanded = index === activeFaq;
             return (
               <article className={expanded ? "faq-item is-open" : "faq-item"} key={item.question}>
                 <button
@@ -930,159 +909,110 @@ function FaqSection({
                   aria-controls={`faq-answer-${index}`}
                   onClick={() => onFaqChange(expanded ? -1 : index)}
                 >
-                  <span>{item.question}</span>
-                  <ArrowRight size={17} aria-hidden="true" />
+                  {item.question}
+                  <ChevronDown size={17} aria-hidden="true" />
                 </button>
-                {expanded && <p id={`faq-answer-${index}`}>{item.answer}</p>}
+                {expanded ? <p id={`faq-answer-${index}`}>{item.answer}</p> : null}
               </article>
             );
           })}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function CredibilitySection() {
-  return (
-    <section className="site-section credibility-section" id="sample-review">
-      <div className="site-container credibility-grid">
-        <div>
-          <SectionHeader
-            label="Credibility"
-            title="Designed for technical trade decisions."
-            copy="Built around where reviews get stuck: scattered comments, missing facts, unresolved assumptions, and the final trail."
-          />
-          <div className="credibility-proof-list" aria-label="Rulix proof points">
-            <span>Memo reasoning</span>
-            <span>Evidence gaps</span>
-            <span>Reviewer signoff</span>
-          </div>
-        </div>
-        <article className="case-study-card">
-          <span>Illustrative use case</span>
-          <h3>A cleaner path before final memo approval</h3>
-          <div className="case-study-columns">
-            <div>
-              <strong>Before</strong>
-              <p>Three reviewers, scattered comments, unresolved evidence requests, and an unclear decision trail.</p>
+        <form className="access-form" aria-busy={isSubmitting} onSubmit={onSubmit}>
+          {accessStatus === "success" ? (
+            <div className="access-form__success access-form__wide" role="status" aria-live="polite">
+              <CircleCheck size={24} aria-hidden="true" />
+              <div>
+                <strong>Request received.</strong>
+                <p>We'll reply to {form.email} within one business day with access and next steps.</p>
+              </div>
             </div>
-            <div>
-              <strong>After</strong>
-              <p>Structured findings, resolved gaps, and an exportable review record ready for final human signoff.</p>
-            </div>
-          </div>
-          <small>Illustrative only. Not a customer reference.</small>
-        </article>
-      </div>
-    </section>
-  );
-}
-
-function SecuritySection() {
-  return (
-    <section className="site-section security-section">
-      <div className="site-container">
-        <SectionHeader
-          label="Security and privacy"
-          title="Security-conscious by design."
-          copy="Built for controlled workflows: account-based access, review history, and clear guidance about what belongs in a hosted workspace."
-        />
-        <div className="security-grid">
-          {securityItems.map((item) => (
-            <FeatureCard key={item.title} title={item.title} copy={item.copy} icon={item.icon} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RequestAccessSection({
-  form,
-  submitted,
-  onFormChange,
-  onSubmit
-}: {
-  form: RequestAccessForm;
-  submitted: boolean;
-  onFormChange: (form: RequestAccessForm) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <section className="site-section request-section" id="request-access">
-      <div className="site-container request-grid">
-        <div>
-          <SectionHeader
-            label="Request access"
-            title="See if Rulix fits your review workflow."
-            copy="Send a few details. We'll use them to understand fit and suggest a sensible next step."
-          />
-          <a className="sample-link" href="#sample-review">
-            See sample review
-            <ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>
-        <form className="access-form" onSubmit={onSubmit}>
-          <label>
-            Work email
-            <input
-              type="email"
-              required
-              value={form.email}
-              onChange={(event) => onFormChange({ ...form, email: event.target.value })}
-              placeholder="you@company.com"
-            />
-          </label>
-          <label>
-            Company
-            <input
-              required
-              value={form.company}
-              onChange={(event) => onFormChange({ ...form, company: event.target.value })}
-              placeholder="Organization or lab"
-            />
-          </label>
-          <label>
-            Role
-            <input
-              required
-              value={form.role}
-              onChange={(event) => onFormChange({ ...form, role: event.target.value })}
-              placeholder="Compliance, counsel, founder, operations"
-            />
-          </label>
-          <label>
-            Expected review volume
-            <select
-              value={form.volume}
-              onChange={(event) => onFormChange({ ...form, volume: event.target.value })}
-            >
-              <option>1-5 reviews/month</option>
-              <option>6-20 reviews/month</option>
-              <option>21-50 reviews/month</option>
-              <option>50+ reviews/month</option>
-            </select>
-          </label>
-          <label className="sample-checkbox">
-            <input
-              type="checkbox"
-              checked={form.sampleReady}
-              onChange={(event) => onFormChange({ ...form, sampleReady: event.target.checked })}
-            />
-            <span>
-              <UploadCloud size={18} aria-hidden="true" />
-              I have a redacted memo sample ready.
-            </span>
-          </label>
-          <button className="site-button site-button-primary site-button-full" type="submit">
-            <Mail size={18} aria-hidden="true" />
-            Request access
-          </button>
-          {submitted && (
-            <p className="form-confirmation">
-              Opening your mail client. Attach only public, sanitized, or approved samples.
-            </p>
+          ) : (
+            <>
+              <label className="access-form__honeypot" aria-hidden="true">
+                <span>Website</span>
+                <input name="website" tabIndex={-1} autoComplete="off" />
+              </label>
+              <Field label="Work email">
+                <input
+                  required
+                  autoComplete="email"
+                  disabled={isSubmitting}
+                  maxLength={254}
+                  name="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={form.email}
+                  onChange={(event) => onFormChange({ ...form, email: event.target.value })}
+                />
+              </Field>
+              <Field label="Organization">
+                <input
+                  required
+                  autoComplete="organization"
+                  disabled={isSubmitting}
+                  maxLength={160}
+                  name="organization"
+                  placeholder="Company or university"
+                  value={form.organization}
+                  onChange={(event) => onFormChange({ ...form, organization: event.target.value })}
+                />
+              </Field>
+              <Field label="Role">
+                <input
+                  required
+                  autoComplete="organization-title"
+                  disabled={isSubmitting}
+                  maxLength={120}
+                  name="role"
+                  placeholder="Export control, counsel, operations"
+                  value={form.role}
+                  onChange={(event) => onFormChange({ ...form, role: event.target.value })}
+                />
+              </Field>
+              <Field label="Review volume">
+                <select
+                  disabled={isSubmitting}
+                  name="volume"
+                  value={form.volume}
+                  onChange={(event) => onFormChange({ ...form, volume: event.target.value })}
+                >
+                  <option>1-5 reviews / month</option>
+                  <option>6-20 reviews / month</option>
+                  <option>21-50 reviews / month</option>
+                  <option>50+ reviews / month</option>
+                </select>
+              </Field>
+              <Field className="access-form__wide" label="What would you like to review?">
+                <textarea
+                  disabled={isSubmitting}
+                  maxLength={1200}
+                  name="review"
+                  rows={4}
+                  placeholder="A self-classification memo, commodity review, due-diligence memo..."
+                  value={form.review}
+                  onChange={(event) => onFormChange({ ...form, review: event.target.value })}
+                />
+              </Field>
+              <button
+                className="rulix-button rulix-button--primary access-form__wide"
+                disabled={isSubmitting}
+                type="submit"
+              >
+                {isSubmitting ? "Sending request..." : "Request access"}
+                <ArrowRight size={17} aria-hidden="true" />
+              </button>
+              <p className="access-form__promise access-form__wide">
+                We usually reply within one business day. Please don't send controlled technical data through this form.
+              </p>
+              {accessStatus === "error" ? (
+                <div className="access-form__error access-form__wide" role="alert">
+                  <CircleAlert size={18} aria-hidden="true" />
+                  <p>
+                    {accessError} Try again, or <a href={`mailto:${CONTACT_EMAIL}`}>email us directly</a>.
+                  </p>
+                </div>
+              ) : null}
+            </>
           )}
         </form>
       </div>
@@ -1090,72 +1020,119 @@ function RequestAccessSection({
   );
 }
 
-function SeoSection() {
+function Field({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <section className="site-section seo-section" aria-label="Rulix topic pages">
-      <div className="site-container">
-        <SectionHeader
-          label="Search paths"
-          title="Choose the review path that matches the job."
-          copy="Each page keeps the same review-support boundary for a specific use case."
-        />
-        <div className="seo-link-grid">
-          {seoLinks.map((item) => (
-            <a href={item.path} key={item.path}>
-              <strong>{item.heroTitle}</strong>
-              <span>{item.description}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SectionHeader({ label, title, copy }: { label: string; title: string; copy: string }) {
-  return (
-    <div className="site-section-header">
+    <label className={className}>
       <span>{label}</span>
-      <h2>{title}</h2>
-      <p>{copy}</p>
-    </div>
-  );
-}
-
-function FeatureCard({
-  title,
-  copy,
-  icon: Icon
-}: {
-  title: string;
-  copy: string;
-  icon: LucideIcon;
-}) {
-  return (
-    <article className="feature-card">
-      <Icon size={22} aria-hidden="true" />
-      <h3>{title}</h3>
-      <p>{copy}</p>
-    </article>
-  );
-}
-
-function MarketingButton({
-  href,
-  variant,
-  className,
-  children
-}: {
-  href: string;
-  variant: "primary" | "secondary" | "text";
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <a className={["site-button", `site-button-${variant}`, className].filter(Boolean).join(" ")} href={href}>
       {children}
-    </a>
+    </label>
   );
+}
+
+function ProductMedia({
+  autoPlay = false,
+  className = "",
+  label,
+  poster,
+  reducedMotion,
+  video
+}: {
+  autoPlay?: boolean;
+  className?: string;
+  label: string;
+  poster: string;
+  reducedMotion: boolean;
+  video: string;
+}) {
+  return (
+    <figure className={["product-media", className].filter(Boolean).join(" ")}>
+      <div className="product-media__top">
+        <BrandLogo tone="light" size="compact" />
+        <span>Reviewer workspace</span>
+        <strong>Human signoff</strong>
+      </div>
+      {reducedMotion ? (
+        <img src={poster} alt={label} />
+      ) : (
+        <video muted loop playsInline autoPlay={autoPlay} preload="metadata" poster={poster} aria-label={label}>
+          <source src={video} type="video/mp4" />
+        </video>
+      )}
+    </figure>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="rulix-footer">
+      <div className="rulix-shell rulix-footer__grid">
+        <div>
+          <BrandLogo tone="dark" size="compact" />
+          <p>Export-control memo review with human signoff.</p>
+          <small>© 2026 Rulix. Public, sanitized, or approved input only.</small>
+        </div>
+        <FooterLinks title="Product" links={[["Product overview", "#product"], ["Review loop", "#review-loop"], ["Use cases", "#use-cases"]]} />
+        <FooterLinks title="Trust" links={[["How it works", "#trust"], ["Security and data handling", "/security"], ["Fit check", "#fit-check"]]} />
+        <FooterLinks title="Company" links={[["About", "/#top"], ["Contact", `mailto:${CONTACT_EMAIL}`], ["Sign in", "https://app.rulix.cloud"]]} />
+        <FooterLinks title="Legal" links={[["Privacy policy", "/legal"], ["Terms of service", "/legal"]]} />
+      </div>
+    </footer>
+  );
+}
+
+function FooterLinks({ title, links }: { title: string; links: Array<[string, string]> }) {
+  return (
+    <nav aria-label={title}>
+      <strong>{title}</strong>
+      {links.map(([label, href]) => <a href={href} key={label}>{label}</a>)}
+    </nav>
+  );
+}
+
+function usePrefersReducedMotion() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(query.matches);
+    const update = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reducedMotion;
+}
+
+function useSectionState() {
+  const [activeSection, setActiveSection] = useState<string>("product");
+  const [scrolled, setScrolled] = useState(false);
+  const frameRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const update = () => {
+      frameRef.current = undefined;
+      setScrolled(window.scrollY > 24);
+      let current = "product";
+      for (const id of SECTION_IDS) {
+        const element = document.getElementById(id);
+        if (element && element.getBoundingClientRect().top <= 190) current = id;
+      }
+      setActiveSection(current);
+    };
+    const onScroll = () => {
+      if (frameRef.current !== undefined) return;
+      frameRef.current = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frameRef.current !== undefined) window.cancelAnimationFrame(frameRef.current);
+    };
+  }, []);
+
+  return { activeSection, scrolled };
 }
 
 export function isMarketingPath(pathname: string) {
@@ -1181,21 +1158,6 @@ function applyMarketingMetadata(page: PageMeta) {
   upsertMeta("og:image", `${window.location.origin}/marketing/demos/hero-rulix-review-loop.png`, "property");
   upsertMeta("twitter:card", "summary_large_image");
   upsertCanonical(`${window.location.origin}${page.path}`);
-}
-
-function usePrefersReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(query.matches);
-    const update = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  return reducedMotion;
 }
 
 function upsertMeta(name: string, content: string, attribute = "name") {

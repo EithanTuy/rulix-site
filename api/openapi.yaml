@@ -11,6 +11,75 @@ servers:
 security:
   - cookieAuth: []
 paths:
+  /access-requests:
+    post:
+      summary: Create a public Rulix access request
+      operationId: createAccessRequest
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, organization, role, volume]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                organization:
+                  type: string
+                  maxLength: 160
+                role:
+                  type: string
+                  maxLength: 120
+                volume:
+                  type: string
+                  enum:
+                    - 1-5 reviews / month
+                    - 6-20 reviews / month
+                    - 21-50 reviews / month
+                    - 50+ reviews / month
+                review:
+                  type: string
+                  maxLength: 1200
+                sourcePath:
+                  type: string
+                  maxLength: 200
+                website:
+                  type: string
+                  description: Honeypot field; legitimate clients should leave this empty.
+                  maxLength: 200
+      responses:
+        "201":
+          description: Access request persisted or a honeypot submission was quietly discarded
+        "400":
+          description: Invalid request fields
+        "429":
+          description: Too many requests
+  /admin/access-requests:
+    get:
+      summary: List persisted public access requests
+      operationId: listAccessRequests
+      responses:
+        "200":
+          description: Access request list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests]
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccessRequest"
+        "401":
+          description: Authentication required
+        "403":
+          description: Admin access required
   /admin/users:
     get:
       summary: List one bounded page of aggregate-backed account activity
@@ -1581,6 +1650,31 @@ components:
         maxLength: 4096
         pattern: '^[A-Za-z0-9_.-]+$'
   schemas:
+    AccessRequest:
+      type: object
+      required: [id, email, organization, role, volume, sourcePath, status, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        organization:
+          type: string
+        role:
+          type: string
+        volume:
+          type: string
+        review:
+          type: string
+        sourcePath:
+          type: string
+        status:
+          type: string
+          enum: [new]
+        createdAt:
+          type: string
+          format: date-time
     ErrorResponse:
       type: object
       required: [error]

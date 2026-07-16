@@ -84,6 +84,55 @@ describe("Rulix ECCN API", () => {
     expect(response.body).toEqual({ user: null, csrfToken: null });
   });
 
+  it("persists public access requests and exposes them to admins", async () => {
+    const admin = await signedInAgent("access-admin@example.com", "export-control-officer");
+    const created = await request(admin.app)
+      .post("/api/access-requests")
+      .send({
+        email: "reviewer@example.edu",
+        organization: "Example University",
+        role: "Export control officer",
+        volume: "6-20 reviews / month",
+        review: "A self-classification memo",
+        sourcePath: "/university-export-control-review"
+      })
+      .expect(201);
+
+    expect(created.body.request.id).toMatch(/^access-/);
+    expect(created.body.message).toContain("one business day");
+    await request(admin.app).get("/api/admin/access-requests").expect(401);
+
+    const listed = await admin.agent.get("/api/admin/access-requests").expect(200);
+    expect(listed.body.requests).toHaveLength(1);
+    expect(listed.body.requests[0]).toMatchObject({
+      email: "reviewer@example.edu",
+      organization: "Example University",
+      status: "new",
+      sourcePath: "/university-export-control-review"
+    });
+  });
+
+  it("rejects invalid access requests and quietly discards honeypot submissions", async () => {
+    const { app, store } = testHarness();
+    await request(app)
+      .post("/api/access-requests")
+      .send({ email: "not-an-email" })
+      .expect(400);
+
+    await request(app)
+      .post("/api/access-requests")
+      .send({
+        email: "bot@example.com",
+        organization: "Bot Corp",
+        role: "Bot",
+        volume: "1-5 reviews / month",
+        website: "https://spam.example"
+      })
+      .expect(201);
+
+    expect(await store.listAccessRequests()).toEqual([]);
+  });
+
   it("limits production CORS to trusted app origins", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = "production";
