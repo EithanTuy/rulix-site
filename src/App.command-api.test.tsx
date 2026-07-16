@@ -42,9 +42,11 @@ vi.mock("./lib/apiClient", () => ({
   },
   ApiError: class ApiError extends Error {
     status: number;
-    constructor(status: number, message: string) {
+    code?: string;
+    constructor(status: number, message: string, code?: string) {
       super(message);
       this.status = status;
+      this.code = code;
     }
   },
   ...api,
@@ -122,6 +124,57 @@ describe("rendered paged command workspace", () => {
     // The rendered memo body may repeat its Markdown title at a lower heading
     // level. Assert the workspace title specifically so the query is stable.
     expect(screen.getByRole("heading", { name: primary.title, level: 1 })).toBeInTheDocument();
+  });
+
+  it("restores and validates a migrated review even when it is not on the first summary page", async () => {
+    const migrated = review("paste-1782080000000", "Migrated pasted review", "c");
+    api.loadWorkspacePreferences.mockResolvedValue({ version: 4, selectedMemoId: migrated.id });
+    api.getReviewDetail.mockImplementation(async (memoId: string) => ({
+      review: memoId === migrated.id ? migrated : primary
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: migrated.title, level: 1 })).toBeInTheDocument();
+    expect(api.getReviewDetail).toHaveBeenCalledWith(migrated.id);
+    await waitFor(() => expect(api.updateWorkspacePreferences).not.toHaveBeenCalled(), { timeout: 700 });
+  });
+
+  it("removes a deleted restored review, selects the next summary, and repairs preferences once", async () => {
+    const deletedId = "upload-1782080000000";
+    const { ApiError } = await import("./lib/apiClient");
+    api.loadWorkspacePreferences.mockResolvedValue({ version: 7, selectedMemoId: deletedId });
+    api.getReviewDetail.mockImplementation(async (memoId: string) => {
+      if (memoId === deletedId) throw new ApiError(404, "Review not found", "review_not_found");
+      return { review: primary };
+    });
+    api.updateWorkspacePreferences.mockResolvedValue({ version: 8, selectedMemoId: primary.id });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: primary.title, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText(/that review no longer exists/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(api.updateWorkspacePreferences).toHaveBeenCalledWith(7, {
+        selectedMemoId: primary.id,
+        activeMemoBuilderSessionId: null
+      });
+    });
+    expect(api.updateWorkspacePreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps retryable service failures selected and succeeds when the reviewer retries", async () => {
+    const { ApiError } = await import("./lib/apiClient");
+    api.getReviewDetail.mockRejectedValueOnce(new ApiError(503, "Service unavailable", "service_unavailable"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Review details unavailable" })).toBeInTheDocument();
+    expect((await screen.findAllByText(/temporarily unavailable/i)).length).toBeGreaterThan(0);
+    api.getReviewDetail.mockResolvedValue({ review: primary });
+    fireEvent.click(screen.getByRole("button", { name: /retry loading review/i }));
+
+    expect(await screen.findByRole("heading", { name: primary.title, level: 1 })).toBeInTheDocument();
   });
 });
 

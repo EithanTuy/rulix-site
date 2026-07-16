@@ -1618,7 +1618,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^review-[A-Za-z0-9_-]+$'
+        pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
         maxLength: 128
     AiApprovalRequestId:
       name: approvalRequestId
@@ -1936,7 +1936,7 @@ components:
           const: council
         reviewId:
           type: string
-          pattern: '^review-[A-Za-z0-9_-]+$'
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
           maxLength: 128
         depth:
           $ref: "#/components/schemas/AnalysisDepth"
@@ -1960,7 +1960,7 @@ components:
           const: memo-chat
         reviewId:
           type: string
-          pattern: '^review-[A-Za-z0-9_-]+$'
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
           maxLength: 128
         message:
           type: string
@@ -2526,6 +2526,8 @@ components:
           minimum: 0
         selectedMemoId:
           type: string
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
+          maxLength: 128
         activeMemoBuilderSessionId:
           type: string
     WorkspacePreferenceUpdateCommand:
@@ -2538,6 +2540,8 @@ components:
           minimum: 0
         selectedMemoId:
           type: [string, "null"]
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
+          maxLength: 128
         activeMemoBuilderSessionId:
           type: [string, "null"]
     MemoBuilderSession:
@@ -2567,6 +2571,8 @@ components:
           maxLength: 8000
         contextMemoId:
           type: string
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
+          maxLength: 128
         pendingInput:
           type: string
           maxLength: 8000
@@ -2624,6 +2630,8 @@ components:
             maxLength: 1000
         reviewContextMemoId:
           type: string
+          pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
+          maxLength: 128
     VersionedMemoBuilderSession:
       type: object
       required: [session, version]

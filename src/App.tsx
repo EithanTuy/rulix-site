@@ -46,6 +46,7 @@ import type { ReviewSummary } from "./lib/apiClient";
 import { memoFromFile } from "./lib/documentIntake";
 import { mergeChatPage } from "./lib/chatOrdering";
 import { buildReviewReport } from "./lib/report";
+import { isReviewId } from "./shared/reviewIds";
 import type {
   AppView,
   AuditEvent,
@@ -80,6 +81,12 @@ type AuthState =
   | { status: "checking" }
   | { status: "signed-out"; error?: string }
   | { status: "signed-in"; user: UserProfile };
+
+type ReviewLoadFailure = {
+  memoId: string;
+  message: string;
+  retryable: boolean;
+};
 
 export interface AuthLinkBootstrap {
   mode?: Extract<AuthMode, "invite" | "reset-complete">;
@@ -129,6 +136,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   const [auditCursors, setAuditCursors] = useState<Record<string, string | undefined>>({});
   const [chatCursors, setChatCursors] = useState<Record<string, string | undefined>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | undefined>();
+  const [detailFailure, setDetailFailure] = useState<ReviewLoadFailure | undefined>();
   const [selectedMemoId, setSelectedMemoId] = useState<string | undefined>();
   const [search, setSearch] = useState("");
   const [intakeWarning, setIntakeWarning] = useState<string | undefined>();
@@ -161,6 +169,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   const workspaceSaveChainRef = useRef<Promise<void>>(Promise.resolve());
   const loadedReviewDetailsRef = useRef(new Set<string>());
   const detailRequestsRef = useRef(new Map<string, Promise<void>>());
+  const restoredSelectionRef = useRef<string | undefined>(undefined);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   const activeMemos = useMemo(() => memos.filter((memo) => !memo.archivedAt), [memos]);
@@ -340,7 +349,12 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       setSelectedMemoId(undefined);
       return;
     }
-    if (activeMemos.length > 0 && selectedMemoId && !activeMemos.some((memo) => memo.id === selectedMemoId)) {
+    if (
+      activeMemos.length > 0
+      && selectedMemoId
+      && !activeMemos.some((memo) => memo.id === selectedMemoId)
+      && restoredSelectionRef.current !== selectedMemoId
+    ) {
       setSelectedMemoId(activeMemos[0].id);
     }
     if (activeMemos.length > 0 && !selectedMemoId) {
@@ -350,7 +364,12 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   useEffect(() => setSelectedFindingId(undefined), [selectedMemo?.id]);
 
   useEffect(() => {
-    if (!selectedMemo || auth.status !== "signed-in") {
+    if (
+      !selectedMemo
+      || auth.status !== "signed-in"
+      || auth.user.role === "submitter"
+      || !backendHealth?.provider.configured
+    ) {
       setCouncilApproval(undefined);
       return;
     }
@@ -368,7 +387,9 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     selectedMemo?.revision,
     selectedMemo?.contentHash,
     analysisMode,
-    auth.status
+    auth.status,
+    currentUser?.role,
+    backendHealth?.provider.configured
   ]);
 
   const filteredMemos = activeMemos.filter((memo) =>
@@ -384,6 +405,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
 
     const request = (async () => {
       setDetailLoadingId(memoId);
+      setDetailFailure((current) => current?.memoId === memoId ? undefined : current);
       const [detail, auditPage, chatPage] = await Promise.all([
         getReviewDetail(memoId),
         listReviewAuditEvents(memoId, { limit: 25 }),
@@ -415,9 +437,22 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         setChatCursors((current) => ({ ...current, [memoId]: chatPage.nextCursor }));
       });
       loadedReviewDetailsRef.current.add(memoId);
+      if (restoredSelectionRef.current === memoId) restoredSelectionRef.current = undefined;
     })()
       .catch((error) => {
-        setSyncNotice(readableApiError(error instanceof Error ? error.message : "Review load failed"));
+        const failure = classifyReviewLoadFailure(memoId, error);
+        if (!failure.retryable) {
+          const nextMemoId = memosRef.current.find((memo) => !memo.archivedAt && memo.id !== memoId)?.id;
+          restoredSelectionRef.current = undefined;
+          loadedReviewDetailsRef.current.delete(memoId);
+          setMemos((current) => current.filter((memo) => memo.id !== memoId));
+          setSelectedMemoId((current) => current === memoId ? nextMemoId : current);
+          setIntakeWarning(failure.message);
+          setDetailFailure(undefined);
+        } else {
+          setDetailFailure(failure);
+        }
+        setSyncNotice(failure.message);
         throw error;
       })
       .finally(() => {
@@ -1188,6 +1223,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     preferenceFingerprintRef.current = "";
     loadedReviewDetailsRef.current.clear();
     detailRequestsRef.current.clear();
+    restoredSelectionRef.current = undefined;
     builderVersionsRef.current.clear();
     builderFingerprintsRef.current.clear();
     persistedBuilderIdsRef.current.clear();
@@ -1204,6 +1240,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     setBuilderCursor(undefined);
     setAuditCursors({});
     setChatCursors({});
+    setDetailFailure(undefined);
   };
 
   const hydratePagedWorkspace = (
@@ -1221,7 +1258,14 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       selectedMemoId: preferences.selectedMemoId ?? null,
       activeMemoBuilderSessionId: preferences.activeMemoBuilderSessionId ?? null
     });
-    setSelectedMemoId(preferences.selectedMemoId ?? summaryMemos[0]?.id);
+    const restoredMemoId = isReviewId(preferences.selectedMemoId)
+      ? preferences.selectedMemoId
+      : undefined;
+    restoredSelectionRef.current = restoredMemoId
+      && !summaryMemos.some((memo) => memo.id === restoredMemoId)
+      ? restoredMemoId
+      : undefined;
+    setSelectedMemoId(restoredMemoId ?? summaryMemos[0]?.id);
     const builderSessions = storedSessions.map((stored) => stored.session);
     builderVersionsRef.current = new Map(
       storedSessions.map((stored) => [stored.session.id, stored.version])
@@ -1376,9 +1420,11 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
                       <p>
                         {detailLoadingId === selectedMemoId
                           ? "Fetching this memo, its analysis, chat, and audit history."
-                          : "The review summary loaded, but its detail request did not finish."}
+                          : detailFailure?.memoId === selectedMemoId
+                            ? detailFailure.message
+                            : "The review summary loaded, but its detail request did not finish."}
                       </p>
-                      {detailLoadingId !== selectedMemoId && (
+                      {detailLoadingId !== selectedMemoId && detailFailure?.retryable !== false && (
                         <button
                           className="button primary"
                           type="button"
@@ -1900,4 +1946,30 @@ function readableApiError(message: string) {
   } catch {
     return message;
   }
+}
+
+export function classifyReviewLoadFailure(memoId: string, error: unknown): ReviewLoadFailure {
+  if (error instanceof ApiError && (error.status === 404 || error.code === "invalid_review_id")) {
+    return {
+      memoId,
+      retryable: false,
+      message: error.status === 404
+        ? "That review no longer exists. It was removed from this queue and your next available review was selected."
+        : "That saved review reference is no longer supported. It was removed from this queue and your next available review was selected."
+    };
+  }
+  if (error instanceof ApiError && error.status === 403) {
+    return {
+      memoId,
+      retryable: false,
+      message: "You no longer have access to that review. Your next available review was selected."
+    };
+  }
+  return {
+    memoId,
+    retryable: true,
+    message: error instanceof ApiError && error.status >= 500
+      ? "Rulix could not load this review because the service is temporarily unavailable. Retry when ready."
+      : "Rulix could not finish loading this review. Check your connection and retry."
+  };
 }

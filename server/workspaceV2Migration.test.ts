@@ -92,7 +92,7 @@ class MemoryMigrationBackend implements WorkspaceMigrationBackend {
 
 function sampleState(commentCount = 0): AccountReviewState {
   const memo: MemoRecord = {
-    id: "memo-1",
+    id: "paste-1782080000000",
     title: "Navigation controller",
     itemFamily: "Avionics",
     owner: "Reviewer",
@@ -339,7 +339,7 @@ describe("workspace v2 migration", () => {
     const backend = new MemoryMigrationBackend();
     const content = new InMemoryWorkspaceContentStore();
     await migrateWorkspaceAccount({ mode: "apply", plan, backend, content, owner: "worker" });
-    const review = backend.items.get(workspaceSk.review("memo-1"))!;
+    const review = backend.items.get(workspaceSk.review("paste-1782080000000"))!;
     review.updatedAt = "2026-07-15T00:00:00.000Z";
     await expect(verifyWorkspaceMigration(plan, backend)).rejects.toBeInstanceOf(WorkspaceIntegrityError);
 
@@ -364,7 +364,7 @@ describe("workspace v2 migration", () => {
         source: "system",
         outcome: "succeeded",
         subjectType: "review",
-        subjectId: "memo-1",
+        subjectId: "paste-1782080000000",
         originalActor: "Legacy Display Name",
         legacyUnverified: true
       }

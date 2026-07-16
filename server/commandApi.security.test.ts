@@ -9,6 +9,81 @@ import { createApp } from "./app";
 import { LocalAccountStore } from "./store";
 
 describe("scoped review command API", () => {
+  it.each([
+    "review-command-compatibility",
+    "paste-1782080000000",
+    "upload-1782080000000",
+    "ai-draft-1782080000000"
+  ])("keeps durable current and migrated review IDs usable across command surfaces: %s", async (reviewId) => {
+    const session = await signedIn(`compat-${reviewId.split("-")[0]}@example.com`);
+    const created = await createReview(session);
+    await session.store.upsertReview(session.user.id, {
+      ...created.review,
+      id: reviewId,
+      documentCode: `LEGACY-${reviewId.split("-")[0].toUpperCase()}`,
+      contentHash: undefined
+    });
+
+    const detail = await session.agent.get(`/api/reviews/${reviewId}`).expect(200);
+    await session.agent.get(`/api/reviews/${reviewId}/audit?limit=25`).expect(200);
+    await session.agent.get(`/api/reviews/${reviewId}/chat?limit=25`).expect(200);
+
+    const preference = await session.agent
+      .patch("/api/account/preferences")
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({ expectedVersion: 0, selectedMemoId: reviewId })
+      .expect(200);
+    expect(preference.body.selectedMemoId).toBe(reviewId);
+
+    const sessionId = `builder-${randomUUID()}`;
+    await session.agent
+      .put(`/api/account/memo-builder/sessions/${sessionId}`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({
+        expectedVersion: 0,
+        session: {
+          id: sessionId,
+          title: "Improve an existing review",
+          dataClass: "proprietary",
+          updatedAt: new Date().toISOString(),
+          contextMemoId: reviewId,
+          messages: [],
+          draft: {
+            title: "Improved memo",
+            itemFamily: "Cryogenic controller",
+            dataClass: "proprietary",
+            memoText: "# Improved memo\n\nReview-ready content.",
+            source: "review-improvement",
+            reviewContextMemoId: reviewId
+          }
+        }
+      })
+      .expect(200);
+
+    const approval = await session.agent
+      .post("/api/ai-approval-requests")
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({
+        requestId: randomUUID(),
+        purpose: "council",
+        reviewId,
+        depth: "standard",
+        ...bindings(detail.body.review)
+      })
+      .expect(503);
+    expect(approval.body.code).toBe("ai_provider_unavailable");
+
+    const edited = await session.agent
+      .patch(`/api/reviews/${reviewId}`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({
+        memoText: `${detail.body.review.memoText}\n\nCompatibility path verified.`,
+        ...bindings(detail.body.review)
+      })
+      .expect(200);
+    expect(edited.body.review.id).toBe(reviewId);
+  });
+
   it("creates idempotently from a normalized server hash and rejects request-ID reuse", async () => {
     const session = await signedIn("idempotency@example.com");
     const payload = reviewInput();

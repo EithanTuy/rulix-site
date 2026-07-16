@@ -10,6 +10,7 @@ import {
   MEMO_CHAT_REQUEST_MAX_BYTES,
   normalizeMemoChatMessage
 } from "../src/shared/aiLimits";
+import { isReviewId } from "../src/shared/reviewIds";
 import type {
   AiApprovalPolicyBinding,
   AiApprovalRequestOfficerDetail,
@@ -1376,7 +1377,7 @@ export function createApp(options: CreateAppOptions = {}) {
         const allowed = purpose === "council"
           ? new Set(["requestId", "purpose", "reviewId", "depth", "expectedVersion", "expectedRevision", "expectedHash"])
           : new Set(["requestId", "purpose", "reviewId", "message", "expectedVersion", "expectedRevision", "expectedHash"]);
-        const reviewId = coercePathId(req.body.reviewId, "review-", 128);
+        const reviewId = coerceReviewEntityId(req.body.reviewId);
         const bindings = coerceReviewBindings(req.body);
         if (!reviewId || !bindings || Object.keys(req.body).some((key) => !allowed.has(key))) {
           res.status(400).json({
@@ -2644,12 +2645,17 @@ function bindReviewResult(result: ReviewResult, memo: MemoRecord, userId: string
 }
 
 function coerceReviewId(req: Request, res: Response) {
-  const memoId = coercePathId(req.params.id, "review-", 128);
+  const memoId = coerceReviewEntityId(req.params.id);
   if (!memoId) {
     res.status(400).json({ code: "invalid_review_id", error: "Review ID is invalid." });
     return undefined;
   }
   return memoId;
+}
+
+function coerceReviewEntityId(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return isReviewId(raw) ? raw : undefined;
 }
 
 function coercePathId(value: unknown, prefix: string, maxLength: number) {
@@ -2796,7 +2802,7 @@ function coerceWorkspacePreferenceCommand(value: unknown) {
   const expectedVersion = coerceExpectedVersion(input.expectedVersion, true);
   const selectedMemoId = input.selectedMemoId === null
     ? null
-    : coercePathId(input.selectedMemoId, "review-", 128);
+    : coerceReviewEntityId(input.selectedMemoId);
   const activeMemoBuilderSessionId = input.activeMemoBuilderSessionId === null
     ? null
     : coercePathId(input.activeMemoBuilderSessionId, "builder-", 128);
@@ -2906,7 +2912,7 @@ function coerceMemoBuilderSession(value: unknown, expectedId: string | undefined
   const starterPrompt = optionalText("starterPrompt", 8_000);
   const contextMemoId = input.contextMemoId === undefined
     ? undefined
-    : coercePathId(input.contextMemoId, "review-", 128);
+    : coerceReviewEntityId(input.contextMemoId);
   const pendingInput = optionalText("pendingInput", 8_000);
   if (
     (input.starterPrompt !== undefined && !starterPrompt)
@@ -2965,7 +2971,7 @@ function coerceBuilderDraft(value: unknown): NonNullable<MemoBuilderSession["dra
     : coerceBoundedString(input.intendedUse, 1, 2_000);
   const reviewContextMemoId = input.reviewContextMemoId === undefined
     ? undefined
-    : coercePathId(input.reviewContextMemoId, "review-", 128);
+    : coerceReviewEntityId(input.reviewContextMemoId);
   if (
     (input.manufacturer !== undefined && !manufacturer)
     || (input.intendedUse !== undefined && !intendedUse)
