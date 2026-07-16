@@ -374,7 +374,19 @@ variable "app_base_url" {
 variable "auth_email_from" {
   description = "Verified SES sender address for invite and password reset emails. Empty disables email delivery while still creating invite/reset tokens."
   type        = string
-  default     = ""
+  default     = "security@rulix.cloud"
+}
+
+variable "auth_email_domain" {
+  description = "SES domain identity used for transactional authentication email. Publish the generated DKIM CNAME records at the authoritative DNS provider."
+  type        = string
+  default     = "rulix.cloud"
+}
+
+variable "auth_mail_from_domain" {
+  description = "Custom SES MAIL FROM domain. Publish the SES feedback MX and SPF TXT records at the authoritative DNS provider."
+  type        = string
+  default     = "mail.rulix.cloud"
 }
 
 variable "auth_bootstrap_secret" {

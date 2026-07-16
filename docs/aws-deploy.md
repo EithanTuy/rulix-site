@@ -149,18 +149,23 @@ not inspect.
 ### 3. Auth Email and First Admin
 
 Production auth uses DynamoDB tables created by Terraform and sends invite/reset
-links with SESv2. Verify a sender address in SES, then deploy with:
+links with SESv2. Terraform manages the `rulix.cloud` domain identity, the
+`mail.rulix.cloud` custom MAIL FROM domain, and the default
+`security@rulix.cloud` sender. Publish the DKIM, MAIL FROM MX, and SPF records
+reported by SES at GoDaddy before enabling real invitations or password resets.
+Deploy with:
 
 ```powershell
 terraform apply `
   -var tenant_slug=prod `
   -var aws_region=us-east-1 `
-  -var auth_email_from=security@rulix.cloud `
   -var auth_bootstrap_secret="<one-time-random-secret>"
 ```
 
-`auth_email_from` may be left empty during dry runs; invites will be created but
-email delivery will report that `AUTH_EMAIL_FROM` is not configured. Use
+Override `auth_email_from` only when a different address under the verified
+domain is required. It may be set to an empty string during dry runs; invites
+will be created but email delivery will report that `AUTH_EMAIL_FROM` is not
+configured. Use
 `POST /api/auth/bootstrap-invite` with header `x-rulix-bootstrap-secret` only to
 create the first export-control-officer invite, then remove or rotate the
 bootstrap secret after an admin can create invites from the Users console.

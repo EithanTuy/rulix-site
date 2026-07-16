@@ -82,6 +82,30 @@ output "app_custom_domain_cname_target" {
   value       = var.custom_domain == "" ? "" : aws_cloudfront_distribution.app[0].domain_name
 }
 
+output "auth_email_dns_records" {
+  description = "SES DKIM, custom MAIL FROM, and SPF records to publish at the authoritative DNS provider."
+  value = {
+    dkim = [
+      for token in aws_sesv2_email_identity.auth.dkim_signing_attributes[0].tokens : {
+        name  = "${token}._domainkey.${var.auth_email_domain}"
+        type  = "CNAME"
+        value = "${token}.dkim.amazonses.com"
+      }
+    ]
+    mail_from_mx = {
+      name     = var.auth_mail_from_domain
+      type     = "MX"
+      priority = 10
+      value    = "feedback-smtp.${var.aws_region}.amazonses.com"
+    }
+    mail_from_spf = {
+      name  = var.auth_mail_from_domain
+      type  = "TXT"
+      value = "v=spf1 include:amazonses.com ~all"
+    }
+  }
+}
+
 output "github_actions_deploy_role_arn" {
   description = "OIDC role used by the production GitHub Actions deployment workflow."
   value       = aws_iam_role.github_actions_deploy.arn

@@ -98,10 +98,13 @@ public, sample, or authorized/redacted material. Real controlled technical data
 belongs in AWS GovCloud unless counsel and customer compliance approve another
 boundary.
 
-### 7. SES Sender and First Admin Bootstrap (ACTION REQUIRED ON NEXT DEPLOY)
+### 7. SES Sender and First Admin Bootstrap
 
-The app no longer supports public account creation. Before inviting production
-users, verify an SES sender for `AUTH_EMAIL_FROM` and configure a temporary
+The app no longer supports public account creation. Terraform manages the
+`rulix.cloud` SES identity, the `mail.rulix.cloud` custom MAIL FROM domain, and
+the default `security@rulix.cloud` sender. Publish the SES-provided DKIM, MX,
+and SPF records in GoDaddy and wait for both identity and MAIL FROM verification
+before inviting production users. Configure a temporary
 `AUTH_BOOTSTRAP_SECRET` to create the first `export-control-officer` invite.
 After the first admin signs in, future invites should be created from the Users
 console and the bootstrap secret should be removed or rotated.
