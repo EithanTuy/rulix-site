@@ -2,20 +2,17 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type FormEvent,
-  type ReactNode
+  useState
 } from "react";
 import {
   ArrowRight,
   Check,
   ChevronDown,
-  CircleAlert,
-  CircleCheck,
   ClipboardCheck,
   FileCheck2,
   GitBranch,
   LockKeyhole,
+  Mail,
   Menu,
   SearchCheck,
   ShieldCheck,
@@ -49,17 +46,10 @@ type ComparisonKey = "reasoning" | "evidence" | "reviewer" | "trail";
 type TrustKey = "human" | "sources" | "data" | "history";
 type UseCaseKey = "officers" | "industry" | "research";
 
-interface AccessFormState {
-  email: string;
-  organization: string;
-  role: string;
-  volume: string;
-  review: string;
-}
-
-type AccessFormStatus = "idle" | "submitting" | "success" | "error";
-
 const CONTACT_EMAIL = CONTACT_EMAIL_TO;
+const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Rulix access request")}&body=${encodeURIComponent(
+  "Organization:\nRole:\nWhat we would like to review:\n\nPlease do not include controlled technical data."
+)}`;
 const SECTION_IDS = ["product", "review-loop", "trust", "use-cases", "request-access"] as const;
 
 const MARKETING_PAGES: Record<MarketingPageKey, PageMeta> = {
@@ -350,15 +340,6 @@ export function MarketingSite() {
   const [activeTrust, setActiveTrust] = useState<TrustKey>("human");
   const [activeUseCase, setActiveUseCase] = useState<UseCaseKey>("officers");
   const [activeFaq, setActiveFaq] = useState(0);
-  const [accessStatus, setAccessStatus] = useState<AccessFormStatus>("idle");
-  const [accessError, setAccessError] = useState("");
-  const [form, setForm] = useState<AccessFormState>({
-    email: "",
-    organization: "",
-    role: "",
-    volume: "1-5 reviews / month",
-    review: ""
-  });
 
   useEffect(() => {
     document.documentElement.classList.add("marketing-page");
@@ -380,41 +361,6 @@ export function MarketingSite() {
     }, 6000);
     return () => window.clearInterval(timer);
   }, [demoPaused, reducedMotion]);
-
-  const submitLead = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const website = String(new FormData(event.currentTarget).get("website") ?? "");
-    setAccessStatus("submitting");
-    setAccessError("");
-
-    try {
-      const response = await fetch("/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          "form-name": "access-request",
-          ...form,
-          website,
-          sourcePath: window.location.pathname
-        }).toString()
-      });
-      if (!response.ok) {
-        throw new Error("We could not save your request.");
-      }
-      setAccessStatus("success");
-    } catch (error) {
-      setAccessError(error instanceof Error ? error.message : "We could not save your request.");
-      setAccessStatus("error");
-    }
-  };
-
-  const updateAccessForm = (nextForm: AccessFormState) => {
-    setForm(nextForm);
-    if (accessStatus === "error") {
-      setAccessStatus("idle");
-      setAccessError("");
-    }
-  };
 
   return (
     <div className="rulix-site">
@@ -446,12 +392,7 @@ export function MarketingSite() {
         <FitCheck />
         <ConversionSection
           activeFaq={activeFaq}
-          accessError={accessError}
-          accessStatus={accessStatus}
-          form={form}
           onFaqChange={setActiveFaq}
-          onFormChange={updateAccessForm}
-          onSubmit={submitLead}
         />
       </main>
       <SiteFooter />
@@ -870,25 +811,7 @@ function FitList({ title, items, muted = false }: { title: string; items: string
   );
 }
 
-function ConversionSection({
-  accessError,
-  accessStatus,
-  activeFaq,
-  form,
-  onFaqChange,
-  onFormChange,
-  onSubmit
-}: {
-  accessError: string;
-  accessStatus: AccessFormStatus;
-  activeFaq: number;
-  form: AccessFormState;
-  onFaqChange: (faq: number) => void;
-  onFormChange: (form: AccessFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  const isSubmitting = accessStatus === "submitting";
-
+function ConversionSection({ activeFaq, onFaqChange }: { activeFaq: number; onFaqChange: (faq: number) => void }) {
   return (
     <section className="rulix-band conversion-section" id="request-access">
       <div className="rulix-shell conversion-section__grid">
@@ -917,115 +840,20 @@ function ConversionSection({
             );
           })}
         </div>
-        <form className="access-form" aria-busy={isSubmitting} onSubmit={onSubmit}>
-          {accessStatus === "success" ? (
-            <div className="access-form__success access-form__wide" role="status" aria-live="polite">
-              <CircleCheck size={24} aria-hidden="true" />
-              <div>
-                <strong>Request received.</strong>
-                <p>We'll reply to {form.email} within one business day with access and next steps.</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <label className="access-form__honeypot" aria-hidden="true">
-                <span>Website</span>
-                <input name="website" tabIndex={-1} autoComplete="off" />
-              </label>
-              <Field label="Work email">
-                <input
-                  required
-                  autoComplete="email"
-                  disabled={isSubmitting}
-                  maxLength={254}
-                  name="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={form.email}
-                  onChange={(event) => onFormChange({ ...form, email: event.target.value })}
-                />
-              </Field>
-              <Field label="Organization">
-                <input
-                  required
-                  autoComplete="organization"
-                  disabled={isSubmitting}
-                  maxLength={160}
-                  name="organization"
-                  placeholder="Company or university"
-                  value={form.organization}
-                  onChange={(event) => onFormChange({ ...form, organization: event.target.value })}
-                />
-              </Field>
-              <Field label="Role">
-                <input
-                  required
-                  autoComplete="organization-title"
-                  disabled={isSubmitting}
-                  maxLength={120}
-                  name="role"
-                  placeholder="Export control, counsel, operations"
-                  value={form.role}
-                  onChange={(event) => onFormChange({ ...form, role: event.target.value })}
-                />
-              </Field>
-              <Field label="Review volume">
-                <select
-                  disabled={isSubmitting}
-                  name="volume"
-                  value={form.volume}
-                  onChange={(event) => onFormChange({ ...form, volume: event.target.value })}
-                >
-                  <option>1-5 reviews / month</option>
-                  <option>6-20 reviews / month</option>
-                  <option>21-50 reviews / month</option>
-                  <option>50+ reviews / month</option>
-                </select>
-              </Field>
-              <Field className="access-form__wide" label="What would you like to review?">
-                <textarea
-                  disabled={isSubmitting}
-                  maxLength={1200}
-                  name="review"
-                  rows={4}
-                  placeholder="A self-classification memo, commodity review, due-diligence memo..."
-                  value={form.review}
-                  onChange={(event) => onFormChange({ ...form, review: event.target.value })}
-                />
-              </Field>
-              <button
-                className="rulix-button rulix-button--primary access-form__wide"
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting ? "Sending request..." : "Request access"}
-                <ArrowRight size={17} aria-hidden="true" />
-              </button>
-              <p className="access-form__promise access-form__wide">
-                We usually reply within one business day. Please don't send controlled technical data through this form.
-              </p>
-              {accessStatus === "error" ? (
-                <div className="access-form__error access-form__wide" role="alert">
-                  <CircleAlert size={18} aria-hidden="true" />
-                  <p>
-                    {accessError} Try again, or <a href={`mailto:${CONTACT_EMAIL}`}>email us directly</a>.
-                  </p>
-                </div>
-              ) : null}
-            </>
-          )}
-        </form>
+        <div className="access-contact">
+          <div className="access-contact__icon" aria-hidden="true"><Mail size={22} /></div>
+          <span className="access-contact__eyebrow">Direct contact</span>
+          <h3>Start with an email.</h3>
+          <p>Tell us what your team reviews and where the current process slows down. We’ll reply with access and a focused next step.</p>
+          <a className="access-contact__email" href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
+          <a className="rulix-button rulix-button--primary access-contact__button" href={CONTACT_MAILTO}>
+            Email the Rulix team
+            <ArrowRight size={17} aria-hidden="true" />
+          </a>
+          <small>We usually reply within one business day. Please don’t email controlled technical data.</small>
+        </div>
       </div>
     </section>
-  );
-}
-
-function Field({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
-  return (
-    <label className={className}>
-      <span>{label}</span>
-      {children}
-    </label>
   );
 }
 
