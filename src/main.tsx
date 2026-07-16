@@ -2,8 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { MarketingSite } from "./components/MarketingSite";
 import { Contact } from "./pages/Contact";
-import { Home, type LandingVariant } from "./pages/Home";
 import { Legal } from "./pages/Legal";
 import { Security } from "./pages/Security";
 import "./index.css";
@@ -17,30 +17,26 @@ const future = {
   v7_skipActionErrorRevalidation: true,
 };
 
-const seoRoutes: Array<{ path: string; variant: LandingVariant }> = [
-  { path: "export-control-memo-review", variant: "memo-review" },
-  { path: "eccn-classification-assistant", variant: "eccn-assistant" },
-  { path: "ai-export-compliance-review", variant: "ai-review" },
-  { path: "university-export-control-review", variant: "university" },
-  { path: "manufacturer-eccn-review", variant: "manufacturer" },
+const marketingRoutes = [
+  "/",
+  "/export-control-memo-review",
+  "/eccn-classification-assistant",
+  "/ai-export-compliance-review",
+  "/university-export-control-review",
+  "/manufacturer-eccn-review",
 ];
 
 const router = createBrowserRouter([
+  ...marketingRoutes.map((path) => ({ path, element: <MarketingSite /> })),
   {
-    path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Home /> },
-      ...seoRoutes.map((route) => ({
-        path: route.path,
-        element: <Home variant={route.variant} />,
-      })),
-      { path: "security", element: <Security /> },
-      { path: "contact", element: <Contact /> },
-      { path: "legal", element: <Legal /> },
-      { path: "*", element: <Navigate to="/" replace /> },
+      { path: "/security", element: <Security /> },
+      { path: "/contact", element: <Contact /> },
+      { path: "/legal", element: <Legal /> },
     ],
   },
+  { path: "*", element: <Navigate to="/" replace /> },
 ], { future });
 
 createRoot(document.getElementById("root")!).render(

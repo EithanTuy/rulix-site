@@ -17,9 +17,9 @@ export function Brand({ size = 28 }: { size?: number }) {
 }
 
 const NAV = [
-  { to: "/#product-demo", label: "Product" },
+  { to: "/#product", label: "Product" },
   { to: "/#review-loop", label: "Review loop" },
-  { to: "/#fit-check", label: "Fit check" },
+  { to: "/#trust", label: "Trust" },
 ];
 
 export function Layout() {
@@ -58,7 +58,7 @@ export function Layout() {
             <a href="https://app.rulix.cloud" className="transition-colors hover:text-text-1 max-md:hidden">
               Sign in
             </a>
-            <Link to="/contact" className="site-button site-button-primary !min-h-[42px] !px-5 !text-[13px]">Request access</Link>
+            <Link to="/#request-access" className="site-button site-button-primary !min-h-[42px] !px-5 !text-[13px]">Request access</Link>
           </nav>
         </div>
       </header>
@@ -79,7 +79,7 @@ export function Layout() {
           <div className="text-[13.5px]">
             <h4 className="mb-3 text-[12px] uppercase tracking-[0.1em] text-text-3">Product</h4>
             <ul className="m-0 list-none space-y-2 p-0 text-text-2">
-              <li><Link to="/#product-demo" className="hover:text-text-1">Product in action</Link></li>
+              <li><Link to="/#product" className="hover:text-text-1">Product in action</Link></li>
               <li><Link to="/#review-loop" className="hover:text-text-1">Review loop</Link></li>
               <li><Link to="/#fit-check" className="hover:text-text-1">Fit check</Link></li>
               <li><Link to="/security" className="hover:text-text-1">Security and data handling</Link></li>

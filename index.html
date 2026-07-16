@@ -10,11 +10,21 @@
     <meta property="og:title" content="Rulix — Export-control memo review" />
     <meta property="og:description" content="Rulix helps reviewers find gaps, ask better evidence questions, and prepare a clean record before final signoff." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://rulix.cloud/marketing/rulix-audit-product.png" />
+    <meta property="og:image" content="https://rulix.cloud/marketing/demos/hero-rulix-review-loop.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#030405" />
+    <meta name="theme-color" content="#ffffff" />
   </head>
   <body>
+    <form name="access-request" method="POST" data-netlify="true" netlify-honeypot="website" hidden>
+      <input type="hidden" name="form-name" value="access-request" />
+      <input name="website" />
+      <input name="email" type="email" />
+      <input name="organization" />
+      <input name="role" />
+      <input name="volume" />
+      <textarea name="review"></textarea>
+      <input name="sourcePath" />
+    </form>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
