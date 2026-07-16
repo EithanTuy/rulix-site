@@ -350,6 +350,9 @@ describe("Terraform security invariants", () => {
     expect(gcPolicy).not.toContain('"dynamodb:DeleteItem"');
     expect(gcPolicy).not.toContain('"dynamodb:PutItem"');
     expect(gcPolicy).not.toContain('"dynamodb:TransactWriteItems"');
+    expect(hosting).toContain('sid = "AuthTableCommands"');
+    expect(hosting).toContain('sid = "NormalizedWorkspaceCommands"');
+    expect(hosting.match(/"dynamodb:ConditionCheckItem"/g)).toHaveLength(2);
     expect(gcPolicy).toContain('actions   = ["s3:DeleteObjectVersion"]');
     expect(gcPolicy).not.toContain('"s3:PutObject"');
     expect(gcPolicy).toContain("resources = [aws_kms_key.workspace.arn]");

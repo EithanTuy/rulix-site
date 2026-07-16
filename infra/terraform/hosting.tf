@@ -84,6 +84,7 @@ data "aws_iam_policy_document" "lambda_auth" {
   statement {
     sid = "AuthTableCommands"
     actions = [
+      "dynamodb:ConditionCheckItem",
       "dynamodb:DeleteItem",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
@@ -110,6 +111,7 @@ data "aws_iam_policy_document" "lambda_auth" {
     sid = "NormalizedWorkspaceCommands"
     actions = [
       "dynamodb:BatchGetItem",
+      "dynamodb:ConditionCheckItem",
       "dynamodb:DeleteItem",
       "dynamodb:GetItem",
       "dynamodb:PutItem",
