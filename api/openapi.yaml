@@ -974,6 +974,23 @@ paths:
           description: Per-account AI workload limit reached
         "503":
           description: AI egress policy or workload admission unavailable
+  /tenant/members:
+    get:
+      summary: List current tenant members for assignment and mentions
+      operationId: listTenantMembers
+      responses:
+        "200":
+          description: Bounded tenant member projection without credentials or secrets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TenantMember"
   /reviews:
     get:
       summary: List bounded review summaries
@@ -987,6 +1004,30 @@ paths:
             type: string
             enum: [active, archived, all]
             default: active
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: lifecycleStage
+          in: query
+          schema: { $ref: "#/components/schemas/ReviewLifecycleStage" }
+        - name: assignee
+          in: query
+          schema: { type: string, maxLength: 128 }
+        - name: priority
+          in: query
+          schema: { type: string, enum: [low, normal, high, urgent] }
+        - name: due
+          in: query
+          schema: { type: string, enum: [overdue, today, next-7-days, none] }
+        - name: tags
+          in: query
+          schema:
+            type: array
+            maxItems: 12
+            items: { type: string, maxLength: 48 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [updated-desc, updated-asc], default: updated-desc }
       responses:
         "200":
           description: Review summary page
@@ -1084,6 +1125,160 @@ paths:
                         type: array
                         items:
                           $ref: "#/components/schemas/AuditEvent"
+  /reviews/{reviewId}/metadata:
+    patch:
+      summary: Update review assignment, priority, due date, tags, or lifecycle using optimistic bindings
+      operationId: updateReviewMetadata
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewMetadataUpdateCommand"
+      responses:
+        "200":
+          description: Authoritative updated review and audit event
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewMutationResult" }
+        "403": { description: Role cannot manage review metadata }
+        "409": { description: Review bindings are stale }
+  /reviews/{reviewId}/comments:
+    get:
+      summary: List tenant-visible review comments
+      operationId: listReviewComments
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: Comment page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CursorPage"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/CaseComment" }
+    post:
+      summary: Add a tenant-visible comment or request for information
+      operationId: createReviewComment
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 4000 }
+                mentions:
+                  type: array
+                  maxItems: 25
+                  items: { type: string, maxLength: 128 }
+                kind: { type: string, enum: [comment, request-information], default: comment }
+      responses:
+        "201":
+          description: Comment created and audited
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseComment" }
+  /reviews/{reviewId}/comments/{commentId}/resolve:
+    post:
+      summary: Resolve a review comment as its author or an export-control officer
+      operationId: resolveReviewComment
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/ReviewId"
+        - name: commentId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^comment-[A-Za-z0-9_-]+$', maxLength: 128 }
+      responses:
+        "200":
+          description: Resolved authoritative comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseComment" }
+        "403": { description: Only the author or an officer can resolve }
+        "404": { description: Comment not found }
+  /notifications:
+    get:
+      summary: List the authenticated user's notification inbox
+      operationId: listNotifications
+      parameters:
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: unread
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Notification page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CursorPage"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/WorkspaceNotification" }
+  /notifications/read:
+    patch:
+      summary: Mark every notification read
+      operationId: markAllNotificationsRead
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        "200":
+          description: Mark-all result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, readAt]
+                properties:
+                  count: { type: integer, minimum: 0 }
+                  readAt: { type: string, format: date-time }
+  /notifications/{notificationId}/read:
+    patch:
+      summary: Mark one notification read
+      operationId: markNotificationRead
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^notification-[A-Za-z0-9_-]+$', maxLength: 128 }
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceNotification" }
+        "404": { description: Notification not found }
   /ai-approval-requests:
     get:
       summary: List the authenticated account's bounded AI approval requests
@@ -2517,6 +2712,71 @@ components:
           minimum: 1
         expectedHash:
           $ref: "#/components/schemas/Sha256"
+    ReviewLifecycleStage:
+      type: string
+      enum: [draft, needs-information, ready-for-analysis, in-review, changes-requested, ready-for-decision, approved, rejected, superseded, archived]
+    TenantMember:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, role]
+      properties:
+        id: { type: string, maxLength: 128 }
+        name: { type: string, maxLength: 160 }
+        email: { type: string, format: email, maxLength: 254 }
+        role: { type: string, enum: [export-control-officer, reviewer, submitter, counsel] }
+    ReviewMetadataUpdateCommand:
+      allOf:
+        - $ref: "#/components/schemas/ExpectedReviewBindings"
+        - type: object
+          additionalProperties: false
+          properties:
+            priority: { type: string, enum: [low, normal, high, urgent] }
+            assignedTo: { type: [string, "null"], maxLength: 128 }
+            dueAt: { type: [string, "null"], format: date-time }
+            tags:
+              type: array
+              maxItems: 12
+              items: { type: string, maxLength: 48 }
+            lifecycleStage: { $ref: "#/components/schemas/ReviewLifecycleStage" }
+    CaseComment:
+      type: object
+      additionalProperties: false
+      required: [id, memoId, authorId, authorName, body, createdAt, mentions]
+      properties:
+        id: { type: string, pattern: '^comment-[A-Za-z0-9_-]+$' }
+        memoId: { type: string, pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$', maxLength: 128 }
+        authorId: { type: string, maxLength: 128 }
+        authorName: { type: string, maxLength: 160 }
+        body: { type: string, maxLength: 4000 }
+        createdAt: { type: string }
+        mentions:
+          type: array
+          maxItems: 25
+          items: { type: string, maxLength: 128 }
+        resolvedAt: { type: string, format: date-time }
+        resolvedBy: { type: string, maxLength: 128 }
+    WorkspaceNotification:
+      type: object
+      additionalProperties: false
+      required: [id, userId, kind, title, detail, createdAt]
+      properties:
+        id: { type: string, pattern: '^notification-[A-Za-z0-9_-]+$' }
+        userId: { type: string, maxLength: 128 }
+        memoId: { type: string, pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$', maxLength: 128 }
+        kind: { type: string, enum: [assignment, mention, request-info, decision, due-date, system] }
+        title: { type: string, maxLength: 160 }
+        detail: { type: string, maxLength: 1200 }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: string, format: date-time }
+    SavedReviewView:
+      type: object
+      additionalProperties: false
+      required: [id, name, query, createdAt]
+      properties:
+        id: { type: string, pattern: '^view-[A-Za-z0-9_-]+$', maxLength: 128 }
+        name: { type: string, maxLength: 80 }
+        query: { type: string, maxLength: 1200 }
+        createdAt: { type: string }
     WorkspacePreferences:
       type: object
       required: [version]
@@ -2530,6 +2790,18 @@ components:
           maxLength: 128
         activeMemoBuilderSessionId:
           type: string
+        onboardingCompletedAt: { type: string, format: date-time }
+        dismissedGuidance:
+          type: array
+          maxItems: 40
+          items: { type: string, maxLength: 80 }
+        savedReviewViews:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/SavedReviewView" }
+        activeWorkspace: { type: string, enum: [operations, growth] }
+        lastAppRoute: { type: string, maxLength: 240 }
+        lastDashboardRoute: { type: string, maxLength: 240 }
     WorkspacePreferenceUpdateCommand:
       type: object
       additionalProperties: false
@@ -2544,6 +2816,18 @@ components:
           maxLength: 128
         activeMemoBuilderSessionId:
           type: [string, "null"]
+        onboardingCompletedAt: { type: [string, "null"] }
+        dismissedGuidance:
+          type: array
+          maxItems: 40
+          items: { type: string, maxLength: 80 }
+        savedReviewViews:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/SavedReviewView" }
+        activeWorkspace: { type: string, enum: [operations, growth] }
+        lastAppRoute: { type: string, maxLength: 240 }
+        lastDashboardRoute: { type: string, maxLength: 240 }
     MemoBuilderSession:
       type: object
       additionalProperties: false

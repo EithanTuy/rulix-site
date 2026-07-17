@@ -2,26 +2,47 @@
 
 Rulix is a review aid for ECCN classification memos. It helps an export-control reviewer find weak reasoning, missing technical facts, conflicts, and source citations. It does not make a final legal determination.
 
-The same four-step guide is available inside the app from **Help** on desktop and mobile. On an empty account it is also available through **Learn the workflow**.
+The same workflow guide is available inside the app from **Help** on desktop and mobile. **Home / My Work** keeps a dismissible, role-aware checklist until the user has completed the core workflow.
+
+## Finding your way around
+
+- **Home / My Work** prioritizes assigned reviews, urgent work, information requests, decisions, and recent activity.
+- **Reviews** is the searchable queue. Filters, sorting, paging, saved views, and the current queue state remain in the URL so the view can be bookmarked or shared.
+- **Memo Builder** keeps AI drafting conversations and artifacts together. A generated artifact never silently overwrites an approved review.
+- **Evidence Library** searches source material and exposes review/citation associations.
+- **Controls** contains exact-content AI approvals. **Administration** and the operator dashboard are role-gated.
+- Press **Ctrl/Command+K** to open command search. Right-click a review or memo artifact for open, copy-link, duplicate, download, audit, and archive actions. The menu is keyboard navigable and uses the platform's native shortcut label.
+
+On mobile, open the main navigation from the top-left menu. Review sections become a horizontal tab row and the workbench stacks in the order case context, evidence/analysis, then artifacts/collaboration.
 
 ## Core workflow
 
-1. Select **New Review**, **Paste Text**, **Upload / Approve**, or **Build with AI**.
+1. Start from **Home / My Work** or the **Review Queue**, then select **New review**, paste text, upload a supported file, or begin in **Memo Builder**.
 2. Confirm the exact memo text, source/manufacturer, data class, classification path, and any file bytes before analysis.
 3. Start AI analysis:
    - Export-control officers select **Approve & Analyze**. This approves only the exact current revision, depth, server-loaded context, and allowed provider lane.
    - Reviewers and counsel select **Request Approval**. An officer inspects the exact request in **Controls > AI approval queue**, then selects **Approve one dispatch**. The requester can then select **Run Approved Analysis** without editing the memo.
-4. Read the memo in the center panel and inspect **Decision Support**:
+4. Follow the persistent workbench path: **Intake → Evidence → AI approval/run → Resolve findings → Human decision → Export**. Read the memo and inspect evidence and AI findings:
    - Check jurisdiction before relying on an EAR/ECCN path.
    - Treat blocking evidence as unresolved until the underlying fact or citation is fixed.
    - Treat the recommendation as decision support, never as the final determination.
-5. Select Evidence Map rows to inspect the rationale, memo claim, and official-source citation.
+5. Use **AI summary**, **Key findings**, **Full evidence**, and **Citations** to inspect the rationale, exact memo claim, source provenance, and official-source citation.
 6. Use **Information to Request** when technical parameters or source support are missing.
 7. Record exactly one human decision with notes:
    - **Accept Recommendation** only when the memo support is sufficient.
    - **Request More Info** when missing facts prevent signoff.
    - **Override / Change ECCN** when the reviewer disagrees with the recommendation or jurisdiction path.
 8. Export the report after the current revision has a valid decision.
+
+The right-hand artifact pane holds review notes, collaboration, and the active memo artifact beside the evidence being evaluated. Comments and information requests are tenant-visible and audited. Use `@Name` to mention a tenant member; assignment, mention, due-date, request-information, decision, and system events appear in the notification inbox.
+
+## Queue and review recovery
+
+- A missing or deleted restored selection is cleared once, then Rulix opens the next usable review instead of repeating a failed preference save.
+- A retryable network failure keeps the selection and offers retry. It is not treated as a deletion.
+- A stale version (`409`) keeps the authoritative server record, explains the conflict, and requires the intended edit to be reapplied.
+- Malformed review data is isolated from the queue with an actionable error instead of crashing the workspace.
+- Filters and saved views never change access control. Bulk assignment and tagging appear only for authorized roles.
 
 ## Exact AI approval behavior
 

@@ -24,8 +24,8 @@ build ID.
 
 ## Availability contract
 
-Successful responses include `availability` and the exact `rangeStart` and
-`rangeEnd`:
+Successful responses include `generatedAt`, `availability`, and the exact
+`rangeStart` and `rangeEnd` reporting window:
 
 - usage totals, daily/model/workflow buckets, and the account total are exact;
 - Dynamo mode reports online presence as `null` and marks it unavailable,
@@ -34,6 +34,20 @@ Successful responses include `availability` and the exact `rangeStart` and
   because a capped or approximate ranking would be misleading;
 - the local store retains exact online and top-user behavior and reports every
   facet available.
+
+## Dashboard metric definitions
+
+| Metric | Definition | Drill-down |
+|---|---|---|
+| Spend | Settled provider cost for the selected UTC window | Usage by model and workflow |
+| AI calls | Settled provider dispatches in the selected UTC window | Daily/model/workflow buckets |
+| Tokens processed | Settled input plus output tokens | Usage breakdown |
+| Average latency | Mean settled provider latency for calls with timing data | Daily usage detail |
+| Failures | Settled failed provider dispatches | Workflow and daily detail |
+| Accounts | Exact tenant account counter as of the availability timestamp | Accounts |
+| Online now | Exact local-session count; unavailable in Dynamo mode | Accounts when available |
+
+The dashboard must display the reporting window and freshness beside these metrics. A missing or unavailable facet renders an honest unavailable state, never zero or an inferred aggregate.
 
 If the marker is missing, old, building, or malformed, the endpoint returns
 `503 admin_metrics_backfill_required` or `admin_metrics_integrity_failed`.

@@ -15,17 +15,27 @@ for (const role of roles) {
     const errors = collectRuntimeErrors(page);
     const session = await provisionAccount(page, role, testInfo.project.name);
     const title = `${role} responsive review`;
-    await seedReview(page, session.csrfToken, title);
+    const reviewId = await seedReview(page, session.csrfToken, title);
 
-    await page.goto("/app");
+    await page.goto("/app#/home");
 
     await expect(page).toHaveTitle("Rulix ECCN");
-    await expect(page.getByText("Review Queue", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
+    await page.goto(`/app#/reviews/${reviewId}/overview`);
     await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
-    await page.getByRole("button", { name: "Help and getting started" }).click();
+    await expect(page.getByRole("navigation", { name: "Review progress" })).toBeVisible();
+    await page.getByRole("button", { name: "Help" }).click();
     await expect(page.getByRole("heading", { name: "From memo to defensible decision" })).toBeVisible();
     await page.getByRole("button", { name: "Close Rulix guide" }).click();
     await expect(page.getByRole("heading", { name: "From memo to defensible decision" })).toBeHidden();
+    await page.keyboard.press("Control+K");
+    await expect(page.getByRole("dialog", { name: "Command search" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    const artifact = page.getByRole("button", { name: /AI memo draft/i });
+    await artifact.click({ button: "right" });
+    await expect(page.getByRole("menu", { name: "Artifact actions" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Duplicate as draft" })).toBeEnabled();
+    await page.keyboard.press("Escape");
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -45,10 +55,15 @@ test("an officer can move between dashboard operations surfaces", async ({ page 
   await expect(page.getByRole("heading", { name: "Operations overview" })).toBeVisible();
   await page.getByRole("button", { name: "Usage" }).click();
   await expect(page.getByRole("heading", { name: "AI usage and spend" })).toBeVisible();
-  await expect(page).toHaveURL(/#usage$/);
+  await expect(page).toHaveURL(/#operations\/usage$/);
   await page.getByRole("button", { name: "Accounts" }).click();
   await expect(page.getByRole("heading", { name: "Account activity" })).toBeVisible();
-  await expect(page).toHaveURL(/#accounts$/);
+  await expect(page).toHaveURL(/#operations\/accounts$/);
+  await page.getByRole("button", { name: /^Growth/ }).click();
+  await expect(page.getByRole("heading", { name: "Growth pipeline overview" })).toBeVisible();
+  await page.locator(".dash-rail nav").getByRole("button", { name: "Lead Review" }).click();
+  await expect(page.getByRole("heading", { name: "Lead review queue", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/#growth\/lead-review$/);
 
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -91,6 +106,8 @@ async function seedReview(page: Page, csrfToken: string, title: string) {
     }
   });
   expect(response.ok()).toBe(true);
+  const body = await response.json() as { review: { id: string } };
+  return body.review.id;
 }
 
 function collectRuntimeErrors(page: Page) {

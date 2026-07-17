@@ -19,6 +19,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
+    "test:bundle": "npm run build && node scripts/check-bundle-budgets.mjs",
     "e2e:server": "tsx scripts/start-e2e.ts",
     "test:ai": "cmd /c scripts\\run-live-test.cmd server/test-live-ai.ts",
     "test:ai:deep": "cmd /c scripts\\run-live-test.cmd server/test-live-council.ts",

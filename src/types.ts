@@ -209,7 +209,15 @@ export type ReviewLifecycleStage =
 
 export type CasePriority = "low" | "normal" | "high" | "urgent";
 
-export type AppView = "reviews" | "controls" | "evidence" | "corpus" | "users" | "settings" | "memo-builder";
+export type AppView =
+  | "home"
+  | "reviews"
+  | "controls"
+  | "evidence"
+  | "corpus"
+  | "users"
+  | "settings"
+  | "memo-builder";
 
 export type AgentRole =
   | "memo-parser"
@@ -469,11 +477,21 @@ export interface WorkspaceNotification {
   readAt?: string;
 }
 
+export interface SavedReviewView {
+  id: string;
+  name: string;
+  query: string;
+  createdAt: string;
+}
+
 export interface WorkspacePreferences {
   selectedMemoId?: string;
   onboardingCompletedAt?: string;
-  dismissedHelp?: string[];
-  savedReviewFilter?: string;
+  dismissedGuidance?: string[];
+  savedReviewViews?: SavedReviewView[];
+  activeWorkspace?: "operations" | "growth";
+  lastAppRoute?: string;
+  lastDashboardRoute?: string;
 }
 
 export interface MemoChatMessage {

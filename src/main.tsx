@@ -1,8 +1,5 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import { App, consumeAuthLinkFragment } from "./App";
-import { DashboardApp } from "./components/DashboardApp";
-import { MarketingSite, isMarketingPath } from "./components/MarketingSite";
 import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
 import "./styles.css";
 
@@ -30,34 +27,30 @@ function isAppSurface() {
   );
 }
 
-function isMarketingSurface() {
-  if (typeof window === "undefined") return true;
-  const host = window.location.hostname.toLowerCase();
-  return (
-    host === "rulix.cloud" ||
-    host === "www.rulix.cloud" ||
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    isMarketingPath(window.location.pathname)
-  );
-}
-
 const dashboardSurface = isDashboardSurface();
 const appSurface = isAppSurface();
 document.title = dashboardSurface ? "Rulix Dash" : appSurface ? "Rulix ECCN" : "Rulix";
 applyTheme(getInitialTheme());
 
+const AppSurface = lazy(() => import("./App").then((module) => ({
+  default: function RulixAppSurface() {
+    return <module.App authLink={module.consumeAuthLinkFragment()} />;
+  }
+})));
+const DashboardSurface = lazy(() => import("./components/DashboardApp").then((module) => ({ default: module.DashboardApp })));
+const MarketingSurface = lazy(() => import("./components/MarketingSite").then((module) => ({ default: module.MarketingSite })));
+
 const root = dashboardSurface
-  ? <DashboardApp />
+  ? <DashboardSurface />
   : appSurface
-    ? <App authLink={consumeAuthLinkFragment()} />
-    : isMarketingSurface()
-      ? <MarketingSite />
-      : <MarketingSite />;
+    ? <AppSurface />
+    : <MarketingSurface />;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {root}
+    <Suspense fallback={<div className="surface-loader" role="status" aria-live="polite"><span />Loading Rulix…</div>}>
+      {root}
+    </Suspense>
   </React.StrictMode>
 );
 

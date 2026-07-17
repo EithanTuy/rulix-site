@@ -19,6 +19,7 @@ import type {
   AiApprovalStatus,
   AiApprovalSubjectBinding,
   AuditEvent,
+  CaseComment,
   DataClass,
   MemoBuilderSession,
   MemoChatMessage,
@@ -31,7 +32,8 @@ import type {
   ReviewResult,
   ReviewerDecision,
   UsageEvent,
-  UserProfile
+  UserProfile,
+  WorkspaceNotification
 } from "../src/types";
 import {
   createLocalPublicMemoTemplate,
@@ -1098,10 +1100,17 @@ export function createApp(options: CreateAppOptions = {}) {
     res.json(await store.getWorkspacePreferences(res.locals.user.id));
   });
 
-  app.patch("/api/account/preferences", requireJsonBytes(4 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
+  app.get("/api/tenant/members", requireAuth(store), async (_req, res) => {
+    const users = await store.listUsers();
+    res.json({
+      items: users.map(({ id, name, email, role }) => ({ id, name, email, role }))
+    });
+  });
+
+  app.patch("/api/account/preferences", requireJsonBytes(16 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
     const command = coerceWorkspacePreferenceCommand(req.body);
     if (!command) {
-      res.status(400).json({ code: "invalid_preferences", error: "Preferences require a version and only bounded selected/active IDs." });
+      res.status(400).json({ code: "invalid_preferences", error: "Preferences require a version and only bounded workspace, route, guidance, view, or selection fields." });
       return;
     }
     try {
@@ -1220,6 +1229,212 @@ export function createApp(options: CreateAppOptions = {}) {
     if (!memoId || !query) return;
     try {
       res.json(await store.listReviewChatMessages(res.locals.user.id, memoId, query));
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.patch(
+    "/api/reviews/:id/metadata",
+    requireJsonBytes(16 * 1024),
+    requireAuth(store),
+    requireCsrf,
+    requireRoles("reviewer", "counsel", "export-control-officer"),
+    async (req, res) => {
+      const memoId = coerceReviewId(req, res);
+      const command = coerceReviewMetadataCommand(req.body);
+      if (!memoId || !command) {
+        if (memoId) res.status(400).json({
+          code: "invalid_review_metadata",
+          error: "Metadata updates require current review bindings and at least one bounded field."
+        });
+        return;
+      }
+      const changedFields = [...Object.keys(command.patch), ...command.clear];
+      const auditEvent = authoritativeReviewAuditEvent(
+        res.locals.user,
+        memoId,
+        "Review metadata updated",
+        `Updated ${changedFields.join(", ")}.`,
+        changedFields.includes("lifecycleStage") || changedFields.includes("dueAt") ? "review" : "info",
+        { changedFields: changedFields.join(",") }
+      );
+      try {
+        const result = await store.updateReviewMetadata(res.locals.user.id, memoId, {
+          ...command,
+          auditEvent
+        });
+        const users = await store.listUsers();
+        const recipients = new Map(users.map((user) => [user.id, user]));
+        const notifications: Array<{ userId: string; notification: WorkspaceNotification }> = [];
+        if (command.patch.assignedTo) {
+          const assignee = recipients.get(command.patch.assignedTo);
+          if (assignee) notifications.push({
+            userId: assignee.id,
+            notification: workspaceNotification(assignee.id, memoId, "assignment", "Review assigned", `${result.review.title} was assigned to you.`)
+          });
+        }
+        if (command.patch.dueAt && result.review.assignedTo) {
+          const assignee = recipients.get(result.review.assignedTo);
+          if (assignee) notifications.push({
+            userId: assignee.id,
+            notification: workspaceNotification(assignee.id, memoId, "due-date", "Review due date changed", `${result.review.title} is due ${command.patch.dueAt.slice(0, 10)}.`)
+          });
+        }
+        await Promise.all(notifications.map(({ userId, notification }) =>
+          store.appendNotifications(userId, [notification])));
+        res.json(result);
+      } catch (error) {
+        sendStoreError(res, error);
+      }
+    }
+  );
+
+  app.get("/api/reviews/:id/comments", requireAuth(store), async (req, res) => {
+    const memoId = coerceReviewId(req, res);
+    const query = coercePageQuery(req, res);
+    if (!memoId || !query) return;
+    try {
+      res.json(await store.listReviewComments(res.locals.user.id, memoId, query));
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.post(
+    "/api/reviews/:id/comments",
+    requireJsonBytes(8 * 1024),
+    requireAuth(store),
+    requireCsrf,
+    async (req, res) => {
+      const memoId = coerceReviewId(req, res);
+      const input = coerceCommentInput(req.body);
+      if (!memoId || !input) {
+        if (memoId) res.status(400).json({ code: "invalid_comment", error: "A bounded comment and tenant-member mentions are required." });
+        return;
+      }
+      try {
+        const users = await store.listUsers();
+        const byId = new Map(users.map((user) => [user.id, user]));
+        if (input.mentions.some((userId) => !byId.has(userId))) {
+          res.status(400).json({ code: "invalid_mention", error: "Comments may mention only current tenant members." });
+          return;
+        }
+        const now = new Date().toISOString();
+        const comment: CaseComment = {
+          id: `comment-${randomUUID()}`,
+          memoId,
+          authorId: res.locals.user.id,
+          authorName: res.locals.user.name,
+          body: input.body,
+          createdAt: now,
+          mentions: input.mentions
+        };
+        const requestInformation = input.kind === "request-information";
+        const auditEvent = authoritativeReviewAuditEvent(
+          res.locals.user,
+          memoId,
+          requestInformation ? "Information requested" : "Comment added",
+          requestInformation ? "A tenant-visible request for information was added." : "A tenant-visible review comment was added.",
+          requestInformation ? "review" : "info",
+          { commentId: comment.id }
+        );
+        const created = await store.createReviewComment(res.locals.user.id, memoId, { comment, auditEvent });
+        await Promise.all(input.mentions
+          .filter((userId) => userId !== res.locals.user.id)
+          .map((userId) => store.appendNotifications(userId, [workspaceNotification(
+            userId,
+            memoId,
+            requestInformation ? "request-info" : "mention",
+            requestInformation ? "Information requested" : `${res.locals.user.name} mentioned you`,
+            input.body
+          )])));
+        res.status(201).json(created);
+      } catch (error) {
+        sendStoreError(res, error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/reviews/:id/comments/:commentId/resolve",
+    requireJsonBytes(2 * 1024),
+    requireAuth(store),
+    requireCsrf,
+    async (req, res) => {
+      const memoId = coerceReviewId(req, res);
+      const commentId = coercePathId(req.params.commentId, "comment-", 128);
+      if (!memoId || !commentId || Object.keys(req.body ?? {}).length > 0) {
+        if (memoId) res.status(400).json({ code: "invalid_comment_resolution", error: "Comment resolution accepts no request fields." });
+        return;
+      }
+      try {
+        const comment = await findReviewComment(store, res.locals.user.id, memoId, commentId);
+        if (!comment) {
+          res.status(404).json({ code: "comment_not_found", error: "Comment not found." });
+          return;
+        }
+        if (comment.authorId !== res.locals.user.id && res.locals.user.role !== "export-control-officer") {
+          res.status(403).json({ code: "comment_resolution_forbidden", error: "Only the comment author or an export-control officer can resolve it." });
+          return;
+        }
+        const resolvedAt = new Date().toISOString();
+        const auditEvent = authoritativeReviewAuditEvent(
+          res.locals.user,
+          memoId,
+          "Comment resolved",
+          "A tenant-visible review comment was resolved.",
+          "info",
+          { commentId }
+        );
+        res.json(await store.resolveReviewComment(res.locals.user.id, memoId, commentId, {
+          resolvedAt,
+          resolvedBy: res.locals.user.id,
+          auditEvent
+        }));
+      } catch (error) {
+        sendStoreError(res, error);
+      }
+    }
+  );
+
+  app.get("/api/notifications", requireAuth(store), async (req, res) => {
+    const query = coerceNotificationPageQuery(req, res);
+    if (!query) return;
+    try {
+      res.json(await store.listNotifications(res.locals.user.id, query));
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.patch("/api/notifications/read", requireJsonBytes(2 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
+    if (Object.keys(req.body ?? {}).length > 0) {
+      res.status(400).json({ code: "invalid_notification_patch", error: "Mark-all-read accepts no request fields." });
+      return;
+    }
+    try {
+      const readAt = new Date().toISOString();
+      const count = await store.markAllNotificationsRead(res.locals.user.id, readAt);
+      res.json({ count, readAt });
+    } catch (error) {
+      sendStoreError(res, error);
+    }
+  });
+
+  app.patch("/api/notifications/:notificationId/read", requireJsonBytes(2 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
+    const notificationId = coercePathId(req.params.notificationId, "notification-", 128);
+    if (!notificationId || Object.keys(req.body ?? {}).length > 0) {
+      res.status(400).json({ code: "invalid_notification_patch", error: "A valid notification ID is required." });
+      return;
+    }
+    try {
+      const notification = await store.markNotificationRead(res.locals.user.id, notificationId, new Date().toISOString());
+      if (!notification) {
+        res.status(404).json({ code: "notification_not_found", error: "Notification not found." });
+        return;
+      }
+      res.json(notification);
     } catch (error) {
       sendStoreError(res, error);
     }
@@ -2327,6 +2542,15 @@ export function createApp(options: CreateAppOptions = {}) {
       throw error;
     }
 
+    if (transition.review.assignedTo) {
+      await store.appendNotifications(transition.review.assignedTo, [workspaceNotification(
+        transition.review.assignedTo,
+        memo.id,
+        decision.action === "request-info" ? "request-info" : "decision",
+        decision.action === "request-info" ? "More information requested" : "Review decision recorded",
+        `${transition.review.title}: ${decision.notes}`
+      )]).catch(() => undefined);
+    }
     res.json(transition);
     }
   );
@@ -2789,14 +3013,163 @@ function coerceReviewPageQuery(req: Request, res: Response) {
     res.status(400).json({ code: "invalid_review_state", error: "state must be active, archived, or all." });
     return undefined;
   }
-  return { ...page, state };
+  const scalar = (value: unknown) => Array.isArray(value) ? value[0] : value;
+  const rawSearch = scalar(req.query.search);
+  const search = rawSearch === undefined ? undefined : coerceBoundedString(rawSearch, 1, 120);
+  const rawLifecycle = scalar(req.query.lifecycleStage);
+  const lifecycleStage: MemoRecord["lifecycleStage"] | undefined = rawLifecycle === undefined
+    ? undefined
+    : coerceReviewLifecycleStage(rawLifecycle);
+  const rawAssignee = scalar(req.query.assignee);
+  const assignee = rawAssignee === undefined ? undefined : coerceBoundedString(rawAssignee, 1, 128);
+  const rawPriority = scalar(req.query.priority);
+  const priority: MemoRecord["priority"] | undefined = rawPriority === undefined
+    ? undefined
+    : coerceCasePriority(rawPriority);
+  const rawDue = scalar(req.query.due);
+  const due: "overdue" | "today" | "next-7-days" | "none" | undefined = rawDue === undefined
+    ? undefined
+    : rawDue === "overdue" || rawDue === "today" || rawDue === "next-7-days" || rawDue === "none"
+      ? rawDue
+      : undefined;
+  const rawSort = scalar(req.query.sort);
+  const sort: "updated-desc" | "updated-asc" | undefined = rawSort === undefined
+    ? "updated-desc" as const
+    : rawSort === "updated-desc" || rawSort === "updated-asc"
+      ? rawSort
+      : undefined;
+  const rawTags = req.query.tags;
+  const tags = rawTags === undefined
+    ? undefined
+    : (Array.isArray(rawTags) ? rawTags : [rawTags])
+        .flatMap((value) => typeof value === "string" ? value.split(",") : [])
+        .map((value) => value.trim())
+        .filter(Boolean);
+  if (
+    (rawSearch !== undefined && !search)
+    || (rawLifecycle !== undefined && !lifecycleStage)
+    || (rawAssignee !== undefined && !assignee)
+    || (rawPriority !== undefined && !priority)
+    || (rawDue !== undefined && !due)
+    || !sort
+    || (tags && (tags.length > 12 || tags.some((tag) => tag.length > 32)))
+  ) {
+    res.status(400).json({ code: "invalid_review_filter", error: "Review filters are invalid or exceed their bounded limits." });
+    return undefined;
+  }
+  return {
+    ...page,
+    state,
+    sort,
+    ...(search ? { search } : {}),
+    ...(lifecycleStage ? { lifecycleStage } : {}),
+    ...(assignee ? { assignee } : {}),
+    ...(priority ? { priority } : {}),
+    ...(due ? { due } : {}),
+    ...(tags?.length ? { tags: [...new Set(tags)] } : {})
+  };
+}
+
+function coerceNotificationPageQuery(req: Request, res: Response) {
+  const page = coercePageQuery(req, res);
+  if (!page) return undefined;
+  const raw = Array.isArray(req.query.unread) ? req.query.unread[0] : req.query.unread;
+  if (raw !== undefined && raw !== "true" && raw !== "false") {
+    res.status(400).json({ code: "invalid_notification_filter", error: "unread must be true or false." });
+    return undefined;
+  }
+  return { ...page, ...(raw === "true" ? { unreadOnly: true } : {}) };
+}
+
+function coerceReviewMetadataCommand(value: unknown) {
+  if (!isRecord(value)) return undefined;
+  const bindings = coerceReviewBindings(value);
+  if (!bindings) return undefined;
+  const allowed = new Set([
+    "expectedVersion", "expectedRevision", "expectedHash",
+    "priority", "assignedTo", "dueAt", "tags", "lifecycleStage"
+  ]);
+  if (Object.keys(value).some((key) => !allowed.has(key))) return undefined;
+  const patch: Partial<Pick<MemoRecord, "priority" | "assignedTo" | "dueAt" | "tags" | "lifecycleStage">> = {};
+  const clear: Array<"assignedTo" | "dueAt"> = [];
+  if (Object.prototype.hasOwnProperty.call(value, "priority")) {
+    const priority = coerceCasePriority(value.priority);
+    if (!priority) return undefined;
+    patch.priority = priority;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, "assignedTo")) {
+    if (value.assignedTo === null) clear.push("assignedTo");
+    else {
+      const assignedTo = coerceBoundedString(value.assignedTo, 1, 128);
+      if (!assignedTo) return undefined;
+      patch.assignedTo = assignedTo;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(value, "dueAt")) {
+    if (value.dueAt === null) clear.push("dueAt");
+    else if (typeof value.dueAt === "string" && value.dueAt.length <= 40 && Number.isFinite(Date.parse(value.dueAt))) {
+      patch.dueAt = new Date(value.dueAt).toISOString();
+    } else return undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, "tags")) {
+    if (!Array.isArray(value.tags) || value.tags.length > 12) return undefined;
+    const tags = value.tags.map((tag) => typeof tag === "string" ? tag.trim() : "");
+    if (tags.some((tag) => !tag || tag.length > 32)) return undefined;
+    patch.tags = [...new Set(tags)];
+  }
+  if (Object.prototype.hasOwnProperty.call(value, "lifecycleStage")) {
+    const lifecycleStage = coerceReviewLifecycleStage(value.lifecycleStage);
+    if (!lifecycleStage) return undefined;
+    patch.lifecycleStage = lifecycleStage;
+  }
+  if (Object.keys(patch).length + clear.length === 0) return undefined;
+  return { ...bindings, patch, clear };
+}
+
+function coerceCasePriority(value: unknown): MemoRecord["priority"] | undefined {
+  return value === "low" || value === "normal" || value === "high" || value === "urgent"
+    ? value
+    : undefined;
+}
+
+function coerceReviewLifecycleStage(value: unknown): MemoRecord["lifecycleStage"] | undefined {
+  return value === "draft" || value === "needs-information" || value === "ready-for-analysis"
+    || value === "in-review" || value === "changes-requested" || value === "ready-for-decision"
+    || value === "approved" || value === "rejected" || value === "superseded" || value === "archived"
+    ? value
+    : undefined;
+}
+
+function coerceCommentInput(value: unknown) {
+  if (!isRecord(value) || Object.keys(value).some((key) => !["body", "mentions", "kind"].includes(key))) {
+    return undefined;
+  }
+  const body = coerceBoundedString(value.body, 1, 4_000);
+  const mentions = value.mentions === undefined ? [] : value.mentions;
+  const kind = value.kind === undefined ? "comment" : value.kind;
+  if (
+    !body
+    || !Array.isArray(mentions)
+    || mentions.length > 20
+    || mentions.some((mention) => typeof mention !== "string" || mention.length < 1 || mention.length > 128)
+    || (kind !== "comment" && kind !== "request-information")
+  ) return undefined;
+  return {
+    body,
+    mentions: [...new Set(mentions as string[])],
+    kind: kind as "comment" | "request-information"
+  };
 }
 
 function coerceWorkspacePreferenceCommand(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const input = value as Record<string, unknown>;
   const keys = Object.keys(input);
-  if (keys.some((key) => !["expectedVersion", "selectedMemoId", "activeMemoBuilderSessionId"].includes(key))) {
+  if (keys.some((key) => ![
+    "expectedVersion", "selectedMemoId", "activeMemoBuilderSessionId",
+    "onboardingCompletedAt", "dismissedGuidance", "savedReviewViews", "activeWorkspace",
+    "lastAppRoute", "lastDashboardRoute"
+  ].includes(key))) {
     return undefined;
   }
   const expectedVersion = coerceExpectedVersion(input.expectedVersion, true);
@@ -2811,11 +3184,76 @@ function coerceWorkspacePreferenceCommand(value: unknown) {
     || (input.selectedMemoId !== undefined && selectedMemoId === undefined)
     || (input.activeMemoBuilderSessionId !== undefined && activeMemoBuilderSessionId === undefined)
   ) return undefined;
+  const onboardingCompletedAt = input.onboardingCompletedAt === null
+    ? null
+    : input.onboardingCompletedAt === undefined
+      ? undefined
+      : typeof input.onboardingCompletedAt === "string"
+        && input.onboardingCompletedAt.length <= 40
+        && Number.isFinite(Date.parse(input.onboardingCompletedAt))
+          ? new Date(input.onboardingCompletedAt).toISOString()
+          : undefined;
+  const dismissedGuidance = input.dismissedGuidance === undefined
+    ? undefined
+    : boundedStringArray(input.dismissedGuidance, 32, 80);
+  const savedReviewViews = input.savedReviewViews === undefined
+    ? undefined
+    : coerceSavedReviewViews(input.savedReviewViews);
+  const activeWorkspace: "operations" | "growth" | undefined = input.activeWorkspace === undefined
+    ? undefined
+    : input.activeWorkspace === "operations" || input.activeWorkspace === "growth"
+      ? input.activeWorkspace
+      : undefined;
+  const lastAppRoute = coerceNullableRoute(input.lastAppRoute, "#/", 240);
+  const lastDashboardRoute = coerceNullableRoute(input.lastDashboardRoute, "#", 240);
+  if (
+    (input.onboardingCompletedAt !== undefined && onboardingCompletedAt === undefined)
+    || (input.dismissedGuidance !== undefined && dismissedGuidance === undefined)
+    || (input.savedReviewViews !== undefined && savedReviewViews === undefined)
+    || (input.activeWorkspace !== undefined && activeWorkspace === undefined)
+    || (input.lastAppRoute !== undefined && lastAppRoute === undefined)
+    || (input.lastDashboardRoute !== undefined && lastDashboardRoute === undefined)
+  ) return undefined;
   return {
     expectedVersion,
     ...(input.selectedMemoId !== undefined ? { selectedMemoId } : {}),
-    ...(input.activeMemoBuilderSessionId !== undefined ? { activeMemoBuilderSessionId } : {})
+    ...(input.activeMemoBuilderSessionId !== undefined ? { activeMemoBuilderSessionId } : {}),
+    ...(input.onboardingCompletedAt !== undefined ? { onboardingCompletedAt } : {}),
+    ...(dismissedGuidance !== undefined ? { dismissedGuidance } : {}),
+    ...(savedReviewViews !== undefined ? { savedReviewViews } : {}),
+    ...(activeWorkspace !== undefined ? { activeWorkspace } : {}),
+    ...(input.lastAppRoute !== undefined ? { lastAppRoute } : {}),
+    ...(input.lastDashboardRoute !== undefined ? { lastDashboardRoute } : {})
   };
+}
+
+function boundedStringArray(value: unknown, count: number, length: number) {
+  if (!Array.isArray(value) || value.length > count) return undefined;
+  const strings = value.map((entry) => typeof entry === "string" ? entry.trim() : "");
+  return strings.some((entry) => !entry || entry.length > length) ? undefined : [...new Set(strings)];
+}
+
+function coerceSavedReviewViews(value: unknown) {
+  if (!Array.isArray(value) || value.length > 20) return undefined;
+  const views = value.map((entry) => {
+    if (!isRecord(entry) || Object.keys(entry).some((key) => !["id", "name", "query", "createdAt"].includes(key))) return undefined;
+    const id = coercePathId(entry.id, "view-", 128);
+    const name = coerceBoundedString(entry.name, 1, 80);
+    const query = typeof entry.query === "string" && entry.query.length <= 1_000 ? entry.query : undefined;
+    const createdAt = typeof entry.createdAt === "string" && entry.createdAt.length <= 40 && Number.isFinite(Date.parse(entry.createdAt))
+      ? new Date(entry.createdAt).toISOString()
+      : undefined;
+    return id && name && query !== undefined && createdAt ? { id, name, query, createdAt } : undefined;
+  });
+  return views.some((view) => !view) ? undefined : views as NonNullable<typeof views[number]>[];
+}
+
+function coerceNullableRoute(value: unknown, prefix: string, maxLength: number) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return typeof value === "string" && value.startsWith(prefix) && value.length <= maxLength && !/[\u0000-\u001f\u007f]/u.test(value)
+    ? value
+    : undefined;
 }
 
 function coerceNewReviewInput(value: unknown): NewReviewInput | undefined {
@@ -2998,7 +3436,8 @@ function authoritativeReviewAuditEvent(
   memoId: string,
   action: string,
   detail: string,
-  severity: AuditEvent["severity"]
+  severity: AuditEvent["severity"],
+  metadata: AuditEvent["metadata"] = {}
 ) {
   return {
     ...createAuditEvent(memoId, action, detail, severity, user.name),
@@ -3009,9 +3448,45 @@ function authoritativeReviewAuditEvent(
       source: "authenticated-api",
       outcome: "succeeded",
       subjectType: "review",
-      subjectId: memoId
+      subjectId: memoId,
+      ...metadata
     }
   } satisfies AuditEvent;
+}
+
+function workspaceNotification(
+  userId: string,
+  memoId: string | undefined,
+  kind: WorkspaceNotification["kind"],
+  title: string,
+  detail: string
+): WorkspaceNotification {
+  return {
+    id: `notification-${randomUUID()}`,
+    userId,
+    ...(memoId ? { memoId } : {}),
+    kind,
+    title: title.slice(0, 160),
+    detail: detail.slice(0, 1_000),
+    createdAt: new Date().toISOString()
+  };
+}
+
+async function findReviewComment(
+  store: AccountStore,
+  userId: string,
+  memoId: string,
+  commentId: string
+) {
+  let cursor: string | undefined;
+  for (let pageNumber = 0; pageNumber < 20; pageNumber += 1) {
+    const page = await store.listReviewComments(userId, memoId, { limit: 50, ...(cursor ? { cursor } : {}) });
+    const comment = page.items.find((item) => item.id === commentId);
+    if (comment) return comment;
+    if (!page.nextCursor) return undefined;
+    cursor = page.nextCursor;
+  }
+  return undefined;
 }
 
 function coerceAuthToken(value: unknown) {

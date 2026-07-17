@@ -3,6 +3,8 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  BriefcaseBusiness,
+  ChevronDown,
   CheckCircle2,
   ClipboardCheck,
   CircleDollarSign,
@@ -28,11 +30,13 @@ import {
   getAdminMetrics,
   getCurrentUser,
   getOutreachProviderConfig,
+  loadWorkspacePreferences,
   listAdminUsers,
   listInvites,
   setOutreachProviderConfig,
   signIn,
   signOut,
+  updateWorkspacePreferences,
   type InviteSummary,
   type OutreachProviderConfig
 } from "../lib/apiClient";
@@ -46,17 +50,22 @@ import { OutreachJobsPanel } from "./OutreachJobsPanel";
 
 const ADMIN_ROLE: UserProfile["role"] = "export-control-officer";
 const RANGE_OPTIONS = [7, 30, 90] as const;
-type DashboardTab = "overview" | "usage" | "accounts" | "invites" | "leads" | "review" | "jobs" | "writer" | "settings";
+type DashboardWorkspace = "operations" | "growth";
+type DashboardTab = "overview" | "usage" | "accounts" | "invites" | "settings" | "growth-overview" | "leads" | "lead-review" | "jobs" | "writer";
 
-const DASHBOARD_TABS: Array<{
+type DashboardTabInfo = {
   id: DashboardTab;
+  workspace: DashboardWorkspace;
   label: string;
   heading: string;
   description: string;
   icon: typeof LayoutDashboard;
-}> = [
+};
+
+const DASHBOARD_TABS: DashboardTabInfo[] = [
   {
     id: "overview",
+    workspace: "operations",
     label: "Overview",
     heading: "Operations overview",
     description: "A concise view of service health, Bedrock activity, and account access.",
@@ -64,6 +73,7 @@ const DASHBOARD_TABS: Array<{
   },
   {
     id: "usage",
+    workspace: "operations",
     label: "Usage",
     heading: "AI usage and spend",
     description: "Bedrock costs, model activity, workflow volume, tokens, and latency.",
@@ -71,6 +81,7 @@ const DASHBOARD_TABS: Array<{
   },
   {
     id: "accounts",
+    workspace: "operations",
     label: "Accounts",
     heading: "Account activity",
     description: "Operator access, online status, and cumulative AI usage by account.",
@@ -78,27 +89,47 @@ const DASHBOARD_TABS: Array<{
   },
   {
     id: "invites",
+    workspace: "operations",
     label: "Invitations",
     heading: "Secure invitations",
     description: "Provision role-based access and review recent invitation status.",
     icon: UserPlus
   },
   {
+    id: "settings",
+    workspace: "operations",
+    label: "Settings",
+    heading: "Provider and workspace settings",
+    description: "Configure approved provider lanes and operational defaults with an auditable boundary.",
+    icon: Settings
+  },
+  {
+    id: "growth-overview",
+    workspace: "growth",
+    label: "Overview",
+    heading: "Growth pipeline overview",
+    description: "Move qualified leads from source-backed research through human review, drafting, signing, and sent status.",
+    icon: LayoutDashboard
+  },
+  {
     id: "leads",
+    workspace: "growth",
     label: "Leads",
     heading: "Lead pipeline",
     description: "The imported outreach sheet plus timed, source-aware Bedrock lead discovery.",
     icon: Target
   },
   {
-    id: "review",
-    label: "Review Queue",
+    id: "lead-review",
+    workspace: "growth",
+    label: "Lead Review",
     heading: "Lead review queue",
     description: "Human approval, ownership, lifecycle status, and follow-up planning.",
     icon: ClipboardCheck
   },
   {
     id: "jobs",
+    workspace: "growth",
     label: "Background Jobs",
     heading: "Background outreach jobs",
     description: "Durable bulk work with progress, retries, pause/resume, and cost controls.",
@@ -106,17 +137,11 @@ const DASHBOARD_TABS: Array<{
   },
   {
     id: "writer",
+    workspace: "growth",
     label: "Bedrock Writer",
     heading: "Bedrock Writer",
     description: "Generate, edit, and save project-first outreach drafts.",
     icon: Mail
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    heading: "AI provider settings",
-    description: "Switch between Amazon Bedrock and the direct Anthropic API for email and lead features.",
-    icon: Settings
   }
 ];
 
@@ -248,14 +273,14 @@ function DashboardDenied({ user, onSignOut }: { user: UserProfile; onSignOut: ()
 }
 
 function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () => Promise<void> }) {
+  const initialRoute = parseDashboardHash(window.location.hash);
   const [metrics, setMetrics] = useState<AdminMetrics | undefined>();
   const [users, setUsers] = useState<UserAdminSummary[]>([]);
   const [userCursor, setUserCursor] = useState<string | undefined>();
   const [loadingMoreUsers, setLoadingMoreUsers] = useState(false);
-  const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
-    const hash = window.location.hash.replace("#", "");
-    return DASHBOARD_TABS.some((tab) => tab.id === hash) ? hash as DashboardTab : "overview";
-  });
+  const [activeWorkspace, setActiveWorkspace] = useState<DashboardWorkspace>(initialRoute.workspace);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(initialRoute.tab);
+  const [preferenceVersion, setPreferenceVersion] = useState(0);
   const [rangeDays, setRangeDays] = useState<(typeof RANGE_OPTIONS)[number]>(30);
   const [error, setError] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -297,22 +322,49 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const applyHash = () => {
+      const route = parseDashboardHash(window.location.hash);
+      setActiveWorkspace(route.workspace);
+      setActiveTab(route.tab);
+    };
+    window.addEventListener("hashchange", applyHash);
+    void loadWorkspacePreferences().then((preferences) => {
+      setPreferenceVersion(preferences.version);
+      if (!window.location.hash && preferences.lastDashboardRoute) {
+        window.history.replaceState(null, "", preferences.lastDashboardRoute);
+        applyHash();
+      }
+    }).catch(() => undefined);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
   const selectTab = (tab: DashboardTab) => {
+    const info = DASHBOARD_TABS.find((candidate) => candidate.id === tab) ?? DASHBOARD_TABS[0];
     setActiveTab(tab);
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${tab}`);
+    setActiveWorkspace(info.workspace);
+    const hash = dashboardHash(info.workspace, tab);
+    window.history.pushState(null, "", hash);
     document.querySelector(".dash-main")?.scrollTo({ top: 0, behavior: "smooth" });
+    void persistDashboardLocation(preferenceVersion, info.workspace, hash).then(setPreferenceVersion).catch(() => undefined);
   };
+  const switchWorkspace = (workspace: DashboardWorkspace) => selectTab(workspace === "operations" ? "overview" : "growth-overview");
   const activeTabInfo = DASHBOARD_TABS.find((tab) => tab.id === activeTab) ?? DASHBOARD_TABS[0];
+  const visibleTabs = DASHBOARD_TABS.filter((tab) => tab.workspace === activeWorkspace);
   const showsMetricsRange = activeTab === "overview" || activeTab === "usage";
 
   return (
     <div className="dash-app-shell">
       <aside className="dash-rail">
         <div className="dash-brand">
-          <BrandLogo tone="light" size="rail" product="Operations" />
+          <BrandLogo tone="light" size="rail" product={activeWorkspace === "operations" ? "Operations" : "Growth"} />
         </div>
-        <nav aria-label="Operations dashboard">
-          {DASHBOARD_TABS.map((tab) => {
+        <div className="dash-workspace-switcher" role="group" aria-label="Dashboard workspace">
+          <button type="button" className={activeWorkspace === "operations" ? "active" : ""} onClick={() => switchWorkspace("operations")}><BriefcaseBusiness size={16} /><span><strong>Operations</strong><small>Service and access</small></span><ChevronDown size={14} /></button>
+          <button type="button" className={activeWorkspace === "growth" ? "active" : ""} onClick={() => switchWorkspace("growth")}><Target size={16} /><span><strong>Growth</strong><small>Research and drafts</small></span><ChevronDown size={14} /></button>
+        </div>
+        <nav aria-label={`${activeWorkspace === "operations" ? "Operations" : "Growth"} dashboard`}>
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
@@ -344,6 +396,7 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
       <main className="dash-main">
         <header className="dash-header">
           <div>
+            <nav className="dash-breadcrumbs" aria-label="Breadcrumb"><button type="button" onClick={() => switchWorkspace(activeWorkspace)}>{activeWorkspace === "operations" ? "Operations" : "Growth"}</button><span>/</span><span>{activeTabInfo.label}</span></nav>
             <span className="dash-eyebrow">Admin control room</span>
             <h1>{activeTabInfo.heading}</h1>
             <p>{activeTabInfo.description}</p>
@@ -459,8 +512,9 @@ function DashboardHome({ user, onSignOut }: { user: UserProfile; onSignOut: () =
             />
           )}
           {activeTab === "invites" && <InvitePanel onChanged={load} />}
+          {activeTab === "growth-overview" && <GrowthOverview onOpen={selectTab} />}
           {activeTab === "leads" && <LeadsPanel />}
-          {activeTab === "review" && <LeadReviewQueue />}
+          {activeTab === "lead-review" && <LeadReviewQueue />}
           {activeTab === "jobs" && <OutreachJobsPanel />}
           {activeTab === "writer" && <OutreachWriterPanel />}
           {activeTab === "settings" && <ProviderSettingsPanel />}
@@ -492,6 +546,59 @@ function SystemHealth() {
       </div>
     </section>
   );
+}
+
+function GrowthOverview({ onOpen }: { onOpen: (tab: DashboardTab) => void }) {
+  const stages: Array<{ tab: DashboardTab; label: string; detail: string; icon: typeof Target }> = [
+    { tab: "leads", label: "Ingest and research", detail: "Import leads and attach source-backed company research.", icon: Target },
+    { tab: "lead-review", label: "Human lead review", detail: "Qualify, assign, and approve the next outreach action.", icon: ClipboardCheck },
+    { tab: "jobs", label: "Background work", detail: "Track durable research and drafting jobs with retry and cancel controls.", icon: Workflow },
+    { tab: "writer", label: "Draft and sign", detail: "Generate a project-first draft, edit it, and mark it sent only after a person sends it.", icon: Mail }
+  ];
+  return (
+    <div className="dash-growth-overview">
+      <section className="dash-growth-guardrail"><ShieldCheck size={21} /><div><strong>Human-controlled outreach</strong><p>Rulix researches and drafts. It never sends outreach automatically; a person reviews, signs, sends, and records the result.</p></div></section>
+      <section className="dash-growth-flow" aria-label="Growth workflow">
+        {stages.map((stage, index) => {
+          const Icon = stage.icon;
+          return <button type="button" key={stage.tab} onClick={() => onOpen(stage.tab)}><span>{index + 1}</span><Icon size={20} /><div><strong>{stage.label}</strong><p>{stage.detail}</p></div><ExternalLink size={15} /></button>;
+        })}
+      </section>
+      <section className="dash-overview-grid">
+        <OverviewPanel icon={<Target size={19} />} title="Lead pipeline" detail="Source-backed leads and explicit qualification state." action="Open leads" onOpen={() => onOpen("leads")} />
+        <OverviewPanel icon={<Workflow size={19} />} title="Job control" detail="Visible progress, model lane, cost estimate, retries, cancellation, and audit history." action="Open jobs" onOpen={() => onOpen("jobs")} />
+        <OverviewPanel icon={<Mail size={19} />} title="Draft workspace" detail="Project-first drafts remain editable and require human sending." action="Open writer" onOpen={() => onOpen("writer")} />
+      </section>
+    </div>
+  );
+}
+
+function dashboardHash(workspace: DashboardWorkspace, tab: DashboardTab) {
+  const path = tab === "growth-overview" ? "overview" : tab === "invites" ? "invitations" : tab;
+  return `#${workspace}/${path}`;
+}
+
+export function parseDashboardHash(hash: string): { workspace: DashboardWorkspace; tab: DashboardTab } {
+  const clean = hash.replace(/^#\/?/, "").split("?")[0];
+  const [workspaceValue, pathValue] = clean.split("/");
+  const workspace: DashboardWorkspace = workspaceValue === "growth" ? "growth" : "operations";
+  const path = pathValue || workspaceValue;
+  const candidate: DashboardTab = workspace === "growth"
+    ? path === "overview" || path === "growth-overview" ? "growth-overview" : path === "review" ? "lead-review" : path as DashboardTab
+    : path === "invitations" ? "invites" : path as DashboardTab;
+  const valid = DASHBOARD_TABS.some((tab) => tab.id === candidate && tab.workspace === workspace);
+  return valid ? { workspace, tab: candidate } : { workspace, tab: workspace === "growth" ? "growth-overview" : "overview" };
+}
+
+async function persistDashboardLocation(expectedVersion: number, workspace: DashboardWorkspace, hash: string) {
+  try {
+    const updated = await updateWorkspacePreferences(expectedVersion, { activeWorkspace: workspace, lastDashboardRoute: hash });
+    return updated.version;
+  } catch {
+    const latest = await loadWorkspacePreferences();
+    const updated = await updateWorkspacePreferences(latest.version, { activeWorkspace: workspace, lastDashboardRoute: hash });
+    return updated.version;
+  }
 }
 
 function MetricCards({ metrics, rangeDays }: { metrics: AdminMetrics; rangeDays: number }) {

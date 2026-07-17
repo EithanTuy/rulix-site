@@ -208,9 +208,24 @@ describe("scoped review command API", () => {
     const preference = await session.agent
       .patch("/api/account/preferences")
       .set("x-rulix-csrf", session.csrfToken)
-      .send({ expectedVersion: 0, selectedMemoId: created.review.id })
+      .send({
+        expectedVersion: 0,
+        selectedMemoId: created.review.id,
+        onboardingCompletedAt: "2026-07-16T12:00:00.000Z",
+        dismissedGuidance: ["queue-right-click"],
+        savedReviewViews: [{ id: "view-urgent", name: "Urgent", query: "priority=urgent", createdAt: "2026-07-16T12:00:00.000Z" }],
+        activeWorkspace: "growth",
+        lastAppRoute: `#/reviews/${created.review.id}/overview`,
+        lastDashboardRoute: "#growth/leads"
+      })
       .expect(200);
-    expect(preference.body).toMatchObject({ version: 1, selectedMemoId: created.review.id });
+    expect(preference.body).toMatchObject({
+      version: 1,
+      selectedMemoId: created.review.id,
+      activeWorkspace: "growth",
+      lastDashboardRoute: "#growth/leads",
+      savedReviewViews: [{ id: "view-urgent", name: "Urgent" }]
+    });
     const stalePreference = await session.agent
       .patch("/api/account/preferences")
       .set("x-rulix-csrf", session.csrfToken)
@@ -247,6 +262,63 @@ describe("scoped review command API", () => {
 
     const reviewPage = await session.agent.get("/api/reviews?limit=50&state=all").expect(200);
     expect(reviewPage.body.items.map((item: { id: string }) => item.id)).toContain(created.review.id);
+  });
+
+  it("supports filtered work queues, authoritative metadata, comments, and notifications", async () => {
+    const session = await signedIn("collaboration@example.com");
+    const created = await createReview(session);
+
+    const members = await session.agent.get("/api/tenant/members").expect(200);
+    expect(members.body.items).toEqual([expect.objectContaining({ id: session.user.id, email: session.user.email })]);
+
+    const metadata = await session.agent
+      .patch(`/api/reviews/${created.review.id}/metadata`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({
+        ...bindings(created.review),
+        priority: "urgent",
+        assignedTo: session.user.id,
+        dueAt: "2026-07-20T17:00:00.000Z",
+        tags: ["customer", "cryogenic"],
+        lifecycleStage: "in-review"
+      })
+      .expect(200);
+    expect(metadata.body.review).toMatchObject({ priority: "urgent", assignedTo: session.user.id, tags: ["customer", "cryogenic"], lifecycleStage: "in-review" });
+    expect(metadata.body.auditEvents[0].action).toBe("Review metadata updated");
+
+    const filtered = await session.agent.get("/api/reviews?search=RLX-200&priority=urgent&lifecycleStage=in-review&tags=customer&state=active").expect(200);
+    expect(filtered.body.items.map((review: MemoRecord) => review.id)).toEqual([created.review.id]);
+    await session.agent.get("/api/reviews?priority=impossible").expect(400);
+
+    const createdComment = await session.agent
+      .post(`/api/reviews/${created.review.id}/comments`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({ body: "Please verify the operating temperature range.", kind: "request-information", mentions: [] })
+      .expect(201);
+    expect(createdComment.body).toMatchObject({ memoId: created.review.id, authorId: session.user.id });
+    const comments = await session.agent.get(`/api/reviews/${created.review.id}/comments?limit=25`).expect(200);
+    expect(comments.body.items).toHaveLength(1);
+    await session.agent
+      .post(`/api/reviews/${created.review.id}/comments/${createdComment.body.id}/resolve`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({})
+      .expect(200)
+      .expect((response) => expect(response.body.resolvedBy).toBe(session.user.id));
+
+    const notifications = await session.agent.get("/api/notifications?unread=true&limit=25").expect(200);
+    expect(notifications.body.items.map((item: { kind: string }) => item.kind)).toEqual(expect.arrayContaining(["assignment", "due-date"]));
+    const firstNotification = notifications.body.items[0];
+    await session.agent
+      .patch(`/api/notifications/${firstNotification.id}/read`)
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({})
+      .expect(200)
+      .expect((response) => expect(response.body.readAt).toEqual(expect.any(String)));
+    await session.agent
+      .patch("/api/notifications/read")
+      .set("x-rulix-csrf", session.csrfToken)
+      .send({})
+      .expect(200);
   });
 
   it("applies only a stored, review-bound chat suggestion by message ID", async () => {

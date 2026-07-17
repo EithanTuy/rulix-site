@@ -96,12 +96,18 @@ npm run typecheck
 npm test -- --run
 npm run build
 npm run build:lambda
+npm run test:bundle
+npm run test:e2e
 npm audit --audit-level=moderate
 npm run test:ai
 npm run download:corpus
 ```
 
 Reviewer workflow guide: `docs/reviewer-guide.md`.
+Operator dashboard runbook: `docs/dashboard-operator-runbook.md`.
+Frontend release and rollback: `docs/frontend-release-runbook.md`.
+Design system and accessibility: `docs/frontend-design-system.md` and `docs/accessibility-checklist.md`.
+AI approval and human signoff: `docs/ai-approval-and-human-signoff.md`.
 Security and storage guide: `docs/security-auth-storage.md`.
 Bounded admin metrics runbook: `docs/admin-metrics-operations.md`.
 Bounded outreach operations: `docs/outreach-operations.md`.

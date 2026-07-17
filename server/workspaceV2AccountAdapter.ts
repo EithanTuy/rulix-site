@@ -5,6 +5,7 @@ import type {
   AiApprovalMemoChatFence,
   AiApprovalSubjectBinding,
   AuditEvent,
+  CaseComment,
   LeadSearchRun,
   LeadWorkflow,
   MemoBuilderSession,
@@ -16,6 +17,7 @@ import type {
   OutreachLead,
   ReviewResult,
   ReviewerDecision
+  ,WorkspaceNotification
 } from "../src/types";
 import { hashMemoContent, hashReviewResult } from "./domain/hashes";
 import {
@@ -33,18 +35,22 @@ import type {
   ApplyChatSuggestionCommand,
   ArchiveReviewCommand,
   ChatCommandResult,
+  CreateReviewCommentCommand,
   CreateReviewCommand,
   CreateReviewResult,
   CursorPage,
   DecisionExpectedBindings,
   DecisionTransitionResult,
   PageQuery,
+  NotificationPageQuery,
   ReviewCommandResult,
   ReviewDetail,
   ReviewPageQuery,
   ReviewSummary,
+  ResolveReviewCommentCommand,
   StoredMemoBuilderSession,
   UpdateReviewMemoCommand,
+  UpdateReviewMetadataCommand,
   UpdateWorkspacePreferencesCommand,
   UpsertMemoBuilderSessionCommand,
   WorkspacePreferenceRecord
@@ -130,6 +136,16 @@ export interface AiApprovalChatFenceCapture {
 interface BuilderEntity extends WorkspaceItem {
   entityType: "BS";
   session: MemoBuilderSession;
+}
+
+interface CommentEntity extends WorkspaceItem {
+  entityType: "CM";
+  comment: CaseComment;
+}
+
+interface NotificationEntity extends WorkspaceItem {
+  entityType: "NT";
+  notification: WorkspaceNotification;
 }
 
 interface OutreachEntity<T> extends WorkspaceItem {
@@ -218,21 +234,35 @@ export class NormalizedWorkspaceAccountAdapter {
     await this.repository.requireMigrated(userId);
     const pk = workspacePk(this.repository.tenantId, userId);
     const byState = query.state !== "all";
-    const page = await this.repository.queryPage<ReviewEntity>({
-      userId,
-      prefix: "R#",
-      limit: Math.min(query.limit, 100),
-      maxLimit: 100,
-      cursor: query.cursor,
-      forward: false,
-      indexName: byState ? "gsi2" : "gsi1",
-      indexPk: byState
-        ? `${pk}#REVIEWS#${query.state === "archived" ? "ARCHIVED" : "ACTIVE"}`
-        : `${pk}#REVIEWS`,
-      indexPartitionAttribute: byState ? "gsi2pk" : "gsi1pk",
-      indexSortAttribute: byState ? "gsi2sk" : "gsi1sk"
-    });
-    return responsePage(page.items.map((item) => reviewSummary(item.review)), page.nextCursor);
+    const items: ReviewSummary[] = [];
+    let cursor = query.cursor;
+    let nextCursor: string | undefined;
+    for (let pageNumber = 0; pageNumber < 200 && items.length < query.limit; pageNumber += 1) {
+      const remaining = query.limit - items.length;
+      const page = await this.repository.queryPage<ReviewEntity>({
+        userId,
+        prefix: "R#",
+        limit: remaining,
+        cursorPageSize: query.limit,
+        maxLimit: 100,
+        cursor,
+        forward: query.sort === "updated-asc",
+        indexName: byState ? "gsi2" : "gsi1",
+        indexPk: byState
+          ? `${pk}#REVIEWS#${query.state === "archived" ? "ARCHIVED" : "ACTIVE"}`
+          : `${pk}#REVIEWS`,
+        indexPartitionAttribute: byState ? "gsi2pk" : "gsi1pk",
+        indexSortAttribute: byState ? "gsi2sk" : "gsi1sk",
+        queryBinding: reviewQueryBinding(query)
+      });
+      items.push(...page.items
+        .map((item) => reviewSummary(item.review))
+        .filter((review) => reviewMatchesQuery(review, query)));
+      nextCursor = page.nextCursor;
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    return responsePage(items, nextCursor);
   }
 
   async getReviewDetail(userId: string, memoId: string): Promise<ReviewDetail | undefined> {
@@ -601,6 +631,32 @@ export class NormalizedWorkspaceAccountAdapter {
     return { review: transition.review, auditEvents: [structuredClone(command.auditEvent)] };
   }
 
+  async updateReviewMetadata(userId: string, memoId: string, command: UpdateReviewMetadataCommand) {
+    await this.repository.requireMigrated(userId);
+    const currentEntity = await this.requireReviewEntity(userId, memoId);
+    const current = await this.hydrateReview(userId, currentEntity);
+    assertReviewBindings(current, command);
+    const review: MemoRecord = {
+      ...current,
+      ...structuredClone(command.patch),
+      version: (current.version ?? current.revision ?? 1) + 1,
+      updatedAt: this.now().toISOString()
+    };
+    for (const field of command.clear) delete review[field];
+    const nextItem = reviewEntityItem(
+      this.repository.tenantId,
+      userId,
+      review,
+      currentEntity.contentRef,
+      currentEntity.createdAt
+    );
+    await this.repository.transact([
+      casReviewPut(this.repository.tableName, nextItem, command),
+      this.repository.outboxPut(userId, command.auditEvent)
+    ]);
+    return { review, auditEvents: [structuredClone(command.auditEvent)] };
+  }
+
   async setReviewArchived(userId: string, memoId: string, command: ArchiveReviewCommand) {
     await this.repository.requireMigrated(userId);
     const currentEntity = await this.requireReviewEntity(userId, memoId);
@@ -725,6 +781,199 @@ export class NormalizedWorkspaceAccountAdapter {
     return { review: transition.review, messages, auditEvents: [structuredClone(command.auditEvent)] };
   }
 
+  async listReviewComments(userId: string, memoId: string, query: PageQuery) {
+    await this.repository.requireMigrated(userId);
+    const pk = workspacePk(this.repository.tenantId, userId);
+    const page = await this.repository.queryPage<CommentEntity>({
+      userId,
+      prefix: "CM#",
+      limit: Math.min(query.limit, 50),
+      maxLimit: 50,
+      cursor: query.cursor,
+      forward: false,
+      indexName: "gsi1",
+      indexPk: `${pk}#COMMENTS#${memoId}`,
+      queryBinding: { memoId }
+    });
+    return responsePage(page.items.map((item) => item.comment), page.nextCursor);
+  }
+
+  async createReviewComment(userId: string, memoId: string, command: CreateReviewCommentCommand) {
+    await this.repository.requireMigrated(userId);
+    await this.requireReviewEntity(userId, memoId);
+    if (command.comment.memoId !== memoId) {
+      throw new WorkspaceValidationError("Comment review binding is invalid.");
+    }
+    const now = this.now().toISOString();
+    const pk = workspacePk(this.repository.tenantId, userId);
+    const item: CommentEntity = {
+      pk,
+      sk: workspaceSk.comment(memoId, command.comment.id),
+      schemaVersion: WORKSPACE_SCHEMA_VERSION,
+      entityType: "CM",
+      entityVersion: 1,
+      comment: structuredClone(command.comment),
+      gsi1pk: `${pk}#COMMENTS#${memoId}`,
+      gsi1sk: `CM#${command.comment.createdAt}#${command.comment.id}`,
+      createdAt: command.comment.createdAt,
+      updatedAt: now
+    };
+    await this.repository.transact([
+      immutablePut(this.repository.tableName, item),
+      this.repository.outboxPut(userId, command.auditEvent)
+    ]);
+    return structuredClone(command.comment);
+  }
+
+  async resolveReviewComment(
+    userId: string,
+    memoId: string,
+    commentId: string,
+    command: ResolveReviewCommentCommand
+  ) {
+    await this.repository.requireMigrated(userId);
+    const current = await this.repository.getItem<CommentEntity>(
+      userId,
+      workspaceSk.comment(memoId, commentId),
+      true
+    );
+    if (!current) throw new WorkspaceNotFoundError("Comment not found.");
+    if (current.comment.resolvedAt) return structuredClone(current.comment);
+    const comment: CaseComment = {
+      ...current.comment,
+      resolvedAt: command.resolvedAt,
+      resolvedBy: command.resolvedBy
+    };
+    const next: CommentEntity = {
+      ...current,
+      entityVersion: (current.entityVersion ?? 1) + 1,
+      comment,
+      updatedAt: command.resolvedAt
+    };
+    await this.repository.transact([
+      casEntityPut(this.repository.tableName, next, current.entityVersion ?? 1),
+      this.repository.outboxPut(userId, command.auditEvent)
+    ]);
+    return structuredClone(comment);
+  }
+
+  private async listNotificationEntities(userId: string, limit: number, cursor?: string) {
+    await this.repository.requireMigrated(userId);
+    const pk = workspacePk(this.repository.tenantId, userId);
+    return this.repository.queryPage<NotificationEntity>({
+      userId,
+      prefix: "NT#",
+      limit,
+      maxLimit: 50,
+      cursor,
+      forward: false,
+      indexName: "gsi1",
+      indexPk: `${pk}#NOTIFICATIONS`,
+      queryBinding: { unreadOnly: false }
+    });
+  }
+
+  async listNotifications(userId: string, query: NotificationPageQuery) {
+    await this.repository.requireMigrated(userId);
+    const pk = workspacePk(this.repository.tenantId, userId);
+    const items: WorkspaceNotification[] = [];
+    let cursor = query.cursor;
+    let nextCursor: string | undefined;
+    for (let pageNumber = 0; pageNumber < 200 && items.length < query.limit; pageNumber += 1) {
+      const page = await this.repository.queryPage<NotificationEntity>({
+        userId,
+        prefix: "NT#",
+        limit: query.limit - items.length,
+        cursorPageSize: query.limit,
+        maxLimit: 50,
+        cursor,
+        forward: false,
+        indexName: "gsi1",
+        indexPk: `${pk}#NOTIFICATIONS`,
+        queryBinding: { unreadOnly: Boolean(query.unreadOnly) }
+      });
+      items.push(...page.items
+        .map((item) => item.notification)
+        .filter((notification) => !query.unreadOnly || !notification.readAt));
+      nextCursor = page.nextCursor;
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    return responsePage(items, nextCursor);
+  }
+
+  async appendNotifications(userId: string, notifications: WorkspaceNotification[]) {
+    if (notifications.length === 0) return;
+    await this.repository.requireMigrated(userId);
+    const pk = workspacePk(this.repository.tenantId, userId);
+    const items = notifications.map((notification): NotificationEntity => {
+      if (notification.userId !== userId) {
+        throw new WorkspaceValidationError("Notification user binding is invalid.");
+      }
+      return {
+        pk,
+        sk: workspaceSk.notification(notification.id),
+        schemaVersion: WORKSPACE_SCHEMA_VERSION,
+        entityType: "NT",
+        entityVersion: 1,
+        notification: structuredClone(notification),
+        gsi1pk: `${pk}#NOTIFICATIONS`,
+        gsi1sk: `NT#${notification.createdAt}#${notification.id}`,
+        createdAt: notification.createdAt,
+        updatedAt: notification.createdAt
+      };
+    });
+    for (let index = 0; index < items.length; index += 100) {
+      await this.repository.transact(items
+        .slice(index, index + 100)
+        .map((item) => immutablePut(this.repository.tableName, item)));
+    }
+  }
+
+  async markNotificationRead(userId: string, notificationId: string, readAt: string) {
+    await this.repository.requireMigrated(userId);
+    const current = await this.repository.getItem<NotificationEntity>(
+      userId,
+      workspaceSk.notification(notificationId),
+      true
+    );
+    if (!current) return undefined;
+    if (current.notification.readAt) return structuredClone(current.notification);
+    const notification = { ...current.notification, readAt };
+    const next: NotificationEntity = {
+      ...current,
+      entityVersion: (current.entityVersion ?? 1) + 1,
+      notification,
+      updatedAt: readAt
+    };
+    await this.repository.transact([
+      casEntityPut(this.repository.tableName, next, current.entityVersion ?? 1)
+    ]);
+    return structuredClone(notification);
+  }
+
+  async markAllNotificationsRead(userId: string, readAt: string) {
+    let count = 0;
+    let cursor: string | undefined;
+    do {
+      const page = await this.listNotificationEntities(userId, 50, cursor);
+      const updates = page.items
+        .filter((item) => !item.notification.readAt)
+        .map((item): TransactionItems[number] => casEntityPut(this.repository.tableName, {
+          ...item,
+          entityVersion: (item.entityVersion ?? 1) + 1,
+          notification: { ...item.notification, readAt },
+          updatedAt: readAt
+        }, item.entityVersion ?? 1));
+      if (updates.length) {
+        await this.repository.transact(updates);
+        count += updates.length;
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+    return count;
+  }
+
   async getWorkspacePreferences(userId: string): Promise<WorkspacePreferenceRecord> {
     const meta = await this.repository.requireMigrated(userId);
     return {
@@ -732,7 +981,13 @@ export class NormalizedWorkspaceAccountAdapter {
       ...(meta.selectedMemoId ? { selectedMemoId: meta.selectedMemoId } : {}),
       ...(meta.activeMemoBuilderSessionId
         ? { activeMemoBuilderSessionId: meta.activeMemoBuilderSessionId }
-        : {})
+        : {}),
+      ...(meta.onboardingCompletedAt ? { onboardingCompletedAt: meta.onboardingCompletedAt } : {}),
+      ...(meta.dismissedGuidance ? { dismissedGuidance: structuredClone(meta.dismissedGuidance) } : {}),
+      ...(meta.savedReviewViews ? { savedReviewViews: structuredClone(meta.savedReviewViews) } : {}),
+      ...(meta.activeWorkspace ? { activeWorkspace: meta.activeWorkspace } : {}),
+      ...(meta.lastAppRoute ? { lastAppRoute: meta.lastAppRoute } : {}),
+      ...(meta.lastDashboardRoute ? { lastDashboardRoute: meta.lastDashboardRoute } : {})
     };
   }
 
@@ -757,6 +1012,12 @@ export class NormalizedWorkspaceAccountAdapter {
         delete next.activeMemoBuilderSessionId;
       }
     }
+    applyMetaPreference(next, command, "onboardingCompletedAt");
+    applyMetaPreference(next, command, "dismissedGuidance");
+    applyMetaPreference(next, command, "savedReviewViews");
+    applyMetaPreference(next, command, "activeWorkspace");
+    applyMetaPreference(next, command, "lastAppRoute");
+    applyMetaPreference(next, command, "lastDashboardRoute");
     assertWorkspaceItemSize(next, 32 * 1024);
     await this.repository.transact([
       casEntityPut(this.repository.tableName, next, command.expectedVersion, true)
@@ -1726,6 +1987,80 @@ function casReviewPut(
       }
     }
   };
+}
+
+function reviewQueryBinding(query: ReviewPageQuery) {
+  return {
+    state: query.state,
+    search: query.search ?? null,
+    lifecycleStage: query.lifecycleStage ?? null,
+    assignee: query.assignee ?? null,
+    priority: query.priority ?? null,
+    due: query.due ?? null,
+    tags: query.tags ?? [],
+    sort: query.sort ?? "updated-desc"
+  };
+}
+
+function reviewMatchesQuery(review: ReviewSummary, query: ReviewPageQuery) {
+  const search = query.search?.trim().toLocaleLowerCase();
+  if (search && ![review.title, review.documentCode, review.itemFamily, review.owner, review.manufacturer]
+    .some((value) => value?.toLocaleLowerCase().includes(search))) return false;
+  if (query.lifecycleStage && review.lifecycleStage !== query.lifecycleStage) return false;
+  if (query.assignee && (query.assignee === "unassigned"
+    ? Boolean(review.assignedTo)
+    : review.assignedTo !== query.assignee)) return false;
+  if (query.priority && review.priority !== query.priority) return false;
+  if (query.tags?.length && !query.tags.every((tag) =>
+    review.tags?.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase()))) return false;
+  if (query.due) {
+    const due = review.dueAt?.slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const nextWeek = new Date(`${today}T00:00:00.000Z`);
+    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+    const nextWeekDay = nextWeek.toISOString().slice(0, 10);
+    if (query.due === "none" && due) return false;
+    if (query.due !== "none" && !due) return false;
+    if (query.due === "overdue" && due! >= today) return false;
+    if (query.due === "today" && due !== today) return false;
+    if (query.due === "next-7-days" && (due! < today || due! > nextWeekDay)) return false;
+  }
+  return true;
+}
+
+type MetaPreferenceKey =
+  | "onboardingCompletedAt"
+  | "dismissedGuidance"
+  | "savedReviewViews"
+  | "activeWorkspace"
+  | "lastAppRoute"
+  | "lastDashboardRoute";
+
+function applyMetaPreference(
+  meta: WorkspaceMetaItem,
+  command: UpdateWorkspacePreferencesCommand,
+  key: MetaPreferenceKey
+) {
+  const value = command[key];
+  if (value === undefined) return;
+  if (value === null) delete meta[key];
+  else Object.assign(meta, { [key]: structuredClone(value) });
+}
+
+function assertReviewBindings(
+  review: MemoRecord,
+  expected: { expectedVersion: number; expectedRevision: number; expectedHash: string }
+) {
+  const revision = review.revision ?? 1;
+  const version = review.version ?? revision;
+  const contentHash = review.contentHash ?? hashMemoContent(review);
+  if (
+    version !== expected.expectedVersion
+    || revision !== expected.expectedRevision
+    || contentHash !== expected.expectedHash
+  ) {
+    throw new WorkspaceConflictError("Review changed before the metadata update was applied.");
+  }
 }
 
 function reviewBindingCheck(

@@ -1,53 +1,77 @@
-# Rulix Cloud Editorial Redesign QA
+# Rulix product experience design QA
 
-Date: 2026-07-15
+## Comparison target
 
-Local preview: http://127.0.0.1:4173/
+- Source visual truth: `C:\Users\prana\.codex\generated_images\019f68cb-0342-7b40-955e-6cc22ca92430\exec-c2da2145-072b-4ee3-8350-9847f92a9b03.png`
+- Browser-rendered implementation: `C:\Users\prana\.codex\visualizations\2026\07\16\019f68cb-0342-7b40-955e-6cc22ca92430\rulix-workbench-final-1487x1058.png`
+- Source frame: 1487 × 1058.
+- Browser viewport override: 1487 × 1103; the in-app browser captured a 1487 × 979 effective page viewport after application chrome.
+- Route: `/app#/reviews/review-8aadbba6-80e2-4729-aafb-760b04cf8e49/overview`.
+- State: signed-in export-control officer, proprietary review awaiting exact-content AI approval, artifact context menu open.
 
-Source visual truth: `design/marketing/rulix-cloud-editorial-interactive-final.png`
+The source and implementation were opened together in the same comparison input at native width. The 79-pixel effective-height difference was treated as a capture-surface constraint; the shared above-the-fold product region was compared directly.
 
-## Rendered evidence
+## Full-view comparison evidence
 
-- Desktop, native 1440 x 1024, page top: `design-audits/rulix-cloud-editorial-2026-07-15/01-desktop-top.png`
-- Desktop, reviewer loop with `Map the reasoning` selected: `design-audits/rulix-cloud-editorial-2026-07-15/02-review-loop-map.png`
-- Desktop, trust accordion with `Source-linked findings` expanded: `design-audits/rulix-cloud-editorial-2026-07-15/03-trust-source-linked.png`
-- Mobile, native 390 x 844, page top: `design-audits/rulix-cloud-editorial-2026-07-15/04-mobile-top.png`
-- Mobile, product demo with `Resolve with evidence` selected: `design-audits/rulix-cloud-editorial-2026-07-15/05-mobile-product-resolve.png`
-- Mobile, conversion section with FAQ expanded: `design-audits/rulix-cloud-editorial-2026-07-15/06-mobile-conversion.png`
+- Layout and hierarchy: the implementation preserves the deep-navy global shell, white task header, horizontal review progress, approval-scope banner, and high-contrast three-pane workbench. Panel proportions, active navigation, and the right-side artifact/menu relationship remain faithful.
+- Typography: both use a compact sans-serif product hierarchy with clear weight changes. The implementation uses the repository's Inter files, preserves readable small labels, and avoids accidental marketing/display typography in the product shell.
+- Spacing and rhythm: 24-pixel page gutters, restrained card padding, thin separators, compact tabs, and dense metadata match the reference intent. The implementation removes ornamental space and keeps the main task above the fold.
+- Colors and tokens: navy, white/cool-gray surfaces, blue-gray borders, and restrained teal active/status treatment match the selected direction with WCAG-oriented contrast. Destructive menu content remains red and separated.
+- Assets and icons: the existing Rulix brand asset and Lucide icon family are used throughout. No source asset was replaced with CSS art, emoji, handcrafted SVG, or placeholder imagery.
+- Copy/content: dynamic review content intentionally differs from the concept fixture. Product copy preserves the same meaning while making exact approval scope, source provenance, human signoff, and empty AI state explicit.
 
-The approved concept and latest implementation screenshots were opened together with `view_image` for the final comparison. The implementation was rendered from the production build through the in-app Browser preview; no standalone browser or Playwright CLI was used.
+## Focused region evidence
 
-## Fidelity comparison
+A separate crop was not required because the native-width combined comparison keeps the header, progress path, artifact card, and complete context menu readable. The browser DOM snapshot independently verified accessible names and Windows-native shortcut labels (`Ctrl K`, `Ctrl L`, `Ctrl ↵`).
 
-- Copy: passed. Automated above-the-fold diff found no missing or unexpected approved strings across navigation, headline, supporting paragraph, CTAs, and Claim -> Evidence gap -> Reviewer decision -> Record labels.
-- Layout and spacing: passed. The desktop hero preserves the concept's editorial copy/product split, full-width evidence rail, white-to-graphite transition, and generous section rhythm. Focused reviewer-loop and trust captures preserve the intended left-story/right-interaction hierarchy.
-- Typography: passed. Instrument Serif is loaded for editorial headlines with the intended body/display contrast. The desktop hero is locked to `Find the weak link` / `in every export-control` / `memo.` and remains readable on mobile.
-- Color and surfaces: passed. White, graphite, muted gray, and Rulix teal map to the approved palette. Borders and active states stay restrained; there are no decorative blobs, fake illustrations, or generic floating-card drift.
-- Imagery and assets: passed. Existing Rulix product demo media is used throughout instead of placeholder or CSS-drawn product art. Crops remain sharp and contained at desktop and mobile widths.
-- Behavior and accessibility: passed. Tabs, list-step buttons, comparison rows, accordions, use-case tabs, menu, labels, focus states, reduced-motion behavior, and semantic expanded/selected/pressed states are implemented.
-- Responsiveness: passed at 1440 x 1024 and 390 x 844. Browser measurements found no page-level horizontal overflow (`scrollWidth` <= `innerWidth`) in the hero, selected product demo, or conversion states.
+## Primary interactions tested
+
+- Home → stable review route and browser-restored selection.
+- Command search open/close.
+- Help drawer open/close.
+- Artifact right-click menu, Arrow/Escape behavior, duplicate action availability, outside-click cleanup, and resize cleanup.
+- Reviewer progress/section navigation and AI action affordance.
+- Dashboard Operations → Usage → Accounts → Growth → Lead Review routing.
+- 390, 768, and 1440 responsive journeys for submitter, reviewer, counsel, and export-control officer.
+
+Browser console warnings/errors: none. Same-origin failed requests: none in the passing journeys. Critical Axe violations: none.
 
 ## Comparison history
 
-1. Pass 1 - P1 typography: the desktop hero could wrap `export-control` at the hyphen. Fixed by protecting the compound term and defining the approved three editorial lines.
-2. Pass 2 - P2 layout: the hero copy column was slightly narrow relative to the concept. Fixed by rebalancing the desktop grid while preserving product-media prominence.
-3. Pass 3 - passed: side-by-side review found the approved hierarchy, palette, asset treatment, spacing, and interaction emphasis intact. No P0 or P1 findings remain.
+### Iteration 1
 
-## Interaction and runtime checks
+- [P1] Responsive Help lost its accessible name when the visible label was hidden at tablet width.
+  - Fix: added a stable `aria-label="Help"` to the header control.
+  - Post-fix evidence: the tablet reviewer journey locates and operates Help; all four tablet roles pass.
+- [P2] The context menu displayed Command shortcuts on Windows.
+  - Fix: introduced platform-aware shortcut formatting shared by the header and context menu, with unit coverage for Apple, Windows, and Linux.
+  - Post-fix evidence: the final browser snapshot exposes `Ctrl K`, `Ctrl L`, and `Ctrl ↵`.
+- [P2] An open context menu could persist offscreen after a responsive resize or hash-route transition.
+  - Fix: close on resize, user wheel/touch scroll, and hash change, in addition to outside click, blur, and Escape. Programmatic scroll-to-target remains safe so right-click can reveal and open an offscreen artifact in one action.
+  - Post-fix evidence: menu count changes from one to zero immediately after viewport resize; unit coverage exercises resize, wheel, touch movement, and hash change.
 
-- Product demo tabs: changed to `Resolve with evidence`; selected state and media changed.
-- Reviewer loop: selected `Map the reasoning`; pressed state, copy, and product image changed.
-- Comparison inspector: selected `Evidence`; pressed row and explanation changed.
-- Trust accordion: expanded `Source-linked findings`; preview heading and body changed.
-- Use cases: selected `Manufacturers and labs`; tab and panel content changed.
-- Conversion: expanded `What data can we use?`, filled the email and organization fields, and intentionally did not submit the external mail flow.
-- Mobile navigation: opened and closed successfully at 390 x 844.
-- Console: no warnings or errors.
-- Automated verification: `npm test` (65 tests) and `npm run build` passed.
+### Final comparison
 
-## Intentional deviations
+No actionable P0, P1, or P2 mismatch remains. The implementation intentionally adds Home / My Work, collaboration, notification, Evidence Library, and role-gated administration destinations because those are product requirements beyond the selected static concept. The awaiting-AI empty state is also intentional and preferable to fabricated analysis data.
 
-- The approved concept uses a static illustrative workspace. The implementation uses the existing real Rulix demo recordings and screenshots, preserving the same placement and narrative while providing authentic product evidence.
-- The source concept is a compressed full-page image representing a 1440-wide layout. Fidelity was judged at its intended native 1440 x 1024 desktop viewport, plus a separate 390 x 844 mobile pass.
+## Findings
+
+No actionable P0/P1/P2 findings.
+
+## Open questions
+
+None.
+
+## Implementation checklist
+
+- [x] Match the selected navy/teal high-contrast shell and three-pane workbench.
+- [x] Preserve readable hierarchy and responsive task order.
+- [x] Implement the complete right-click interaction with keyboard and viewport behavior.
+- [x] Verify reviewer and dashboard core routes across 390, 768, and 1440 pixels.
+- [x] Verify console, network, accessibility, unit, integration, build, Lambda, and bundle gates.
+
+## Follow-up polish
+
+No P3 item is being deferred as part of this handoff.
 
 final result: passed

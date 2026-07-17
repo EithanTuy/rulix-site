@@ -38,6 +38,8 @@ import type {
   AiApprovalStatus,
   AiApprovalSubjectBinding,
   AuditEvent,
+  CaseComment,
+  CasePriority,
   DataClass,
   LeadSearchRun,
   LeadWorkflow,
@@ -49,11 +51,14 @@ import type {
   OutreachJob,
   OutreachLead,
   ReviewResult,
+  ReviewLifecycleStage,
   ReviewerDecision,
   AdminMetrics,
   UsageEvent,
   UserAdminSummary,
-  UserProfile
+  UserProfile,
+  WorkspaceNotification,
+  WorkspacePreferences
 } from "../src/types";
 import { outreachLeads as bundledOutreachLeads } from "../src/outreachLeads";
 import { analyzeMemo } from "../src/lib/eccnReview";
@@ -614,6 +619,13 @@ export interface PageQuery {
 
 export interface ReviewPageQuery extends PageQuery {
   state: "active" | "archived" | "all";
+  search?: string;
+  lifecycleStage?: ReviewLifecycleStage;
+  assignee?: string;
+  priority?: CasePriority;
+  due?: "overdue" | "today" | "next-7-days" | "none";
+  tags?: string[];
+  sort?: "updated-desc" | "updated-asc";
 }
 
 export interface CursorPage<T> {
@@ -663,6 +675,12 @@ export interface UpdateReviewMemoCommand extends ReviewExpectedBindings {
   auditEvent: AuditEvent;
 }
 
+export interface UpdateReviewMetadataCommand extends ReviewExpectedBindings {
+  patch: Partial<Pick<MemoRecord, "priority" | "assignedTo" | "dueAt" | "tags" | "lifecycleStage">>;
+  clear: Array<"assignedTo" | "dueAt">;
+  auditEvent: AuditEvent;
+}
+
 export interface ArchiveReviewCommand extends ReviewExpectedBindings {
   archived: boolean;
   actor: string;
@@ -701,6 +719,12 @@ export interface ChatCommandResult extends ReviewCommandResult {
 export interface WorkspacePreferenceRecord {
   selectedMemoId?: string;
   activeMemoBuilderSessionId?: string;
+  onboardingCompletedAt?: string;
+  dismissedGuidance?: string[];
+  savedReviewViews?: WorkspacePreferences["savedReviewViews"];
+  activeWorkspace?: WorkspacePreferences["activeWorkspace"];
+  lastAppRoute?: string;
+  lastDashboardRoute?: string;
   version: number;
 }
 
@@ -708,6 +732,27 @@ export interface UpdateWorkspacePreferencesCommand {
   expectedVersion: number;
   selectedMemoId?: string | null;
   activeMemoBuilderSessionId?: string | null;
+  onboardingCompletedAt?: string | null;
+  dismissedGuidance?: string[];
+  savedReviewViews?: NonNullable<WorkspacePreferences["savedReviewViews"]>;
+  activeWorkspace?: WorkspacePreferences["activeWorkspace"];
+  lastAppRoute?: string | null;
+  lastDashboardRoute?: string | null;
+}
+
+export interface CreateReviewCommentCommand {
+  comment: CaseComment;
+  auditEvent: AuditEvent;
+}
+
+export interface ResolveReviewCommentCommand {
+  resolvedAt: string;
+  resolvedBy: string;
+  auditEvent: AuditEvent;
+}
+
+export interface NotificationPageQuery extends PageQuery {
+  unreadOnly?: boolean;
 }
 
 export interface StoredMemoBuilderSession {
@@ -741,9 +786,17 @@ export interface AccountStore {
   listReviewChatMessages(userId: string, memoId: string, query: PageQuery): Promise<CursorPage<MemoChatMessage>>;
   createReviewIdempotent(userId: string, command: CreateReviewCommand): Promise<CreateReviewResult>;
   updateReviewMemo(userId: string, memoId: string, command: UpdateReviewMemoCommand): Promise<ReviewCommandResult>;
+  updateReviewMetadata(userId: string, memoId: string, command: UpdateReviewMetadataCommand): Promise<ReviewCommandResult>;
   setReviewArchived(userId: string, memoId: string, command: ArchiveReviewCommand): Promise<ReviewCommandResult>;
   appendBoundChat(userId: string, memoId: string, command: AppendBoundChatCommand): Promise<ChatCommandResult>;
   applyChatSuggestion(userId: string, memoId: string, command: ApplyChatSuggestionCommand): Promise<ChatCommandResult>;
+  listReviewComments(userId: string, memoId: string, query: PageQuery): Promise<CursorPage<CaseComment>>;
+  createReviewComment(userId: string, memoId: string, command: CreateReviewCommentCommand): Promise<CaseComment>;
+  resolveReviewComment(userId: string, memoId: string, commentId: string, command: ResolveReviewCommentCommand): Promise<CaseComment>;
+  listNotifications(userId: string, query: NotificationPageQuery): Promise<CursorPage<WorkspaceNotification>>;
+  appendNotifications(userId: string, notifications: WorkspaceNotification[]): Promise<void>;
+  markNotificationRead(userId: string, notificationId: string, readAt: string): Promise<WorkspaceNotification | undefined>;
+  markAllNotificationsRead(userId: string, readAt: string): Promise<number>;
   getWorkspacePreferences(userId: string): Promise<WorkspacePreferenceRecord>;
   updateWorkspacePreferences(userId: string, command: UpdateWorkspacePreferencesCommand): Promise<WorkspacePreferenceRecord>;
   listMemoBuilderSessions(userId: string, query: PageQuery): Promise<CursorPage<StoredMemoBuilderSession>>;
@@ -1084,10 +1137,9 @@ export class LocalAccountStore implements AccountStore {
 
   async listReviews(userId: string, query: ReviewPageQuery) {
     const state = await this.getAccountState(userId);
-    const reviews = state.memos
+    const reviews = filterAndSortReviews(state.memos, query)
       .filter((memo) => query.state === "all"
         || (query.state === "archived" ? Boolean(memo.archivedAt) : !memo.archivedAt))
-      .sort((left, right) => compareByDateThenId(right.updatedAt, right.id, left.updatedAt, left.id))
       .map(reviewSummary);
     return paginate(reviews, query);
   }
@@ -1127,6 +1179,12 @@ export class LocalAccountStore implements AccountStore {
   async updateReviewMemo(userId: string, memoId: string, command: UpdateReviewMemoCommand) {
     return this.mutateAccountState(userId, (state) =>
       applyUpdateReviewMemoCommand(state, userId, memoId, command)
+    );
+  }
+
+  async updateReviewMetadata(userId: string, memoId: string, command: UpdateReviewMetadataCommand) {
+    return this.mutateAccountState(userId, (state) =>
+      applyUpdateReviewMetadataCommand(state, memoId, command)
     );
   }
 
@@ -1177,6 +1235,87 @@ export class LocalAccountStore implements AccountStore {
     );
   }
 
+  async listReviewComments(userId: string, memoId: string, query: PageQuery) {
+    const state = await this.getAccountState(userId);
+    const comments = [...(state.comments?.[memoId] ?? [])]
+      .sort((left, right) => compareByDateThenId(right.createdAt, right.id, left.createdAt, left.id));
+    return paginate(comments, query);
+  }
+
+  async createReviewComment(userId: string, memoId: string, command: CreateReviewCommentCommand) {
+    return this.mutateAccountState(userId, (state) => {
+      if (!state.memos.some((memo) => memo.id === memoId)) {
+        throw new StoreError(404, "Review not found.", "review_not_found");
+      }
+      state.comments ??= {};
+      const comments = state.comments[memoId] ?? [];
+      if (comments.some((comment) => comment.id === command.comment.id)) {
+        throw new StoreError(409, "Comment already exists.", "comment_conflict");
+      }
+      state.comments[memoId] = [...comments, structuredClone(command.comment)];
+      state.auditEvents.push(structuredClone(command.auditEvent));
+      return structuredClone(command.comment);
+    });
+  }
+
+  async resolveReviewComment(
+    userId: string,
+    memoId: string,
+    commentId: string,
+    command: ResolveReviewCommentCommand
+  ) {
+    return this.mutateAccountState(userId, (state) => {
+      const comments = state.comments?.[memoId] ?? [];
+      const index = comments.findIndex((comment) => comment.id === commentId);
+      if (index < 0) throw new StoreError(404, "Comment not found.", "comment_not_found");
+      const current = comments[index]!;
+      const next = current.resolvedAt
+        ? current
+        : { ...current, resolvedAt: command.resolvedAt, resolvedBy: command.resolvedBy };
+      comments[index] = next;
+      state.auditEvents.push(structuredClone(command.auditEvent));
+      return structuredClone(next);
+    });
+  }
+
+  async listNotifications(userId: string, query: NotificationPageQuery) {
+    const state = await this.getAccountState(userId);
+    const notifications = [...(state.notifications ?? [])]
+      .filter((notification) => !query.unreadOnly || !notification.readAt)
+      .sort((left, right) => compareByDateThenId(right.createdAt, right.id, left.createdAt, left.id));
+    return paginate(notifications, query);
+  }
+
+  async appendNotifications(userId: string, notifications: WorkspaceNotification[]) {
+    if (notifications.length === 0) return;
+    this.mutateAccountState(userId, (state) => {
+      const byId = new Map((state.notifications ?? []).map((item) => [item.id, item]));
+      for (const notification of notifications) byId.set(notification.id, structuredClone(notification));
+      state.notifications = [...byId.values()];
+    });
+  }
+
+  async markNotificationRead(userId: string, notificationId: string, readAt: string) {
+    return this.mutateAccountState(userId, (state) => {
+      const notification = (state.notifications ?? []).find((item) => item.id === notificationId);
+      if (!notification) return undefined;
+      notification.readAt ??= readAt;
+      return structuredClone(notification);
+    });
+  }
+
+  async markAllNotificationsRead(userId: string, readAt: string) {
+    return this.mutateAccountState(userId, (state) => {
+      let count = 0;
+      for (const notification of state.notifications ?? []) {
+        if (notification.readAt) continue;
+        notification.readAt = readAt;
+        count += 1;
+      }
+      return count;
+    });
+  }
+
   async getWorkspacePreferences(userId: string) {
     return cloneAccountState(this.workspacePreferences.get(userId) ?? { version: 0 });
   }
@@ -1197,7 +1336,13 @@ export class LocalAccountStore implements AccountStore {
             : {})
         : (command.activeMemoBuilderSessionId
             ? { activeMemoBuilderSessionId: command.activeMemoBuilderSessionId }
-            : {}))
+            : {})),
+      ...preferenceField(current, command, "onboardingCompletedAt"),
+      ...preferenceField(current, command, "dismissedGuidance"),
+      ...preferenceField(current, command, "savedReviewViews"),
+      ...preferenceField(current, command, "activeWorkspace"),
+      ...preferenceField(current, command, "lastAppRoute"),
+      ...preferenceField(current, command, "lastDashboardRoute")
     };
     this.workspacePreferences.set(userId, next);
     this.persist();
@@ -2902,10 +3047,9 @@ export class DynamoAccountStore implements AccountStore {
       return this.callWorkspace((workspace) => workspace.listReviews(userId, query));
     }
     const state = (await this.readAccountState(userId, false)).state;
-    const reviews = state.memos
+    const reviews = filterAndSortReviews(state.memos, query)
       .filter((memo) => query.state === "all"
         || (query.state === "archived" ? Boolean(memo.archivedAt) : !memo.archivedAt))
-      .sort((left, right) => compareByDateThenId(right.updatedAt, right.id, left.updatedAt, left.id))
       .map(reviewSummary);
     return paginate(reviews, query);
   }
@@ -2952,6 +3096,14 @@ export class DynamoAccountStore implements AccountStore {
     }
     return this.mutateAccountState(userId, (state) =>
       applyUpdateReviewMemoCommand(state, userId, memoId, command));
+  }
+
+  async updateReviewMetadata(userId: string, memoId: string, command: UpdateReviewMetadataCommand) {
+    if (this.workspaceMode !== "legacy") {
+      return this.callWorkspace((workspace) => workspace.updateReviewMetadata(userId, memoId, command));
+    }
+    return this.mutateAccountState(userId, (state) =>
+      applyUpdateReviewMetadataCommand(state, memoId, command));
   }
 
   async setReviewArchived(userId: string, memoId: string, command: ArchiveReviewCommand) {
@@ -3049,6 +3201,107 @@ export class DynamoAccountStore implements AccountStore {
       applyChatSuggestionCommand(state, userId, memoId, command));
   }
 
+  async listReviewComments(userId: string, memoId: string, query: PageQuery) {
+    if (await this.shouldUseNormalizedRead(userId)) {
+      return this.callWorkspace((workspace) => workspace.listReviewComments(userId, memoId, query));
+    }
+    const comments = [...((await this.readAccountState(userId, false)).state.comments?.[memoId] ?? [])]
+      .sort((left, right) => compareByDateThenId(right.createdAt, right.id, left.createdAt, left.id));
+    return paginate(comments, query);
+  }
+
+  async createReviewComment(userId: string, memoId: string, command: CreateReviewCommentCommand) {
+    if (this.workspaceMode !== "legacy") {
+      return this.callWorkspace((workspace) => workspace.createReviewComment(userId, memoId, command));
+    }
+    return this.mutateAccountState(userId, (state) => {
+      if (!state.memos.some((memo) => memo.id === memoId)) {
+        throw new StoreError(404, "Review not found.", "review_not_found");
+      }
+      state.comments ??= {};
+      const comments = state.comments[memoId] ?? [];
+      if (comments.some((comment) => comment.id === command.comment.id)) {
+        throw new StoreError(409, "Comment already exists.", "comment_conflict");
+      }
+      state.comments[memoId] = [...comments, structuredClone(command.comment)];
+      state.auditEvents.push(structuredClone(command.auditEvent));
+      return structuredClone(command.comment);
+    });
+  }
+
+  async resolveReviewComment(
+    userId: string,
+    memoId: string,
+    commentId: string,
+    command: ResolveReviewCommentCommand
+  ) {
+    if (this.workspaceMode !== "legacy") {
+      return this.callWorkspace((workspace) => workspace.resolveReviewComment(userId, memoId, commentId, command));
+    }
+    return this.mutateAccountState(userId, (state) => {
+      const comments = state.comments?.[memoId] ?? [];
+      const index = comments.findIndex((comment) => comment.id === commentId);
+      if (index < 0) throw new StoreError(404, "Comment not found.", "comment_not_found");
+      const current = comments[index]!;
+      const next = current.resolvedAt
+        ? current
+        : { ...current, resolvedAt: command.resolvedAt, resolvedBy: command.resolvedBy };
+      comments[index] = next;
+      state.auditEvents.push(structuredClone(command.auditEvent));
+      return structuredClone(next);
+    });
+  }
+
+  async listNotifications(userId: string, query: NotificationPageQuery) {
+    if (await this.shouldUseNormalizedRead(userId)) {
+      return this.callWorkspace((workspace) => workspace.listNotifications(userId, query));
+    }
+    const notifications = [...((await this.readAccountState(userId, false)).state.notifications ?? [])]
+      .filter((notification) => !query.unreadOnly || !notification.readAt)
+      .sort((left, right) => compareByDateThenId(right.createdAt, right.id, left.createdAt, left.id));
+    return paginate(notifications, query);
+  }
+
+  async appendNotifications(userId: string, notifications: WorkspaceNotification[]) {
+    if (notifications.length === 0) return;
+    if (this.workspaceMode !== "legacy") {
+      await this.callWorkspace((workspace) => workspace.appendNotifications(userId, notifications));
+      return;
+    }
+    await this.mutateAccountState(userId, (state) => {
+      const byId = new Map((state.notifications ?? []).map((item) => [item.id, item]));
+      for (const notification of notifications) byId.set(notification.id, structuredClone(notification));
+      state.notifications = [...byId.values()];
+    });
+  }
+
+  async markNotificationRead(userId: string, notificationId: string, readAt: string) {
+    if (this.workspaceMode !== "legacy") {
+      return this.callWorkspace((workspace) => workspace.markNotificationRead(userId, notificationId, readAt));
+    }
+    return this.mutateAccountState(userId, (state) => {
+      const notification = (state.notifications ?? []).find((item) => item.id === notificationId);
+      if (!notification) return undefined;
+      notification.readAt ??= readAt;
+      return structuredClone(notification);
+    });
+  }
+
+  async markAllNotificationsRead(userId: string, readAt: string) {
+    if (this.workspaceMode !== "legacy") {
+      return this.callWorkspace((workspace) => workspace.markAllNotificationsRead(userId, readAt));
+    }
+    return this.mutateAccountState(userId, (state) => {
+      let count = 0;
+      for (const notification of state.notifications ?? []) {
+        if (notification.readAt) continue;
+        notification.readAt = readAt;
+        count += 1;
+      }
+      return count;
+    });
+  }
+
   async getWorkspacePreferences(userId: string) {
     if (await this.shouldUseNormalizedRead(userId)) {
       return this.callWorkspace((workspace) => workspace.getWorkspacePreferences(userId));
@@ -3060,6 +3313,7 @@ export class DynamoAccountStore implements AccountStore {
       ...(state.memoBuilder?.activeSessionId
         ? { activeMemoBuilderSessionId: state.memoBuilder.activeSessionId }
         : {}),
+      ...cloneAccountState(state.preferences ?? {}),
       version: metadata.preferenceVersion ?? 0
     };
   }
@@ -3080,6 +3334,7 @@ export class DynamoAccountStore implements AccountStore {
       if (command.activeMemoBuilderSessionId !== undefined) {
         state.memoBuilder.activeSessionId = command.activeMemoBuilderSessionId || undefined;
       }
+      state.preferences = applyWorkspacePreferenceCommand(state.preferences ?? {}, command);
       writeLegacyWorkspaceMetadata(state, {
         ...metadata,
         preferenceVersion: metadata.preferenceVersion + 1
@@ -3089,6 +3344,7 @@ export class DynamoAccountStore implements AccountStore {
         ...(state.memoBuilder.activeSessionId
           ? { activeMemoBuilderSessionId: state.memoBuilder.activeSessionId }
           : {}),
+        ...cloneAccountState(state.preferences),
         version: metadata.preferenceVersion + 1
       };
     });
@@ -6855,6 +7111,74 @@ function reviewSummary(memo: MemoRecord): ReviewSummary {
   return summary;
 }
 
+function filterAndSortReviews(memos: MemoRecord[], query: ReviewPageQuery) {
+  const search = query.search?.trim().toLocaleLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+  const nextWeek = new Date(`${today}T00:00:00.000Z`);
+  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+  const nextWeekDay = nextWeek.toISOString().slice(0, 10);
+  const tags = new Set(query.tags?.map((tag) => tag.toLocaleLowerCase()));
+  return memos
+    .filter((memo) => !search || [memo.title, memo.documentCode, memo.itemFamily, memo.owner, memo.manufacturer]
+      .some((value) => value?.toLocaleLowerCase().includes(search)))
+    .filter((memo) => !query.lifecycleStage || memo.lifecycleStage === query.lifecycleStage)
+    .filter((memo) => !query.assignee || (query.assignee === "unassigned" ? !memo.assignedTo : memo.assignedTo === query.assignee))
+    .filter((memo) => !query.priority || memo.priority === query.priority)
+    .filter((memo) => !tags.size || [...tags].every((tag) => memo.tags?.some((value) => value.toLocaleLowerCase() === tag)))
+    .filter((memo) => {
+      if (!query.due) return true;
+      const due = memo.dueAt?.slice(0, 10);
+      if (query.due === "none") return !due;
+      if (!due) return false;
+      if (query.due === "overdue") return due < today;
+      if (query.due === "today") return due === today;
+      return due >= today && due <= nextWeekDay;
+    })
+    .sort((left, right) => query.sort === "updated-asc"
+      ? compareByDateThenId(left.updatedAt, left.id, right.updatedAt, right.id)
+      : compareByDateThenId(right.updatedAt, right.id, left.updatedAt, left.id));
+}
+
+type WorkspacePreferenceKey = Exclude<keyof WorkspacePreferenceRecord, "version">;
+
+function preferenceField(
+  current: WorkspacePreferenceRecord,
+  command: UpdateWorkspacePreferencesCommand,
+  key: WorkspacePreferenceKey
+): Partial<WorkspacePreferenceRecord> {
+  const nextValue = command[key];
+  if (nextValue === undefined) {
+    const currentValue = current[key];
+    return currentValue === undefined
+      ? {}
+      : { [key]: cloneAccountState(currentValue) } as Partial<WorkspacePreferenceRecord>;
+  }
+  if (nextValue === null) return {};
+  return { [key]: cloneAccountState(nextValue) } as Partial<WorkspacePreferenceRecord>;
+}
+
+function applyWorkspacePreferenceCommand(
+  current: WorkspacePreferences,
+  command: UpdateWorkspacePreferencesCommand
+): WorkspacePreferences {
+  const next = cloneAccountState(current);
+  const fields: Array<keyof WorkspacePreferences> = [
+    "onboardingCompletedAt",
+    "dismissedGuidance",
+    "savedReviewViews",
+    "activeWorkspace",
+    "lastAppRoute",
+    "lastDashboardRoute"
+  ];
+  for (const field of fields) {
+    const value = command[field];
+    if (value === undefined) continue;
+    if (value === null) delete next[field];
+    else Object.assign(next, { [field]: cloneAccountState(value) });
+  }
+  return next;
+}
+
 function paginate<T>(items: T[], query: PageQuery): CursorPage<T> {
   const limit = Math.min(50, Math.max(1, Math.floor(query.limit)));
   const offset = decodeCursor(query.cursor);
@@ -7338,6 +7662,26 @@ function applyUpdateReviewMemoCommand(
     lifecycleStage: "draft"
   });
   applyReviewUpdate(state, review, userId, "edited");
+  state.auditEvents = mergeById([
+    { ...cloneAccountState(command.auditEvent), memoId }
+  ], state.auditEvents);
+  return { review, auditEvents: auditEventsFor(state, memoId) };
+}
+
+function applyUpdateReviewMetadataCommand(
+  state: AccountReviewState,
+  memoId: string,
+  command: UpdateReviewMetadataCommand
+): ReviewCommandResult {
+  const current = requireExpectedReview(state, memoId, command);
+  const review: MemoRecord = {
+    ...current,
+    ...cloneAccountState(command.patch),
+    version: (current.version ?? current.revision ?? 1) + 1,
+    updatedAt: new Date().toISOString()
+  };
+  for (const field of command.clear) delete review[field];
+  state.memos = state.memos.map((memo) => memo.id === memoId ? review : memo);
   state.auditEvents = mergeById([
     { ...cloneAccountState(command.auditEvent), memoId }
   ], state.auditEvents);

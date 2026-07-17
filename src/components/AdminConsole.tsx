@@ -875,6 +875,7 @@ function readinessClassName(label: string) {
 
 function viewTitle(view: AppView) {
   const titles = {
+    home: ["Home", "Your assigned, urgent, and recently active review work."],
     reviews: ["Reviews", "AI-assisted memo review workspace."],
     controls: ["Controls", "Safety gates and compliance controls for AI classification review."],
     evidence: ["Evidence", "Cross-memo finding queue and evidence quality map."],

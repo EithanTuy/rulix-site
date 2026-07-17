@@ -15,7 +15,7 @@ import {
   type QueryCommandInput,
   type TransactWriteCommandInput
 } from "@aws-sdk/lib-dynamodb";
-import type { AuditEvent } from "../src/types";
+import type { AuditEvent, SavedReviewView } from "../src/types";
 import {
   AuditOutboxContractError,
   canonicalAuditPayload,
@@ -59,6 +59,12 @@ export interface WorkspaceMetaItem extends WorkspaceItem {
   migratedAt?: string;
   selectedMemoId?: string;
   activeMemoBuilderSessionId?: string;
+  onboardingCompletedAt?: string;
+  dismissedGuidance?: string[];
+  savedReviewViews?: SavedReviewView[];
+  activeWorkspace?: "operations" | "growth";
+  lastAppRoute?: string;
+  lastDashboardRoute?: string;
   builderSessionCount?: number;
 }
 
@@ -752,6 +758,8 @@ export class NormalizedWorkspaceRepository {
     indexPk?: string;
     indexPartitionAttribute?: "gsi1pk" | "gsi2pk";
     indexSortAttribute?: "gsi1sk" | "gsi2sk";
+    queryBinding?: unknown;
+    cursorPageSize?: number;
   }): Promise<WorkspacePage<T>> {
     if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > input.maxLimit) {
       throw new WorkspaceValidationError(`Page limit must be from 1 through ${input.maxLimit}.`);
@@ -763,7 +771,8 @@ export class NormalizedWorkspaceRepository {
       indexPartitionAttribute: input.indexPartitionAttribute ?? null,
       indexSortAttribute: input.indexSortAttribute ?? null,
       forward: input.forward ?? true,
-      limit: input.limit
+      limit: input.cursorPageSize ?? input.limit,
+      queryBinding: input.queryBinding ?? null
     });
     const expected = { pk, prefix: input.prefix, queryHash };
     const exclusiveStartKey = input.cursor

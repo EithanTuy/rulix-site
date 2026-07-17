@@ -94,7 +94,7 @@ export function LeadReviewQueue() {
           <h2>Lead review queue</h2>
           <p>Approve, reject, assign, schedule follow-up, and track the loaded outreach lifecycle.</p>
         </div>
-        <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
+        <select aria-label="Filter leads by review state" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
           <option value="all">All review states</option>
           {REVIEW_STATUSES.map((status) => <option value={status} key={status}>{label(status)}</option>)}
         </select>

@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   approveCouncilAnalysis: vi.fn(),
   applyMemoChatSuggestion: vi.fn(),
   completePasswordReset: vi.fn(),
+  createReviewComment: vi.fn(),
   createReview: vi.fn(),
   deleteMemoBuilderSession: vi.fn(),
   getBackendHealth: vi.fn(),
@@ -15,20 +16,25 @@ const api = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   getReviewDetail: vi.fn(),
   listMemoBuilderSessions: vi.fn(),
+  listNotifications: vi.fn(),
+  listReviewComments: vi.fn(),
   listReviewAuditEvents: vi.fn(),
   listReviewChatMessages: vi.fn(),
   listReviews: vi.fn(),
+  listTenantMembers: vi.fn(),
   loadWorkspacePreferences: vi.fn(),
   recordReviewDecision: vi.fn(),
   requestCouncilApproval: vi.fn(),
   requestMemoChatApproval: vi.fn(),
   requestPasswordReset: vi.fn(),
+  resolveReviewComment: vi.fn(),
   revokeAiApproval: vi.fn(),
   sendMemoChat: vi.fn(),
   setReviewArchived: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
   updateReviewMemo: vi.fn(),
+  updateReviewMetadata: vi.fn(),
   updateWorkspacePreferences: vi.fn(),
   upsertMemoBuilderSession: vi.fn(),
   validateInvite: vi.fn(),
@@ -67,6 +73,7 @@ const primary = review("review-rendered-primary", "RLX primary review", "a");
 const secondary = review("review-rendered-secondary", "RLX second-page review", "b");
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   for (const mock of Object.values(api)) mock.mockReset();
   api.getCurrentUser.mockResolvedValue({ user, csrfToken: "csrf-rendered" });
   api.getBackendHealth.mockResolvedValue({
@@ -79,6 +86,9 @@ beforeEach(() => {
   api.getCouncilApproval.mockResolvedValue(undefined);
   api.loadWorkspacePreferences.mockResolvedValue({ version: 0, selectedMemoId: primary.id });
   api.listMemoBuilderSessions.mockResolvedValue({ items: [] });
+  api.listNotifications.mockResolvedValue({ items: [] });
+  api.listReviewComments.mockResolvedValue({ items: [] });
+  api.listTenantMembers.mockResolvedValue({ items: [user] });
   api.listReviewAuditEvents.mockResolvedValue({ items: [] });
   api.listReviewChatMessages.mockResolvedValue({ items: [] });
   api.getReviewDetail.mockResolvedValue({ review: primary });
@@ -92,18 +102,21 @@ describe("rendered paged command workspace", () => {
   it("loads summary pages on demand and fetches detail only for the selected review", async () => {
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: /reviews/i }));
     expect(await screen.findByRole("button", { name: /load more reviews/i })).toBeEnabled();
     expect(await screen.findByText(primary.title)).toBeInTheDocument();
-    expect(api.getReviewDetail).toHaveBeenCalledWith(primary.id);
     expect(api.getReviewDetail).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: /load more reviews/i }));
 
     expect(await screen.findByText(secondary.title)).toBeInTheDocument();
     expect(api.listReviews).toHaveBeenCalledWith({ limit: 25, state: "active" }, expect.any(AbortSignal));
-    expect(api.listReviews).toHaveBeenCalledWith({ limit: 25, cursor: "page-two", state: "active" });
+    expect(api.listReviews).toHaveBeenCalledWith({ limit: 30, cursor: "page-two", state: "active", sort: "updated-desc" });
     expect(api.getReviewDetail).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: /load more reviews/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(primary.title).closest("button")!);
+    expect(await screen.findByRole("heading", { name: primary.title, level: 1 })).toBeInTheDocument();
+    expect(api.getReviewDetail).toHaveBeenCalledWith(primary.id);
   });
 
   it("shows an honest loading state while targeted detail, audit, and chat reads are pending", async () => {
@@ -111,6 +124,7 @@ describe("rendered paged command workspace", () => {
     api.getReviewDetail.mockReturnValue(new Promise((resolve) => {
       resolveDetail = resolve;
     }));
+    window.history.replaceState(null, "", `/#/reviews/${primary.id}/overview`);
 
     render(<App />);
 
@@ -132,6 +146,7 @@ describe("rendered paged command workspace", () => {
     api.getReviewDetail.mockImplementation(async (memoId: string) => ({
       review: memoId === migrated.id ? migrated : primary
     }));
+    window.history.replaceState(null, "", `/#/reviews/${migrated.id}/overview`);
 
     render(<App />);
 
@@ -149,6 +164,7 @@ describe("rendered paged command workspace", () => {
       return { review: primary };
     });
     api.updateWorkspacePreferences.mockResolvedValue({ version: 8, selectedMemoId: primary.id });
+    window.history.replaceState(null, "", `/#/reviews/${deletedId}/overview`);
 
     render(<App />);
 
@@ -166,6 +182,7 @@ describe("rendered paged command workspace", () => {
   it("keeps retryable service failures selected and succeeds when the reviewer retries", async () => {
     const { ApiError } = await import("./lib/apiClient");
     api.getReviewDetail.mockRejectedValueOnce(new ApiError(503, "Service unavailable", "service_unavailable"));
+    window.history.replaceState(null, "", `/#/reviews/${primary.id}/overview`);
 
     render(<App />);
 

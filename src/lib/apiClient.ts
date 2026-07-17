@@ -8,6 +8,7 @@ import type {
   AiApprovalStatus,
   AiApprovalSubjectBinding,
   AuditEvent,
+  CaseComment,
   CorpusSnapshot,
   DataClass,
   MemoBuilderDraftSource,
@@ -23,7 +24,9 @@ import type {
   ReviewResult,
   ReviewerDecision,
   UserAdminSummary,
-  UserProfile
+  UserProfile,
+  WorkspaceNotification,
+  WorkspacePreferences
 } from "../types";
 import { withCloudFrontPayloadHash } from "./cloudfrontPayloadHash";
 import { normalizeMemoChatMessage } from "../shared/aiLimits";
@@ -747,7 +750,18 @@ export interface CursorPage<T> {
 }
 
 export async function listReviews(
-  input: { limit?: number; cursor?: string; state?: "active" | "archived" | "all" } = {},
+  input: {
+    limit?: number;
+    cursor?: string;
+    state?: "active" | "archived" | "all";
+    search?: string;
+    lifecycleStage?: MemoRecord["lifecycleStage"];
+    assignee?: string;
+    priority?: MemoRecord["priority"];
+    due?: "overdue" | "today" | "next-7-days" | "none";
+    tags?: string[];
+    sort?: "updated-desc" | "updated-asc";
+  } = {},
   signal?: AbortSignal
 ) {
   const params = new URLSearchParams({
@@ -755,6 +769,13 @@ export async function listReviews(
     state: input.state ?? "active"
   });
   if (input.cursor) params.set("cursor", input.cursor);
+  if (input.search) params.set("search", input.search);
+  if (input.lifecycleStage) params.set("lifecycleStage", input.lifecycleStage);
+  if (input.assignee) params.set("assignee", input.assignee);
+  if (input.priority) params.set("priority", input.priority);
+  if (input.due) params.set("due", input.due);
+  if (input.sort) params.set("sort", input.sort);
+  for (const tag of input.tags ?? []) params.append("tags", tag);
   return fetchJson<CursorPage<ReviewSummary>>(`/api/reviews?${params}`, { signal });
 }
 
@@ -850,6 +871,103 @@ export async function setReviewArchived(
   });
 }
 
+export async function listTenantMembers(signal?: AbortSignal) {
+  return fetchJson<{
+    items: Array<Pick<UserProfile, "id" | "name" | "email" | "role">>;
+  }>("/api/tenant/members", { signal });
+}
+
+export async function updateReviewMetadata(
+  memo: Pick<MemoRecord, "id" | "version" | "revision" | "contentHash">,
+  patch: Partial<Pick<MemoRecord, "priority" | "tags" | "lifecycleStage">> & {
+    assignedTo?: string | null;
+    dueAt?: string | null;
+  },
+  signal?: AbortSignal
+) {
+  requireReviewBinding(memo);
+  return fetchJson<ReviewCommandResponse>(`/api/reviews/${encodeURIComponent(memo.id)}/metadata`, {
+    method: "PATCH",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      expectedVersion: memo.version,
+      expectedRevision: memo.revision,
+      expectedHash: memo.contentHash,
+      ...patch
+    })
+  });
+}
+
+export async function listReviewComments(
+  memoId: string,
+  input: { limit?: number; cursor?: string } = {},
+  signal?: AbortSignal
+) {
+  return fetchJson<CursorPage<CaseComment>>(
+    `/api/reviews/${encodeURIComponent(memoId)}/comments?${pageParams(input)}`,
+    { signal }
+  );
+}
+
+export async function createReviewComment(
+  memoId: string,
+  body: string,
+  mentions: string[] = [],
+  kind: "comment" | "request-information" = "comment",
+  signal?: AbortSignal
+) {
+  return fetchJson<CaseComment>(`/api/reviews/${encodeURIComponent(memoId)}/comments`, {
+    method: "POST",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body, mentions, kind })
+  });
+}
+
+export async function resolveReviewComment(
+  memoId: string,
+  commentId: string,
+  signal?: AbortSignal
+) {
+  return fetchJson<CaseComment>(
+    `/api/reviews/${encodeURIComponent(memoId)}/comments/${encodeURIComponent(commentId)}/resolve`,
+    {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    }
+  );
+}
+
+export async function listNotifications(
+  input: { limit?: number; cursor?: string; unreadOnly?: boolean } = {},
+  signal?: AbortSignal
+) {
+  const params = pageParams(input);
+  if (input.unreadOnly) params.set("unread", "true");
+  return fetchJson<CursorPage<WorkspaceNotification>>(`/api/notifications?${params}`, { signal });
+}
+
+export async function markNotificationRead(notificationId: string, signal?: AbortSignal) {
+  return fetchJson<WorkspaceNotification>(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: "PATCH",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+}
+
+export async function markAllNotificationsRead(signal?: AbortSignal) {
+  return fetchJson<{ count: number; readAt: string }>("/api/notifications/read", {
+    method: "PATCH",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+}
+
 export async function recordReviewDecision(
   memo: Pick<MemoRecord, "id" | "version" | "revision" | "contentHash">,
   analysis: Pick<ReviewResult, "id" | "resultHash">,
@@ -887,8 +1005,7 @@ export async function recordReviewDecision(
 }
 
 export async function loadWorkspacePreferences(signal?: AbortSignal) {
-  return fetchJson<{
-    selectedMemoId?: string;
+  return fetchJson<WorkspacePreferences & {
     activeMemoBuilderSessionId?: string;
     version: number;
   }>("/api/account/preferences", { signal });
@@ -899,22 +1016,21 @@ export async function updateWorkspacePreferences(
   input: {
     selectedMemoId?: string | null;
     activeMemoBuilderSessionId?: string | null;
-  },
+  } & Partial<Omit<WorkspacePreferences, "selectedMemoId">>,
   signal?: AbortSignal
 ) {
-  return fetchJson<{
-    selectedMemoId?: string;
+  const body: Record<string, unknown> = { expectedVersion };
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined) body[key] = value;
+  }
+  return fetchJson<WorkspacePreferences & {
     activeMemoBuilderSessionId?: string;
     version: number;
   }>("/api/account/preferences", {
     method: "PATCH",
     signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      expectedVersion,
-      selectedMemoId: input.selectedMemoId ?? null,
-      activeMemoBuilderSessionId: input.activeMemoBuilderSessionId ?? null
-    })
+    body: JSON.stringify(body)
   });
 }
 
