@@ -179,7 +179,7 @@ user traffic to CloudFront. TLS terminates at CloudFront with the ACM cert.
 
 ## 5. GitHub
 
-- **Repo:** https://github.com/Daculguy/Rulix (branch `main`).
+- **Repo:** https://github.com/EithanTuy/rulix-site (branch `main`).
 - **What lives there:** the full app (`src/`, `server/`), the deterministic
   engine + tests, the seed corpus, Terraform (`infra/terraform/`), the Lambda
   bundler (`scripts/build-lambda.mjs`), and docs (`docs/`).

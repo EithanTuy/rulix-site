@@ -19,13 +19,11 @@ const ciWorkflow = readFileSync(
 
 describe("production deployment identity", () => {
   it("requires the production environment token to originate from main", () => {
-    expect(terraform).toMatch(
-      /condition\s*{\s*test\s*=\s*"StringEquals"\s*variable\s*=\s*"token\.actions\.githubusercontent\.com:sub"\s*values\s*=\s*\["repo:Daculguy\/Rulix:environment:production"\]\s*}/m
-    );
-    expect(terraform).not.toContain('"repo:Daculguy/Rulix:ref:refs/heads/main"');
+    expect(terraform).toMatch(iamStringEquals("sub", "repo:EithanTuy/rulix-site:environment:production"));
+    expect(terraform).not.toContain('"repo:EithanTuy/rulix-site:ref:refs/heads/main"');
     expect(terraform).toMatch(iamStringEquals("ref", "refs/heads/main"));
     expect(terraform).toMatch(iamStringEquals("environment", "production"));
-    expect(terraform).toMatch(iamStringEquals("repository", "Daculguy/Rulix"));
+    expect(terraform).toMatch(iamStringEquals("repository", "EithanTuy/rulix-site"));
   });
 
   it("isolates OIDC to a minimal, main-only deployment job", () => {

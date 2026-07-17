@@ -25,7 +25,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:Daculguy/Rulix:environment:production"]
+      values   = ["repo:EithanTuy/rulix-site:environment:production"]
     }
 
     # Environment-based OIDC subjects do not include the originating ref. Bind
@@ -46,7 +46,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:repository"
-      values   = ["Daculguy/Rulix"]
+      values   = ["EithanTuy/rulix-site"]
     }
   }
 }
