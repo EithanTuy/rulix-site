@@ -346,6 +346,7 @@ export function MarketingSite() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeDemo, setActiveDemo] = useState<DemoKey>("find");
   const [demoPaused, setDemoPaused] = useState(false);
+  const [demoVisible, setDemoVisible] = useState(false);
   const [activeWorkflow, setActiveWorkflow] = useState(0);
   const [activeComparison, setActiveComparison] = useState<ComparisonKey>("reasoning");
   const [activeTrust, setActiveTrust] = useState<TrustKey>("human");
@@ -372,7 +373,7 @@ export function MarketingSite() {
   }, [page]);
 
   useEffect(() => {
-    if (reducedMotion || demoPaused) return;
+    if (reducedMotion || demoPaused || !demoVisible) return;
     const timer = window.setInterval(() => {
       setActiveDemo((current) => {
         const index = DEMOS.findIndex((demo) => demo.key === current);
@@ -380,7 +381,7 @@ export function MarketingSite() {
       });
     }, 6000);
     return () => window.clearInterval(timer);
-  }, [demoPaused, reducedMotion]);
+  }, [demoPaused, demoVisible, reducedMotion]);
 
   const submitLead = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -429,10 +430,11 @@ export function MarketingSite() {
         <Hero page={page} reducedMotion={reducedMotion} />
         <ProductProof
           activeDemo={activeDemo}
-          paused={demoPaused}
+          paused={demoPaused || !demoVisible}
           reducedMotion={reducedMotion}
           onDemoChange={setActiveDemo}
           onPauseChange={setDemoPaused}
+          onVisibilityChange={setDemoVisible}
         />
         <ReviewLoop
           activeStep={activeWorkflow}
@@ -569,18 +571,36 @@ function ProductProof({
   paused,
   reducedMotion,
   onDemoChange,
-  onPauseChange
+  onPauseChange,
+  onVisibilityChange
 }: {
   activeDemo: DemoKey;
   paused: boolean;
   reducedMotion: boolean;
   onDemoChange: (demo: DemoKey) => void;
   onPauseChange: (paused: boolean) => void;
+  onVisibilityChange: (visible: boolean) => void;
 }) {
   const active = DEMOS.find((demo) => demo.key === activeDemo) ?? DEMOS[0];
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || typeof IntersectionObserver === "undefined") {
+      onVisibilityChange(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => onVisibilityChange(entry.isIntersecting && entry.intersectionRatio >= 0.2),
+      { threshold: [0, 0.2] }
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [onVisibilityChange]);
 
   return (
     <section
+      ref={sectionRef}
       className="rulix-band rulix-band--dark product-proof"
       id="product"
       onFocusCapture={() => onPauseChange(true)}
@@ -657,17 +677,23 @@ function ReviewLoop({ activeStep, onStepChange }: { activeStep: number; onStepCh
         <div className="review-loop__visual">
           <h2>A review that moves<br />like your reviewers do.</h2>
           <p>A structured workflow that keeps the memo, the evidence, and the decision in one place.</p>
-          <div className="review-loop__media" key={active.title}>
+          <div
+            className="review-loop__media"
+            id="review-step-panel"
+            key={active.title}
+            role="tabpanel"
+          >
             <img src={active.media} alt={`${active.title} in the Rulix workspace`} />
           </div>
         </div>
-        <div className="review-loop__steps" role="list" aria-label="Rulix review workflow">
+        <div className="review-loop__steps" role="tablist" aria-label="Rulix review workflow">
           {WORKFLOW.map((step, index) => (
             <button
               className={index === activeStep ? "is-active" : ""}
               type="button"
-              role="listitem"
-              aria-pressed={index === activeStep}
+              role="tab"
+              aria-controls="review-step-panel"
+              aria-selected={index === activeStep}
               key={step.title}
               onClick={() => onStepChange(index)}
               onFocus={() => onStepChange(index)}
@@ -696,29 +722,31 @@ function Comparison({ activeRow, onRowChange }: { activeRow: ComparisonKey; onRo
           <h2>Not another answer.<br />A review record.</h2>
           <p>Rulix keeps the why, the what, and the decision in one place.</p>
         </div>
-        <div className="comparison-table" role="table" aria-label="Generic AI chat compared with Rulix review">
-          <div className="comparison-table__row comparison-table__head" role="row">
-            <span role="columnheader">Review need</span>
-            <span role="columnheader">Generic AI chat</span>
-            <span role="columnheader">Rulix review</span>
+        <div className="comparison-table">
+          <div role="table" aria-label="Generic AI chat compared with Rulix review">
+            <div className="comparison-table__row comparison-table__head" role="row">
+              <span role="columnheader">Review need</span>
+              <span role="columnheader">Generic AI chat</span>
+              <span role="columnheader">Rulix review</span>
+            </div>
+            {COMPARISON_ROWS.map((row) => (
+              <button
+                className={row.key === activeRow ? "comparison-table__row is-active" : "comparison-table__row"}
+                type="button"
+                role="row"
+                aria-current={row.key === activeRow ? "true" : undefined}
+                key={row.key}
+                onClick={() => onRowChange(row.key)}
+              >
+                <strong role="cell">{row.label}</strong>
+                <span role="cell">{row.generic}</span>
+                <span role="cell">
+                  {row.rulix}
+                  <ArrowRight size={16} aria-hidden="true" />
+                </span>
+              </button>
+            ))}
           </div>
-          {COMPARISON_ROWS.map((row) => (
-            <button
-              className={row.key === activeRow ? "comparison-table__row is-active" : "comparison-table__row"}
-              type="button"
-              role="row"
-              aria-pressed={row.key === activeRow}
-              key={row.key}
-              onClick={() => onRowChange(row.key)}
-            >
-              <strong role="cell">{row.label}</strong>
-              <span role="cell">{row.generic}</span>
-              <span role="cell">
-                {row.rulix}
-                <ArrowRight size={16} aria-hidden="true" />
-              </span>
-            </button>
-          ))}
           <div className="comparison-table__inspect" aria-live="polite">
             <SearchCheck size={18} aria-hidden="true" />
             <p><strong>{active.label}:</strong> {active.inspect}</p>

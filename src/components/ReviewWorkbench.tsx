@@ -168,7 +168,7 @@ export function ReviewWorkbench({
           <aside className="px-case-overview">
             <h2>Case overview</h2>
             <dl><div><dt>Classification</dt><dd>{result?.recommended.eccn ?? "Pending analysis"}</dd></div><div><dt>Requester</dt><dd>{memo.owner}</dd></div><div><dt>Item description</dt><dd>{memo.itemFamily}</dd></div><div><dt>Review ID</dt><dd>{memo.id}</dd></div><div><dt>Created</dt><dd>{new Date(memo.createdAt ?? memo.updatedAt).toLocaleString()}</dd></div></dl>
-            <div className="px-provenance"><h3>Source provenance</h3><span><FileText size={16} /><span><strong>{memo.attachments?.[0] ?? "Pasted memo"}</strong><small>{memo.dataClass ?? "Classification required"}</small></span></span><small>SHA-256: {memo.contentHash?.slice(0, 12)}… <button type="button" onClick={() => void navigator.clipboard.writeText(memo.contentHash ?? "")}>Copy</button></small></div>
+            <div className="px-provenance"><h3>Source provenance</h3><span><FileText size={16} /><span><strong>{memo.attachments?.[0] ?? "Pasted memo"}</strong><small>{dataClassLabel(memo.dataClass)}</small></span></span><small>SHA-256: {memo.contentHash?.slice(0, 12)}… <button type="button" onClick={() => void navigator.clipboard.writeText(memo.contentHash ?? "")}>Copy</button></small></div>
             <div className="px-review-record"><h3>Review record</h3><span className={result ? "approved" : "pending"}><ShieldCheck size={17} /><span><strong>{result ? "AI run completed" : "AI approval pending"}</strong><small>{result ? `${result.provider.label} · ${new Date(result.generatedAt).toLocaleString()}` : analysisMessage}</small></span></span></div>
             <div className="px-mini-activity"><h3>Activity</h3>{auditEvents.slice(0, 4).map((event) => <button type="button" key={event.id} onClick={() => onSectionChange("activity")}><Clock3 size={15} /><span><strong>{event.action}</strong><small>{new Date(event.at).toLocaleString()}</small></span></button>)}</div>
           </aside>
@@ -210,8 +210,22 @@ export function ReviewWorkbench({
 function DecisionBar({ onDecision }: { onDecision: ReviewWorkbenchProps["onDecision"] }) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (action: ReviewerDecision["action"]) => {
+    if (!notes.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await onDecision(action, notes);
+    } catch (decisionError) {
+      setError(decisionError instanceof Error ? decisionError.message : "The decision was not recorded. Review the current findings and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!open) return <button type="button" className="button primary px-primary-action" onClick={() => setOpen(true)}><ShieldCheck size={17} />Record human decision</button>;
-  return <div className="px-decision-bar"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Decision rationale is required for the audit trail." /><div><button type="button" className="button" onClick={() => void onDecision("request-info", notes)} disabled={!notes.trim()}>Request info</button><button type="button" className="button" onClick={() => void onDecision("override", notes)} disabled={!notes.trim()}>Override</button><button type="button" className="button primary" onClick={() => void onDecision("accept", notes)} disabled={!notes.trim()}>Accept & sign</button></div></div>;
+  return <div className="px-decision-bar"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Decision rationale is required for the audit trail." />{error ? <p className="px-decision-error" role="alert">{error}</p> : null}<div><button type="button" className="button" onClick={() => void submit("request-info")} disabled={!notes.trim() || busy}>Request info</button><button type="button" className="button" onClick={() => void submit("override")} disabled={!notes.trim() || busy}>Override</button><button type="button" className="button primary" onClick={() => void submit("accept")} disabled={!notes.trim() || busy}>{busy ? "Recording…" : "Accept & sign"}</button></div></div>;
 }
 
 function AnalysisProgress({ message, onCancel }: { message: string; onCancel?: () => void }) {
@@ -238,5 +252,6 @@ function uniqueCitations(result: ReviewResult) {
 }
 
 function downloadText(memo: MemoRecord) { const url = URL.createObjectURL(new Blob([memo.memoText], { type: "text/markdown" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${memo.documentCode}.md`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1_000); }
+function dataClassLabel(value: MemoRecord["dataClass"]) { if (value === "public") return "Public/sample"; if (value === "export-controlled") return "Export-controlled"; if (value === "itar-risk") return "ITAR risk"; if (value === "cui") return "CUI"; if (value === "proprietary") return "Proprietary"; return "Classification required"; }
 function labelize(value: string) { return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function initials(name: string) { return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "RU"; }

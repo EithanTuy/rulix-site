@@ -33,6 +33,8 @@ describe("review report export", () => {
     );
 
     expect(report).toContain("Action: accept");
+    expect(report).toContain("## AI Review Scope");
+    expect(report).toContain(`revision ${result.memoRevision ?? memo.revision ?? "unknown"}`);
     expect(report).toContain("Reviewer decision: accept");
     expect(report).toContain("Official Corpus");
     expect(report).toContain("15 CFR");

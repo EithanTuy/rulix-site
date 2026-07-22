@@ -19,9 +19,31 @@ export default defineConfig({
     video: "retain-on-failure"
   },
   projects: [
-    { name: "desktop", use: { browserName: "chromium", viewport: { width: 1440, height: 1024 } } },
-    { name: "tablet", use: { browserName: "chromium", viewport: { width: 768, height: 1024 } } },
-    { name: "mobile", use: { browserName: "chromium", viewport: { width: 390, height: 844 } } }
+    {
+      name: "desktop",
+      testMatch: /rulix-smoke\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 1440, height: 1024 } }
+    },
+    {
+      name: "tablet",
+      testMatch: /rulix-smoke\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 768, height: 1024 } }
+    },
+    {
+      name: "mobile",
+      testMatch: /rulix-smoke\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 390, height: 844 } }
+    },
+    {
+      name: "demo-1280",
+      testMatch: /rulix-demo-readiness\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 1280, height: 720 } }
+    },
+    {
+      name: "demo-1366",
+      testMatch: /rulix-demo-readiness\.spec\.ts$/,
+      use: { browserName: "chromium", viewport: { width: 1366, height: 768 } }
+    }
   ],
   webServer: {
     command: "npm run e2e:server",
