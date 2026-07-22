@@ -103,17 +103,32 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
         </div>
 
         <div className="modal-grid">
-          <label>
+          <label htmlFor="new-review-title-input">
             Memo title
-            <input value={title} onChange={(event) => handleTitleChange(event.target.value)} />
+            <input
+              id="new-review-title-input"
+              name="title"
+              value={title}
+              onChange={(event) => handleTitleChange(event.target.value)}
+            />
           </label>
-          <label>
+          <label htmlFor="new-review-manufacturer">
             Manufacturer or source
-            <input value={manufacturer} onChange={(event) => setManufacturer(event.target.value)} />
+            <input
+              id="new-review-manufacturer"
+              name="manufacturer"
+              value={manufacturer}
+              onChange={(event) => setManufacturer(event.target.value)}
+            />
           </label>
-          <label>
+          <label htmlFor="new-review-data-class">
             Data class
-            <select value={dataClass} onChange={(event) => setDataClass(event.target.value as DataClass)}>
+            <select
+              id="new-review-data-class"
+              name="dataClass"
+              value={dataClass}
+              onChange={(event) => setDataClass(event.target.value as DataClass)}
+            >
               <option value="public">Public/sample</option>
               <option value="proprietary">Proprietary</option>
               <option value="export-controlled">Export-controlled</option>
@@ -121,9 +136,11 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
               <option value="cui">CUI</option>
             </select>
           </label>
-          <label>
+          <label htmlFor="new-review-source-path">
             Classification path
             <select
+              id="new-review-source-path"
+              name="sourcePath"
               value={sourcePath}
               onChange={(event) => setSourcePath(event.target.value as NewReviewInput["sourcePath"])}
             >
@@ -136,9 +153,15 @@ export function NewReviewModal({ open, onClose, onCreate }: NewReviewModalProps)
           </label>
         </div>
 
-        <label className="modal-memo">
+        <label className="modal-memo" htmlFor="new-review-memo-text">
           Memo text
-          <textarea value={memoText} onChange={(event) => setMemoText(event.target.value)} rows={12} />
+          <textarea
+            id="new-review-memo-text"
+            name="memoText"
+            value={memoText}
+            onChange={(event) => setMemoText(event.target.value)}
+            rows={12}
+          />
         </label>
         <div className="modal-footer">
           {error && <p className="memo-chat-error">{error}</p>}

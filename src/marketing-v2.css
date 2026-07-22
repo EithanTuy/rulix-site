@@ -193,13 +193,13 @@
   transform: translateY(-2px);
 }
 
-.rulix-button--primary {
+.rulix-site .rulix-button--primary {
   color: #fff;
-  border-color: var(--rulix-teal);
-  background: var(--rulix-teal);
+  border-color: var(--rulix-teal-dark);
+  background: var(--rulix-teal-dark);
 }
 
-.rulix-button--primary:hover {
+.rulix-site .rulix-button--primary:hover {
   border-color: var(--rulix-teal-dark);
   background: var(--rulix-teal-dark);
 }
@@ -508,8 +508,8 @@
 
 .rulix-site .demo-tabs button.is-active {
   color: #fff;
-  border-color: var(--rulix-teal);
-  background: var(--rulix-teal);
+  border-color: var(--rulix-teal-dark);
+  background: var(--rulix-teal-dark);
 }
 
 .rulix-site .demo-tabs button.is-active::after {
@@ -635,7 +635,7 @@
 
 .review-loop__steps button.is-active > span {
   color: #fff;
-  background: var(--rulix-teal);
+  background: var(--rulix-teal-dark);
   transform: scale(1.08);
 }
 
@@ -764,6 +764,18 @@
 
 .comparison-table__inspect strong {
   color: #fff;
+}
+
+.theme-light .rulix-site .comparison-section {
+  color: #eff6f5;
+  border-bottom-color: var(--rulix-rule-dark);
+  background: var(--rulix-ink);
+}
+
+.theme-light .rulix-site .comparison-table {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: transparent;
+  box-shadow: none;
 }
 
 .trust-section__grid {
@@ -955,8 +967,8 @@
 
 .use-case-tabs button.is-active {
   color: #fff;
-  border-color: var(--rulix-teal);
-  background: var(--rulix-teal);
+  border-color: var(--rulix-teal-dark);
+  background: var(--rulix-teal-dark);
 }
 
 .use-case-panel {
@@ -1297,7 +1309,7 @@
 .rulix-footer small {
   display: block;
   margin-top: 8px;
-  color: #8a9698;
+  color: var(--rulix-muted);
   font-size: 10px;
 }
 
@@ -1350,8 +1362,21 @@
   }
 
   .rulix-hero__grid {
-    grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
+    grid-template-columns: minmax(340px, 0.78fr) minmax(0, 1.22fr);
     gap: 32px;
+  }
+
+  .rulix-hero h1 {
+    font-size: clamp(50px, 5.5vw, 62px);
+  }
+
+  .rulix-hero__media .product-media__top {
+    min-height: 46px;
+    font-size: 12px;
+  }
+
+  .rulix-hero__media .product-media__top strong {
+    font-size: 11px;
   }
 
   .product-proof__grid,

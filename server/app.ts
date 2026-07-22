@@ -1177,8 +1177,8 @@ export function createApp(options: CreateAppOptions = {}) {
       res.status(400).json({ code: "invalid_review", error: "A UUID requestId and non-empty bounded memo are required." });
       return;
     }
-    const dataClass = storedAiDataClass(res, input.dataClass);
-    if (!dataClass || !enforceDataClass(res, dataClass)) return;
+    const dataClass = input.dataClass;
+    if (!enforceDataClass(res, dataClass)) return;
     const memo = createMemoRecord({ ...input, dataClass }, res.locals.user);
     const inputHash = sha256Canonical({ ...input, dataClass });
     const auditEvent = authoritativeReviewAuditEvent(

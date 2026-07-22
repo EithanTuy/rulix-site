@@ -48,6 +48,13 @@ Generated: ${result.generatedAt}
 Provider: ${result.provider.label} (${result.provider.model})
 Depth: ${result.provider.depth ?? "standard"}
 
+## AI Review Scope
+Exact content reviewed: revision ${result.memoRevision ?? memo.revision ?? "unknown"} of ${memo.title}
+Data class: ${memo.dataClass ?? "unclassified"}
+Content hash: ${memo.contentHash ?? "unavailable"}
+AI input hash: ${result.inputHash ?? "unavailable"}
+The approval and AI result apply only to this exact memo revision, data class, provider lane, analysis depth, and cited source material.
+
 ## AI Classification Recommendation
 ${result.recommended.eccn} - ${result.recommended.label}
 Confidence: ${Math.round(result.recommended.confidence * 100)}%

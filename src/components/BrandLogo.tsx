@@ -17,7 +17,7 @@ export function BrandLogo({ tone = "dark", size = "topbar", product, className }
     .join(" ");
 
   return (
-    <div className={classes} aria-label={product ? `Rulix ${product}` : "Rulix"}>
+    <div className={classes} role="img" aria-label={product ? `Rulix ${product}` : "Rulix"}>
       {isAdaptive ? (
         <>
           <img className="brand-logo-mark brand-logo-asset-light" src="/brand/rulix-mark-light.png" alt="" />

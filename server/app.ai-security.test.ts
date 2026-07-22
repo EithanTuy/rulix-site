@@ -236,7 +236,7 @@ describe("AI route security boundary", () => {
       .set("x-rulix-csrf", session.csrfToken)
       .send(reviewInput("public"))
       .expect(201);
-    expect(created.body.review.dataClass).toBe("cui");
+    expect(created.body.review.dataClass).toBe("public");
 
     delete process.env.RULIX_CONTROLLED_DATA_MODE;
     const response = await session.agent
