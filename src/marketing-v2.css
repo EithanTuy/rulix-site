@@ -4,7 +4,7 @@ html.marketing-page,
 html.marketing-page body,
 html.marketing-page #root {
   min-height: 100%;
-  background: #ffffff;
+  background: #eff7f6;
 }
 
 .rulix-site {
@@ -16,17 +16,42 @@ html.marketing-page #root {
   --rulix-teal-hover: #06666a;
   --rulix-teal-soft: #e8f8f7;
   --rulix-dark-copy: #eff6f5;
+  --rulix-glass: rgba(255, 255, 255, 0.58);
+  --rulix-glass-strong: rgba(255, 255, 255, 0.76);
+  --rulix-glass-edge: rgba(255, 255, 255, 0.82);
+  --rulix-glass-shadow: 0 24px 70px rgba(25, 63, 67, 0.12);
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: clip;
   color: var(--rulix-copy);
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 8% 7%, rgba(49, 179, 174, 0.13), transparent 28%),
+    radial-gradient(circle at 91% 17%, rgba(96, 154, 205, 0.1), transparent 30%),
+    radial-gradient(circle at 61% 78%, rgba(97, 205, 178, 0.08), transparent 34%),
+    linear-gradient(145deg, #f8fbfb 0%, #edf7f5 54%, #f7fafb 100%);
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+.rulix-site::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(12, 75, 77, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12, 75, 77, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  opacity: 0.48;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
 }
 
 .rulix-site *,
@@ -36,6 +61,7 @@ html.marketing-page #root {
 }
 
 .rulix-site main {
+  position: relative;
   flex: 1;
 }
 
@@ -82,10 +108,11 @@ html.marketing-page #root {
   align-items: center;
   gap: 32px;
   padding: 12px max(32px, calc((100vw - 1200px) / 2));
-  border-bottom: 1px solid rgba(16, 23, 25, 0.12);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 30px rgba(16, 23, 25, 0.05);
-  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(248, 253, 252, 0.68);
+  box-shadow: 0 12px 38px rgba(20, 67, 70, 0.09), inset 0 -1px 0 rgba(18, 79, 81, 0.08);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  backdrop-filter: blur(28px) saturate(145%);
   transform: translateY(0);
   transition: transform 190ms ease, box-shadow 190ms ease;
   will-change: transform;
@@ -170,36 +197,61 @@ html.marketing-page #root {
   height: 44px;
   display: none;
   place-items: center;
-  border: 1px solid var(--rulix-rule);
-  border-radius: 6px;
+  border: 1px solid var(--rulix-glass-edge);
+  border-radius: 14px;
   color: var(--rulix-ink);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 10px 28px rgba(20, 67, 70, 0.1), inset 0 1px 0 #ffffff;
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
   cursor: pointer;
 }
 
 .rulix-site .rulix-primary-action {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   width: fit-content;
   min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 1px solid var(--rulix-teal);
-  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 15px;
   padding: 0 24px;
   color: #ffffff;
-  background: var(--rulix-teal);
-  box-shadow: 0 14px 32px rgba(5, 127, 130, 0.17);
+  background: linear-gradient(135deg, rgba(4, 112, 115, 0.98), rgba(3, 84, 89, 0.97));
+  box-shadow:
+    0 16px 38px rgba(5, 103, 107, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.54),
+    inset 0 -1px 0 rgba(0, 50, 53, 0.22);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
   font-size: 16px;
   font-weight: 700;
   line-height: 1;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.rulix-site .rulix-primary-action::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto;
+  z-index: -1;
+  height: 46%;
+  border-radius: 13px 13px 55% 55%;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
 }
 
 .rulix-site .rulix-primary-action:hover {
   color: #ffffff;
-  border-color: var(--rulix-teal-hover);
-  background: var(--rulix-teal-hover);
+  border-color: rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 20px 44px rgba(5, 103, 107, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -1px 0 rgba(0, 50, 53, 0.2);
   transform: translateY(-2px);
 }
 
@@ -208,8 +260,10 @@ html.marketing-page #root {
   align-items: center;
   min-height: calc(100svh - 72px);
   padding: 76px 0 88px;
-  border-bottom: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.24));
+  -webkit-backdrop-filter: blur(12px) saturate(115%);
+  backdrop-filter: blur(12px) saturate(115%);
 }
 
 .rulix-hero__grid {
@@ -245,11 +299,15 @@ html.marketing-page #root {
 }
 
 .product-frame {
+  position: relative;
   overflow: hidden;
-  border: 1px solid #cbd4d6;
-  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: 20px;
   background: #0b1113;
-  box-shadow: 0 24px 54px rgba(16, 23, 25, 0.14);
+  box-shadow:
+    0 28px 70px rgba(16, 54, 57, 0.2),
+    0 2px 8px rgba(16, 54, 57, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .product-frame__top {
@@ -300,8 +358,10 @@ html.marketing-page #root {
 .rulix-band {
   position: relative;
   padding: 112px 0;
-  border-bottom: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  backdrop-filter: blur(22px) saturate(120%);
 }
 
 .section-intro {
@@ -339,9 +399,15 @@ html.marketing-page #root {
 
 .outcome-band,
 .trust-band {
+  overflow: hidden;
   color: var(--rulix-dark-copy);
   border-bottom-color: rgba(255, 255, 255, 0.13);
-  background: var(--rulix-ink);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(35, 176, 169, 0.2), transparent 32%),
+    linear-gradient(145deg, rgba(8, 23, 25, 0.98), rgba(12, 36, 38, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  backdrop-filter: blur(24px) saturate(130%);
 }
 
 .outcome-band__grid {
@@ -393,7 +459,8 @@ html.marketing-page #root {
 }
 
 .product-flow__steps {
-  border-top: 1px solid var(--rulix-rule);
+  display: grid;
+  gap: 24px;
 }
 
 .product-step {
@@ -401,8 +468,13 @@ html.marketing-page #root {
   grid-template-columns: minmax(280px, 0.43fr) minmax(0, 0.57fr);
   align-items: center;
   gap: clamp(52px, 8vw, 112px);
-  padding: 72px 0;
-  border-bottom: 1px solid var(--rulix-rule);
+  padding: clamp(34px, 5vw, 58px);
+  border: 1px solid var(--rulix-glass-edge);
+  border-radius: 26px;
+  background: linear-gradient(145deg, var(--rulix-glass-strong), rgba(255, 255, 255, 0.38));
+  box-shadow: var(--rulix-glass-shadow), inset 0 1px 0 #ffffff;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
 }
 
 .product-step:nth-child(even) .product-step__copy {
@@ -454,6 +526,8 @@ html.marketing-page #root {
 }
 
 .audience-stories {
+  display: grid;
+  gap: 24px;
   padding-top: 48px;
 }
 
@@ -462,13 +536,18 @@ html.marketing-page #root {
   grid-template-columns: minmax(0, 0.47fr) minmax(0, 0.53fr);
   align-items: center;
   gap: clamp(52px, 8vw, 112px);
-  padding: 72px 0;
-  border-bottom: 1px solid var(--rulix-rule);
+  padding: clamp(34px, 5vw, 58px);
+  border: 1px solid var(--rulix-glass-edge);
+  border-radius: 26px;
+  background: linear-gradient(145deg, var(--rulix-glass-strong), rgba(255, 255, 255, 0.38));
+  box-shadow: var(--rulix-glass-shadow), inset 0 1px 0 #ffffff;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
   scroll-margin-top: 92px;
 }
 
 .audience-story:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid var(--rulix-glass-edge);
 }
 
 .audience-story:nth-child(even) .audience-story__copy {
@@ -521,7 +600,8 @@ html.marketing-page #root {
   align-content: start;
   gap: 18px;
   padding: 34px 28px 34px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
 }
 
 .trust-list article:nth-child(odd) {
@@ -558,9 +638,12 @@ html.marketing-page #root {
   max-width: 760px;
   padding: 18px 20px;
   border: 1px solid rgba(121, 212, 209, 0.36);
-  border-radius: 5px;
+  border-radius: 16px;
   color: #e7f8f6;
-  background: rgba(5, 127, 130, 0.2);
+  background: linear-gradient(135deg, rgba(13, 148, 146, 0.26), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 42px rgba(0, 10, 12, 0.15);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
 }
 
 .data-boundary svg {
@@ -578,13 +661,21 @@ html.marketing-page #root {
   align-items: center;
   padding: 104px 0 120px;
   background:
-    linear-gradient(90deg, transparent 0 67%, var(--rulix-teal-soft) 67% 100%),
-    #ffffff;
+    radial-gradient(circle at 18% 42%, rgba(40, 174, 169, 0.11), transparent 34%),
+    transparent;
 }
 
 .contact-page__inner {
+  max-width: 1040px;
   display: grid;
   gap: 30px;
+  padding: clamp(34px, 5.5vw, 68px);
+  border: 1px solid var(--rulix-glass-edge);
+  border-radius: 30px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4));
+  box-shadow: var(--rulix-glass-shadow), inset 0 1px 0 #ffffff;
+  -webkit-backdrop-filter: blur(28px) saturate(135%);
+  backdrop-filter: blur(28px) saturate(135%);
 }
 
 .contact-page h1 {
@@ -593,27 +684,23 @@ html.marketing-page #root {
 
 .contact-email {
   min-height: 68px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 20px;
+  display: inline-flex;
+  gap: 16px;
   margin-top: 8px;
   padding: 8px 22px;
 }
 
 .contact-email span {
+  font-size: 18px;
   font-weight: 700;
 }
 
-.contact-email strong {
-  padding-left: 20px;
-  border-left: 1px solid rgba(255, 255, 255, 0.42);
-  font-size: 18px;
-  font-weight: 600;
-}
-
 .rulix-footer {
-  border-top: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(248, 253, 252, 0.66);
+  box-shadow: inset 0 1px 0 rgba(18, 79, 81, 0.06);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  backdrop-filter: blur(22px) saturate(130%);
 }
 
 .rulix-footer__inner {
@@ -677,10 +764,12 @@ html.marketing-page #root {
     display: none;
     gap: 0;
     padding: 8px 18px;
-    border: 1px solid var(--rulix-rule);
-    border-radius: 6px;
-    background: #ffffff;
-    box-shadow: 0 20px 50px rgba(16, 23, 25, 0.14);
+    border: 1px solid var(--rulix-glass-edge);
+    border-radius: 20px;
+    background: rgba(248, 253, 252, 0.88);
+    box-shadow: 0 24px 60px rgba(16, 54, 57, 0.18), inset 0 1px 0 #ffffff;
+    -webkit-backdrop-filter: blur(28px) saturate(145%);
+    backdrop-filter: blur(28px) saturate(145%);
   }
 
   .rulix-header.is-open .rulix-header__nav {
@@ -819,7 +908,8 @@ html.marketing-page #root {
 
   .product-step,
   .audience-story {
-    padding: 54px 0;
+    padding: 30px 24px;
+    border-radius: 22px;
   }
 
   .product-step h3 {
@@ -840,28 +930,17 @@ html.marketing-page #root {
   .contact-page {
     min-height: calc(100svh - 64px);
     padding: 78px 0 92px;
-    background:
-      linear-gradient(180deg, #ffffff 0 76%, var(--rulix-teal-soft) 76% 100%);
+    background: radial-gradient(circle at 20% 30%, rgba(40, 174, 169, 0.1), transparent 42%);
+  }
+
+  .contact-page__inner {
+    padding: 30px 22px;
+    border-radius: 24px;
   }
 
   .contact-email {
-    grid-template-columns: 1fr auto;
-    gap: 8px 14px;
+    gap: 14px;
     padding: 14px 18px;
-  }
-
-  .contact-email strong {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    padding: 10px 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.42);
-    border-left: 0;
-    font-size: 16px;
-  }
-
-  .contact-email svg {
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .rulix-footer__inner {

@@ -33,7 +33,8 @@ import { BrandLogo } from "./BrandLogo";
 import "../marketing-v2.css";
 
 const CONTACT_EMAIL = "tuyilin2@msu.edu";
-const CONTACT_HREF = `mailto:${CONTACT_EMAIL}?subject=Rulix%20inquiry`;
+const CONTACT_PAGE_HREF = "/contact";
+const CONTACT_EMAIL_HREF = `mailto:${CONTACT_EMAIL}?subject=Rulix%20inquiry`;
 
 const HOME_OUTCOMES = [
   {
@@ -186,7 +187,7 @@ export function MarketingSite() {
   }, [page]);
 
   return (
-    <div className="rulix-site">
+    <div className="rulix-site rulix-site--liquid-glass">
       <SiteHeader
         currentPageKind={page.pageKind}
         focused={headerFocused}
@@ -450,9 +451,8 @@ function ContactPage() {
       <div className="rulix-shell contact-page__inner">
         <h1>Talk with us about your classification workflow.</h1>
         <p>Tell us where the review slows down. We’ll reply by email and help you decide whether Rulix fits the work.</p>
-        <a className="rulix-primary-action contact-email" href={CONTACT_HREF}>
-          <span>Email Rulix</span>
-          <strong>{CONTACT_EMAIL}</strong>
+        <a className="rulix-primary-action contact-email" href={CONTACT_EMAIL_HREF}>
+          <span>{CONTACT_EMAIL}</span>
           <ArrowRight size={20} aria-hidden="true" />
         </a>
       </div>
@@ -487,7 +487,7 @@ function PageHero({
 
 function EmailAction() {
   return (
-    <a className="rulix-primary-action" href={CONTACT_HREF}>
+    <a className="rulix-primary-action" href={CONTACT_PAGE_HREF}>
       Email Rulix
       <ArrowRight size={18} aria-hidden="true" />
     </a>
