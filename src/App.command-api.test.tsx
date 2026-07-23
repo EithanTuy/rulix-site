@@ -102,7 +102,7 @@ describe("rendered paged command workspace", () => {
   it("loads summary pages on demand and fetches detail only for the selected review", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: /reviews/i }));
+    expect(await screen.findByRole("heading", { name: "Work", level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /load more reviews/i })).toBeEnabled();
     expect(await screen.findByText(primary.title)).toBeInTheDocument();
     expect(api.getReviewDetail).toHaveBeenCalledTimes(1);
