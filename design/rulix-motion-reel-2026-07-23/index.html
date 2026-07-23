@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Rulix Review Loop</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        margin: 0;
+        overflow: hidden;
+        background: #071014;
+      }
+
+      #rulix-review-loop {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #071014;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        transform-origin: center center;
+      }
+
+      #narration {
+        width: 1px;
+        height: 1px;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-i3db" id="rulix-review-loop" data-composition-id="rulix-review-loop" data-start="0" data-duration="22.2" data-width="1920" data-height="1080">
+      <audio data-hf-id="hf-tize" id="narration" class="clip" src="narration.mp3" data-start="0" data-duration="21.792" data-track-index="0" data-volume="1"></audio>
+
+      <div data-hf-id="hf-ofdp" id="beat-1-slot" class="clip" data-composition-id="beat-1-review-failure" data-composition-src="compositions/beat-1-review-failure.html" data-start="0" data-duration="4.429" data-track-index="1"></div>
+
+      <div data-hf-id="hf-i7ie" id="beat-2-slot" class="clip" data-composition-id="beat-2-source-gap" data-composition-src="compositions/beat-2-source-gap.html" data-start="3.979" data-duration="4.363" data-track-index="2"></div>
+
+      <div data-hf-id="hf-yaef" id="beat-3-slot" class="clip" data-composition-id="beat-3-decision-path" data-composition-src="compositions/beat-3-decision-path.html" data-start="7.892" data-duration="8.236" data-track-index="3"></div>
+
+      <div data-hf-id="hf-bykg" id="beat-4-slot" class="clip" data-composition-id="beat-4-human-decision" data-composition-src="compositions/beat-4-human-decision.html" data-start="15.678" data-duration="6.522" data-track-index="4"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      var rootTimeline = gsap.timeline({ paused: true });
+
+      rootTimeline.fromTo(
+        "#beat-1-slot",
+        { opacity: 0, scale: 1.025, filter: "blur(10px)" },
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "power2.out" },
+        0.12
+      );
+
+      rootTimeline.to(
+        "#beat-1-slot",
+        { opacity: 0, scale: 1.06, filter: "blur(14px)", duration: 0.45, ease: "power3.inOut" },
+        3.979
+      );
+      rootTimeline.fromTo(
+        "#beat-2-slot",
+        { opacity: 0, scale: 0.94, filter: "blur(12px)" },
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "power3.inOut" },
+        3.979
+      );
+
+      rootTimeline.to(
+        "#beat-2-slot",
+        { opacity: 0, x: -108, scale: 1.025, filter: "blur(12px)", duration: 0.45, ease: "power3.inOut" },
+        7.892
+      );
+      rootTimeline.fromTo(
+        "#beat-3-slot",
+        { opacity: 0, x: 108, scale: 0.975, filter: "blur(12px)" },
+        { opacity: 1, x: 0, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "power3.inOut" },
+        7.892
+      );
+
+      rootTimeline.to(
+        "#beat-3-slot",
+        { opacity: 0, scale: 1.035, filter: "blur(18px)", duration: 0.45, ease: "sine.inOut" },
+        15.678
+      );
+      rootTimeline.fromTo(
+        "#beat-4-slot",
+        { opacity: 0, scale: 0.985, filter: "blur(18px)" },
+        { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.45, ease: "sine.inOut" },
+        15.678
+      );
+
+      window.__timelines["rulix-review-loop"] = rootTimeline;
+    </script>
+  </body>
+</html>
