@@ -4,7 +4,7 @@ html.marketing-page,
 html.marketing-page body,
 html.marketing-page #root {
   min-height: 100%;
-  background: #ffffff;
+  background: #eff7f6;
 }
 
 .rulix-site {
@@ -16,17 +16,57 @@ html.marketing-page #root {
   --rulix-teal-hover: #06666a;
   --rulix-teal-soft: #e8f8f7;
   --rulix-dark-copy: #eff6f5;
+  --rulix-glass: rgba(255, 255, 255, 0.58);
+  --rulix-glass-strong: rgba(255, 255, 255, 0.76);
+  --rulix-glass-edge: rgba(255, 255, 255, 0.82);
+  --rulix-glass-cyan: rgba(34, 210, 211, 0.62);
+  --rulix-glass-shadow: 0 26px 74px rgba(17, 69, 75, 0.17);
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: clip;
   color: var(--rulix-copy);
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 7% 10%, rgba(71, 216, 208, 0.2), transparent 27%),
+    radial-gradient(circle at 91% 14%, rgba(72, 170, 220, 0.18), transparent 29%),
+    radial-gradient(circle at 58% 82%, rgba(79, 220, 189, 0.14), transparent 34%),
+    linear-gradient(145deg, #f7fcfc 0%, #e6f5f5 48%, #eef8fb 100%);
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+.rulix-site::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(12, 75, 77, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12, 75, 77, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  opacity: 0.34;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
+}
+
+.rulix-site::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 102% 4%, transparent 0 8%, rgba(255, 255, 255, 0.72) 8.5%, rgba(31, 210, 215, 0.22) 10%, transparent 16%),
+    radial-gradient(ellipse at -10% 76%, transparent 0 11%, rgba(255, 255, 255, 0.78) 11.5%, rgba(36, 194, 200, 0.18) 14%, transparent 21%),
+    radial-gradient(ellipse at 45% 110%, transparent 0 13%, rgba(255, 255, 255, 0.72) 13.5%, rgba(61, 205, 206, 0.16) 16%, transparent 24%);
+  filter: blur(0.3px);
+  opacity: 0.92;
 }
 
 .rulix-site *,
@@ -36,6 +76,7 @@ html.marketing-page #root {
 }
 
 .rulix-site main {
+  position: relative;
   flex: 1;
 }
 
@@ -74,18 +115,30 @@ html.marketing-page #root {
 
 .rulix-header {
   position: sticky;
-  top: 0;
+  top: 14px;
   z-index: 60;
+  width: min(1360px, calc(100% - 40px));
   min-height: 72px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 32px;
-  padding: 12px max(32px, calc((100vw - 1200px) / 2));
-  border-bottom: 1px solid rgba(16, 23, 25, 0.12);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 30px rgba(16, 23, 25, 0.05);
-  backdrop-filter: blur(18px);
+  margin-inline: auto;
+  padding: 12px clamp(24px, 4vw, 52px);
+  border: 2px solid transparent;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 8% -80%, rgba(255, 255, 255, 0.98), transparent 38%) padding-box,
+    linear-gradient(145deg, rgba(255, 255, 255, 0.74), rgba(225, 247, 249, 0.5)) padding-box,
+    linear-gradient(115deg, #ffffff 0%, rgba(116, 238, 239, 0.72) 34%, #ffffff 58%, rgba(53, 190, 207, 0.44) 100%) border-box;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.46),
+    0 0 30px rgba(38, 205, 211, 0.18),
+    0 22px 58px rgba(18, 90, 98, 0.19),
+    inset 0 2px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -1px 0 rgba(20, 157, 166, 0.2);
+  -webkit-backdrop-filter: blur(34px) saturate(165%);
+  backdrop-filter: blur(34px) saturate(165%);
   transform: translateY(0);
   transition: transform 190ms ease, box-shadow 190ms ease;
   will-change: transform;
@@ -94,7 +147,7 @@ html.marketing-page #root {
 .rulix-header.is-hidden {
   pointer-events: none;
   box-shadow: none;
-  transform: translateY(calc(-100% - 2px));
+  transform: translateY(calc(-100% - 20px));
 }
 
 .rulix-header.is-hidden:focus-within {
@@ -170,49 +223,121 @@ html.marketing-page #root {
   height: 44px;
   display: none;
   place-items: center;
-  border: 1px solid var(--rulix-rule);
-  border-radius: 6px;
+  border: 1px solid var(--rulix-glass-edge);
+  border-radius: 14px;
   color: var(--rulix-ink);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 10px 28px rgba(20, 67, 70, 0.1), inset 0 1px 0 #ffffff;
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
   cursor: pointer;
 }
 
 .rulix-site .rulix-primary-action {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   width: fit-content;
   min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  border: 1px solid var(--rulix-teal);
-  border-radius: 5px;
+  border: 2px solid rgba(143, 244, 242, 0.78);
+  border-radius: 19px;
   padding: 0 24px;
   color: #ffffff;
-  background: var(--rulix-teal);
-  box-shadow: 0 14px 32px rgba(5, 127, 130, 0.17);
+  background:
+    radial-gradient(circle at 26% 0%, rgba(87, 229, 225, 0.35), transparent 42%),
+    linear-gradient(135deg, rgba(5, 113, 118, 0.96), rgba(2, 69, 76, 0.97));
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.48),
+    0 0 24px rgba(36, 212, 211, 0.3),
+    0 20px 46px rgba(2, 78, 84, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(0, 38, 44, 0.34);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  backdrop-filter: blur(24px) saturate(155%);
   font-size: 16px;
   font-weight: 700;
   line-height: 1;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.rulix-site .rulix-primary-action::before {
+  content: "";
+  position: absolute;
+  inset: 2px 2px auto;
+  z-index: -1;
+  height: 52%;
+  border-radius: 16px 16px 60% 60%;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent);
 }
 
 .rulix-site .rulix-primary-action:hover {
   color: #ffffff;
-  border-color: var(--rulix-teal-hover);
-  background: var(--rulix-teal-hover);
+  border-color: rgba(180, 255, 252, 0.96);
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.56),
+    0 0 32px rgba(36, 212, 211, 0.38),
+    0 24px 50px rgba(2, 78, 84, 0.34),
+    inset 0 2px 0 rgba(255, 255, 255, 0.68),
+    inset 0 -2px 0 rgba(0, 38, 44, 0.3);
   transform: translateY(-2px);
 }
 
 .rulix-hero {
+  position: relative;
+  overflow: hidden;
   display: grid;
   align-items: center;
-  min-height: calc(100svh - 72px);
-  padding: 76px 0 88px;
-  border-bottom: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  min-height: calc(100svh - 86px);
+  margin-top: -72px;
+  padding: 160px 0 88px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    radial-gradient(circle at 82% 25%, rgba(49, 214, 216, 0.14), transparent 28%),
+    radial-gradient(circle at 12% 78%, rgba(255, 255, 255, 0.8), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(229, 247, 249, 0.16));
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  backdrop-filter: blur(14px) saturate(125%);
+}
+
+.rulix-hero::before,
+.rulix-hero::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 26px solid rgba(255, 255, 255, 0.56);
+  box-shadow:
+    inset 0 0 0 2px rgba(61, 212, 216, 0.22),
+    0 0 0 2px rgba(61, 212, 216, 0.16),
+    0 24px 70px rgba(52, 164, 173, 0.14);
+  filter: blur(0.2px);
+}
+
+.rulix-hero::before {
+  width: 420px;
+  height: 250px;
+  top: 86px;
+  right: -190px;
+  border-radius: 48% 52% 58% 42%;
+  transform: rotate(28deg);
+}
+
+.rulix-hero::after {
+  width: 560px;
+  height: 230px;
+  bottom: -170px;
+  left: -140px;
+  border-radius: 52% 48% 40% 60%;
+  transform: rotate(12deg);
 }
 
 .rulix-hero__grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(430px, 0.88fr);
   align-items: center;
@@ -245,11 +370,18 @@ html.marketing-page #root {
 }
 
 .product-frame {
+  position: relative;
   overflow: hidden;
-  border: 1px solid #cbd4d6;
-  border-radius: 7px;
-  background: #0b1113;
-  box-shadow: 0 24px 54px rgba(16, 23, 25, 0.14);
+  border: 4px solid transparent;
+  border-radius: 30px;
+  background:
+    linear-gradient(#0b1113, #0b1113) padding-box,
+    linear-gradient(125deg, #ffffff 0%, rgba(112, 245, 241, 0.88) 28%, rgba(255, 255, 255, 0.98) 53%, rgba(28, 194, 207, 0.72) 78%, #ffffff 100%) border-box;
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, 0.58),
+    0 0 44px rgba(32, 208, 211, 0.32),
+    0 34px 82px rgba(16, 71, 78, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.36);
 }
 
 .product-frame__top {
@@ -300,8 +432,10 @@ html.marketing-page #root {
 .rulix-band {
   position: relative;
   padding: 112px 0;
-  border-bottom: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  backdrop-filter: blur(22px) saturate(120%);
 }
 
 .section-intro {
@@ -339,9 +473,15 @@ html.marketing-page #root {
 
 .outcome-band,
 .trust-band {
+  overflow: hidden;
   color: var(--rulix-dark-copy);
   border-bottom-color: rgba(255, 255, 255, 0.13);
-  background: var(--rulix-ink);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(35, 176, 169, 0.2), transparent 32%),
+    linear-gradient(145deg, rgba(8, 23, 25, 0.98), rgba(12, 36, 38, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  backdrop-filter: blur(24px) saturate(130%);
 }
 
 .outcome-band__grid {
@@ -393,7 +533,8 @@ html.marketing-page #root {
 }
 
 .product-flow__steps {
-  border-top: 1px solid var(--rulix-rule);
+  display: grid;
+  gap: 24px;
 }
 
 .product-step {
@@ -401,8 +542,19 @@ html.marketing-page #root {
   grid-template-columns: minmax(280px, 0.43fr) minmax(0, 0.57fr);
   align-items: center;
   gap: clamp(52px, 8vw, 112px);
-  padding: 72px 0;
-  border-bottom: 1px solid var(--rulix-rule);
+  padding: clamp(34px, 5vw, 58px);
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(74, 220, 217, 0.13), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(222, 245, 247, 0.46));
+  box-shadow:
+    0 0 0 2px rgba(49, 195, 200, 0.1),
+    var(--rulix-glass-shadow),
+    inset 0 2px 0 #ffffff,
+    inset 0 -1px 0 rgba(36, 176, 184, 0.16);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(30px) saturate(150%);
 }
 
 .product-step:nth-child(even) .product-step__copy {
@@ -454,6 +606,8 @@ html.marketing-page #root {
 }
 
 .audience-stories {
+  display: grid;
+  gap: 24px;
   padding-top: 48px;
 }
 
@@ -462,13 +616,24 @@ html.marketing-page #root {
   grid-template-columns: minmax(0, 0.47fr) minmax(0, 0.53fr);
   align-items: center;
   gap: clamp(52px, 8vw, 112px);
-  padding: 72px 0;
-  border-bottom: 1px solid var(--rulix-rule);
+  padding: clamp(34px, 5vw, 58px);
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 10% 100%, rgba(74, 220, 217, 0.12), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(222, 245, 247, 0.46));
+  box-shadow:
+    0 0 0 2px rgba(49, 195, 200, 0.1),
+    var(--rulix-glass-shadow),
+    inset 0 2px 0 #ffffff,
+    inset 0 -1px 0 rgba(36, 176, 184, 0.16);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(30px) saturate(150%);
   scroll-margin-top: 92px;
 }
 
 .audience-story:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.94);
 }
 
 .audience-story:nth-child(even) .audience-story__copy {
@@ -521,7 +686,8 @@ html.marketing-page #root {
   align-content: start;
   gap: 18px;
   padding: 34px 28px 34px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
 }
 
 .trust-list article:nth-child(odd) {
@@ -558,9 +724,12 @@ html.marketing-page #root {
   max-width: 760px;
   padding: 18px 20px;
   border: 1px solid rgba(121, 212, 209, 0.36);
-  border-radius: 5px;
+  border-radius: 16px;
   color: #e7f8f6;
-  background: rgba(5, 127, 130, 0.2);
+  background: linear-gradient(135deg, rgba(13, 148, 146, 0.26), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 42px rgba(0, 10, 12, 0.15);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
 }
 
 .data-boundary svg {
@@ -578,13 +747,28 @@ html.marketing-page #root {
   align-items: center;
   padding: 104px 0 120px;
   background:
-    linear-gradient(90deg, transparent 0 67%, var(--rulix-teal-soft) 67% 100%),
-    #ffffff;
+    radial-gradient(circle at 17% 36%, rgba(39, 209, 205, 0.2), transparent 31%),
+    radial-gradient(circle at 88% 78%, rgba(82, 162, 220, 0.14), transparent 32%),
+    transparent;
 }
 
 .contact-page__inner {
+  max-width: 1040px;
   display: grid;
   gap: 30px;
+  padding: clamp(34px, 5.5vw, 68px);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(55, 215, 213, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(222, 246, 248, 0.48));
+  box-shadow:
+    0 0 0 3px rgba(52, 197, 204, 0.1),
+    0 34px 90px rgba(17, 79, 86, 0.2),
+    inset 0 2px 0 #ffffff,
+    inset 0 -1px 0 rgba(36, 176, 184, 0.18);
+  -webkit-backdrop-filter: blur(34px) saturate(160%);
+  backdrop-filter: blur(34px) saturate(160%);
 }
 
 .contact-page h1 {
@@ -593,27 +777,23 @@ html.marketing-page #root {
 
 .contact-email {
   min-height: 68px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 20px;
+  display: inline-flex;
+  gap: 16px;
   margin-top: 8px;
   padding: 8px 22px;
 }
 
 .contact-email span {
+  font-size: 18px;
   font-weight: 700;
 }
 
-.contact-email strong {
-  padding-left: 20px;
-  border-left: 1px solid rgba(255, 255, 255, 0.42);
-  font-size: 18px;
-  font-weight: 600;
-}
-
 .rulix-footer {
-  border-top: 1px solid var(--rulix-rule);
-  background: #ffffff;
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(248, 253, 252, 0.66);
+  box-shadow: inset 0 1px 0 rgba(18, 79, 81, 0.06);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  backdrop-filter: blur(22px) saturate(130%);
 }
 
 .rulix-footer__inner {
@@ -666,6 +846,8 @@ html.marketing-page #root {
 
   .rulix-header {
     grid-template-columns: auto 1fr auto;
+    top: 10px;
+    width: calc(100% - 32px);
     padding-inline: 24px;
   }
 
@@ -677,10 +859,12 @@ html.marketing-page #root {
     display: none;
     gap: 0;
     padding: 8px 18px;
-    border: 1px solid var(--rulix-rule);
-    border-radius: 6px;
-    background: #ffffff;
-    box-shadow: 0 20px 50px rgba(16, 23, 25, 0.14);
+    border: 1px solid var(--rulix-glass-edge);
+    border-radius: 20px;
+    background: rgba(248, 253, 252, 0.88);
+    box-shadow: 0 24px 60px rgba(16, 54, 57, 0.18), inset 0 1px 0 #ffffff;
+    -webkit-backdrop-filter: blur(28px) saturate(145%);
+    backdrop-filter: blur(28px) saturate(145%);
   }
 
   .rulix-header.is-open .rulix-header__nav {
@@ -707,7 +891,26 @@ html.marketing-page #root {
 
   .rulix-hero {
     min-height: auto;
-    padding: 72px 0 78px;
+    margin-top: -72px;
+    padding: 148px 0 78px;
+  }
+
+  .rulix-hero::before {
+    width: 300px;
+    height: 180px;
+    top: 90px;
+    right: -150px;
+    border-width: 18px;
+    opacity: 0.7;
+  }
+
+  .rulix-hero::after {
+    width: 380px;
+    height: 170px;
+    bottom: -120px;
+    left: -180px;
+    border-width: 18px;
+    opacity: 0.65;
   }
 
   .rulix-hero__grid,
@@ -758,8 +961,11 @@ html.marketing-page #root {
   }
 
   .rulix-header {
+    top: 8px;
+    width: calc(100% - 20px);
     min-height: 64px;
     padding-inline: 16px;
+    border-radius: 20px;
   }
 
   .rulix-header__brand .brand-logo-mark {
@@ -772,7 +978,21 @@ html.marketing-page #root {
   }
 
   .rulix-hero {
-    padding: 54px 0 62px;
+    margin-top: -64px;
+    padding: 126px 0 62px;
+  }
+
+  .rulix-hero::before {
+    width: 200px;
+    height: 120px;
+    top: 82px;
+    right: -120px;
+    border-width: 12px;
+    opacity: 0.55;
+  }
+
+  .rulix-hero::after {
+    display: none;
   }
 
   .rulix-hero h1,
@@ -799,6 +1019,16 @@ html.marketing-page #root {
     grid-template-columns: 1fr auto;
   }
 
+  .product-frame {
+    border-width: 2px;
+    border-radius: 24px;
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.52),
+      0 0 28px rgba(32, 208, 211, 0.22),
+      0 26px 60px rgba(16, 71, 78, 0.22),
+      inset 0 2px 0 rgba(255, 255, 255, 0.34);
+  }
+
   .rulix-band {
     padding: 78px 0;
   }
@@ -819,7 +1049,8 @@ html.marketing-page #root {
 
   .product-step,
   .audience-story {
-    padding: 54px 0;
+    padding: 30px 24px;
+    border-radius: 22px;
   }
 
   .product-step h3 {
@@ -840,28 +1071,17 @@ html.marketing-page #root {
   .contact-page {
     min-height: calc(100svh - 64px);
     padding: 78px 0 92px;
-    background:
-      linear-gradient(180deg, #ffffff 0 76%, var(--rulix-teal-soft) 76% 100%);
+    background: radial-gradient(circle at 20% 30%, rgba(40, 174, 169, 0.1), transparent 42%);
+  }
+
+  .contact-page__inner {
+    padding: 30px 22px;
+    border-radius: 24px;
   }
 
   .contact-email {
-    grid-template-columns: 1fr auto;
-    gap: 8px 14px;
+    gap: 14px;
     padding: 14px 18px;
-  }
-
-  .contact-email strong {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    padding: 10px 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.42);
-    border-left: 0;
-    font-size: 16px;
-  }
-
-  .contact-email svg {
-    grid-column: 2;
-    grid-row: 1;
   }
 
   .rulix-footer__inner {

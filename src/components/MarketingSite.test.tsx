@@ -42,9 +42,15 @@ describe("marketing pages", () => {
   it("exposes the approved email as the contact action", () => {
     renderPath("/contact");
 
-    const contact = screen.getByRole("link", { name: /email rulix/i });
-    expect(contact).toHaveTextContent("tuyilin2@msu.edu");
+    const contact = screen.getByRole("link", { name: "tuyilin2@msu.edu" });
     expect(contact).toHaveAttribute("href", "mailto:tuyilin2@msu.edu?subject=Rulix%20inquiry");
+  });
+
+  it("routes the page CTA to Contact before opening email", () => {
+    const { container } = renderPath("/");
+
+    expect(screen.getByRole("link", { name: "Email Rulix" })).toHaveAttribute("href", "/contact");
+    expect(container.querySelector(".rulix-site")).toHaveClass("rulix-site--liquid-glass");
   });
 
   it("uses real page paths in the shared header", () => {
