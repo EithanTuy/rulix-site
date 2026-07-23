@@ -1,0 +1,9 @@
+Your memo can reach the right answer and still fail review.
+
+Rulix finds the missing support inside the source.
+
+It turns each gap into a reviewer question, keeps every response tied to the evidence, and preserves the final call.
+
+AI surfaces the gap.
+
+A qualified person decides.

@@ -4,7 +4,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type FocusEvent
+  type FocusEvent,
+  type ReactNode
 } from "react";
 import {
   ArrowRight,
@@ -14,9 +15,13 @@ import {
   GitBranch,
   LockKeyhole,
   Menu,
+  Pause,
+  Play,
   SearchCheck,
   ShieldCheck,
   UsersRound,
+  Volume2,
+  VolumeX,
   X,
   type LucideIcon
 } from "lucide-react";
@@ -30,11 +35,30 @@ import {
   type MarketingPageMeta
 } from "../marketingPages";
 import { BrandLogo } from "./BrandLogo";
+import "@fontsource/instrument-serif/400.css";
 import "../marketing-v2.css";
 
 const CONTACT_EMAIL = "tuyilin2@msu.edu";
 const CONTACT_PAGE_HREF = "/contact";
 const CONTACT_EMAIL_HREF = `mailto:${CONTACT_EMAIL}?subject=Rulix%20inquiry`;
+const REVIEW_LOOP_SRC = "/marketing/rulix-review-loop.mp4";
+const REVIEW_LOOP_HERO_SRC = "/marketing/rulix-review-loop-hero.mp4";
+const REVIEW_LOOP_POSTER = "/marketing/rulix-review-loop-poster.png";
+
+const REVIEW_LOOP_STAGES = [
+  {
+    label: "Find the gap",
+    time: 4.429
+  },
+  {
+    label: "Resolve the question",
+    time: 8.342
+  },
+  {
+    label: "Preserve the record",
+    time: 16.128
+  }
+] as const;
 
 const HOME_OUTCOMES = [
   {
@@ -282,15 +306,11 @@ function SiteHeader({
 function HomePage() {
   return (
     <>
-      <PageHero
-        title="AI-assisted export classification."
-        copy="Rulix helps export-control teams review classification memos, find missing support, and keep the final decision with a qualified person."
-        media="/marketing/demos/demo-find-missing-reasoning.webp"
-        mediaAlt="Rulix showing a classification memo conclusion that needs more support"
-      />
+      <MotionHomeHero />
+      <ReviewLoopSection />
       <section className="rulix-band outcome-band" aria-labelledby="home-outcomes-title">
         <div className="rulix-shell outcome-band__grid">
-          <div className="section-intro section-intro--light">
+          <div className="section-intro">
             <h2 id="home-outcomes-title">A clearer path from draft to decision.</h2>
             <p>Rulix keeps the review focused on three questions: what is missing, who needs to answer, and what was finally decided.</p>
           </div>
@@ -308,6 +328,158 @@ function HomePage() {
         </div>
       </section>
     </>
+  );
+}
+
+function MotionHomeHero() {
+  const reducedMotion = usePrefersReducedMotion();
+
+  return (
+    <section className="rulix-hero motion-home-hero">
+      <div className="rulix-shell motion-home-hero__grid">
+        <div className="rulix-hero__copy motion-home-hero__copy">
+          <h1>
+            <span>Review the reasoning.</span>
+            <em>Keep the decision human.</em>
+          </h1>
+          <p>
+            Rulix finds missing support in export-classification memos, ties every question to the source,
+            and keeps signoff with a qualified reviewer.
+          </p>
+          <div className="motion-home-hero__actions">
+            <a className="rulix-primary-action" href={CONTACT_PAGE_HREF}>
+              Request access
+              <ArrowRight size={18} aria-hidden="true" />
+            </a>
+            <a className="rulix-secondary-action" href="#review-loop">
+              <Play size={18} aria-hidden="true" />
+              Watch the review loop
+            </a>
+          </div>
+        </div>
+        <MotionProductFrame
+          className="motion-home-hero__media"
+          autoPlay={!reducedMotion}
+          loop
+          muted
+          poster={REVIEW_LOOP_POSTER}
+          src={REVIEW_LOOP_HERO_SRC}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ReviewLoopSection() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
+  const [activeStage, setActiveStage] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playing, setPlaying] = useState(!reducedMotion);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    if (!reducedMotion) return;
+    videoRef.current?.pause();
+    setPlaying(false);
+  }, [reducedMotion]);
+
+  const togglePlayback = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      video.pause();
+      setPlaying(false);
+    }
+  };
+
+  const toggleSound = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const nextMuted = !video.muted;
+    video.muted = nextMuted;
+    setMuted(nextMuted);
+  };
+
+  const seekToStage = (index: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = REVIEW_LOOP_STAGES[index].time;
+    setActiveStage(index);
+    void video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  };
+
+  const updateActiveStage = () => {
+    const time = videoRef.current?.currentTime ?? 0;
+    setCurrentTime(time);
+    setActiveStage(time >= REVIEW_LOOP_STAGES[2].time ? 2 : time >= REVIEW_LOOP_STAGES[1].time ? 1 : 0);
+  };
+
+  return (
+    <section className="review-loop-section" id="review-loop" aria-labelledby="review-loop-title">
+      <div className="rulix-shell review-loop-section__inner">
+        <div className="review-loop-section__copy">
+          <h2 id="review-loop-title">One review. Every decision visible.</h2>
+          <p>
+            Watch Rulix move from a missing fact to a reviewer-owned decision record—without hiding the
+            memo or automating signoff.
+          </p>
+          <strong>
+            <span aria-hidden="true"></span>
+            AI surfaces the gap. A qualified person decides.
+          </strong>
+        </div>
+
+        <div className="review-loop-stage">
+          <MotionProductFrame className="review-loop-stage__frame">
+            <video
+              ref={videoRef}
+              src={REVIEW_LOOP_SRC}
+              poster={REVIEW_LOOP_POSTER}
+              autoPlay={!reducedMotion}
+              muted={muted}
+              playsInline
+              preload="metadata"
+              onEnded={() => {
+                setActiveStage(0);
+                setPlaying(false);
+              }}
+              onPause={() => setPlaying(false)}
+              onPlay={() => setPlaying(true)}
+              onTimeUpdate={updateActiveStage}
+            />
+            <div className="review-loop-controls" aria-label="Review loop controls">
+              <button type="button" onClick={togglePlayback} aria-label={playing ? "Pause review loop" : "Play review loop"}>
+                {playing ? <Pause size={17} aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
+                <span>{playing ? "Pause" : "Play"}</span>
+              </button>
+              <button type="button" onClick={toggleSound} aria-label={muted ? "Turn review loop sound on" : "Mute review loop"}>
+                {muted ? <VolumeX size={17} aria-hidden="true" /> : <Volume2 size={17} aria-hidden="true" />}
+                <span>{muted ? "Sound on" : "Mute"}</span>
+              </button>
+              <time>00:{Math.floor(currentTime).toString().padStart(2, "0")}</time>
+            </div>
+          </MotionProductFrame>
+        </div>
+
+        <div className="review-loop-rail" aria-label="Review loop stages">
+          {REVIEW_LOOP_STAGES.map((stage, index) => (
+            <button
+              className={activeStage === index ? "is-active" : ""}
+              type="button"
+              aria-pressed={activeStage === index}
+              onClick={() => seekToStage(index)}
+              key={stage.label}
+            >
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{stage.label}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -517,6 +689,47 @@ function StaticProductFrame({
   );
 }
 
+function MotionProductFrame({
+  autoPlay = false,
+  children,
+  className = "",
+  loop = false,
+  muted = true,
+  poster,
+  src
+}: {
+  autoPlay?: boolean;
+  children?: ReactNode;
+  className?: string;
+  loop?: boolean;
+  muted?: boolean;
+  poster?: string;
+  src?: string;
+}) {
+  return (
+    <figure className={["product-frame", "motion-product-frame", className].filter(Boolean).join(" ")}>
+      <div className="product-frame__top">
+        <BrandLogo tone="light" size="compact" />
+        <span>Reviewer workspace</span>
+        <strong>Human decision</strong>
+      </div>
+      <div className="motion-product-frame__viewport">
+        {children ?? (
+          <video
+            src={src}
+            poster={poster}
+            autoPlay={autoPlay}
+            loop={loop}
+            muted={muted}
+            playsInline
+            preload="metadata"
+          />
+        )}
+      </div>
+    </figure>
+  );
+}
+
 function SiteFooter() {
   return (
     <footer className="rulix-footer">
@@ -637,6 +850,22 @@ function useOnceVisible(ref: { current: HTMLElement | null }) {
   }, [ref]);
 
   return visible;
+}
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
 }
 
 export function isMarketingPath(pathname: string) {

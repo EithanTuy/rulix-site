@@ -1,0 +1,439 @@
+<template id="beat-4-human-decision-template">
+  <div data-hf-id="hf-jy1i" id="beat-4-human-decision" class="human-decision-composition" data-composition-id="beat-4-human-decision" data-start="0" data-duration="6.522" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-zpfd" class="decision-glow" data-layout-ignore=""></div>
+    <div data-hf-id="hf-1qwe" class="decision-rule decision-rule--top" data-layout-ignore=""></div>
+    <div data-hf-id="hf-37ey" class="decision-rule decision-rule--bottom" data-layout-ignore=""></div>
+
+    <section data-hf-id="hf-6mlw" class="decision-copy">
+      <div data-hf-id="hf-gobw" class="decision-register">
+        <img data-hf-id="hf-8msw" src="capture/assets/svgs/logo-b2ef4711.svg" alt="Rulix">
+        <span data-hf-id="hf-1la2">REVIEW RECORD / COMPLETE</span>
+      </div>
+
+      <h1 data-hf-id="hf-m3fm">
+        <span data-hf-id="hf-i1v3" class="decision-line decision-line--technical">AI surfaces the gap.</span>
+        <span data-hf-id="hf-7gzz" class="decision-line decision-line--human">A qualified person decides.</span>
+      </h1>
+
+      <p data-hf-id="hf-8ipr">
+        The memo, analysis, and reviewer action remain visible in one defensible record.
+      </p>
+
+      <div data-hf-id="hf-u9p1" class="signoff-plate">
+        <span data-hf-id="hf-7hjy" class="signoff-dot" aria-hidden="true"></span>
+        <span data-hf-id="hf-pk7x">HUMAN SIGNOFF REQUIRED</span>
+      </div>
+    </section>
+
+    <section data-hf-id="hf-7uzs" class="decision-product-stage" aria-label="Rulix audit record">
+      <div data-hf-id="hf-2n49" class="decision-product-enter">
+        <div data-hf-id="hf-6njd" class="decision-product-shell">
+          <div data-hf-id="hf-rvtn" class="decision-product-chrome">
+            <span data-hf-id="hf-zfds">Audit trail</span>
+            <strong data-hf-id="hf-2zq7">Human decision</strong>
+            <span data-hf-id="hf-n56s" class="decision-timecode">00:20</span>
+          </div>
+          <div data-hf-id="hf-aicw" class="decision-product-camera">
+            <img data-hf-id="hf-qqv1" src="capture/assets/product/07-export-ready.png" alt="Rulix audit trail with reviewer decision">
+          </div>
+        </div>
+      </div>
+
+      <div data-hf-id="hf-8bq4" class="audit-sequence" aria-label="Review record events">
+        <div data-hf-id="hf-ndow" class="audit-event audit-event--memo">
+          <span data-hf-id="hf-p81i">01</span>
+          <strong data-hf-id="hf-8p85">Memo pasted</strong>
+        </div>
+        <div data-hf-id="hf-eexs" class="audit-event audit-event--analysis">
+          <span data-hf-id="hf-pmcj">02</span>
+          <strong data-hf-id="hf-5ydd">Analysis completed</strong>
+        </div>
+        <div data-hf-id="hf-rqzc" class="audit-event audit-event--decision">
+          <span data-hf-id="hf-q0nk">03</span>
+          <strong data-hf-id="hf-rqat">Reviewer decision</strong>
+        </div>
+        <svg data-hf-id="hf-41c4" class="audit-path" viewBox="0 0 720 72" aria-hidden="true">
+          <path data-hf-id="hf-ove5" d="M38 36 C185 36 226 36 360 36 S570 36 682 36" />
+        </svg>
+      </div>
+    </section>
+
+    <style>
+      @font-face {
+        font-family: "Instrument Serif";
+        src: url("capture/assets/fonts/instrument-serif-latin-400-normal.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 400;
+      }
+
+      @font-face {
+        font-family: "IBM Plex Mono";
+        src: local("Cascadia Mono");
+        font-style: normal;
+        font-weight: 400 700;
+      }
+
+      #beat-4-human-decision {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.32fr);
+        gap: 58px;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        padding: 86px 88px 78px;
+        box-sizing: border-box;
+        color: #ffffff;
+        background-color: #071014;
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      #beat-4-human-decision * {
+        box-sizing: border-box;
+      }
+
+      .decision-glow,
+      .decision-rule {
+        position: absolute;
+        pointer-events: none;
+      }
+
+      .decision-glow {
+        width: 960px;
+        height: 820px;
+        right: -110px;
+        top: 90px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(116, 238, 239, 0.18), rgba(116, 238, 239, 0) 67%);
+      }
+
+      .decision-rule {
+        left: 88px;
+        right: 88px;
+        height: 1px;
+        background: rgba(116, 238, 239, 0.18);
+      }
+
+      .decision-rule--top {
+        top: 62px;
+      }
+
+      .decision-rule--bottom {
+        bottom: 54px;
+      }
+
+      .decision-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 34px;
+        padding: 22px 0 12px;
+      }
+
+      .decision-register {
+        display: inline-flex;
+        align-items: center;
+        gap: 15px;
+        min-height: 48px;
+        color: #74eeef;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+      }
+
+      .decision-register img {
+        display: block;
+        width: 42px;
+        height: 42px;
+        object-fit: contain;
+        padding: 7px;
+        border: 1px solid rgba(116, 238, 239, 0.34);
+        border-radius: 11px;
+        background: #ffffff;
+      }
+
+      .decision-copy h1 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        max-width: 710px;
+        margin: 0;
+        line-height: 0.94;
+        letter-spacing: -0.055em;
+      }
+
+      .decision-line {
+        display: block;
+      }
+
+      .decision-line--technical {
+        max-width: 660px;
+        color: #eff7f6;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 76px;
+        font-weight: 700;
+        letter-spacing: -0.045em;
+      }
+
+      .decision-line--human {
+        max-width: 690px;
+        color: #ffffff;
+        font-family: "Instrument Serif", serif;
+        font-size: 102px;
+        font-weight: 400;
+        line-height: 0.9;
+        letter-spacing: -0.04em;
+      }
+
+      .decision-copy > p {
+        max-width: 650px;
+        margin: 0;
+        color: #b7c9cb;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 24px;
+        font-weight: 500;
+        line-height: 1.52;
+      }
+
+      .signoff-plate {
+        min-height: 56px;
+        display: inline-flex;
+        align-items: center;
+        gap: 13px;
+        border: 1px solid rgba(116, 238, 239, 0.34);
+        border-radius: 7px;
+        padding: 0 19px;
+        color: #eff7f6;
+        background: rgba(5, 11, 18, 0.72);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+      }
+
+      .signoff-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #74eeef;
+        box-shadow: 0 0 24px rgba(116, 238, 239, 0.68);
+      }
+
+      .decision-product-stage {
+        min-width: 0;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
+        perspective: 1500px;
+      }
+
+      .decision-product-enter {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .decision-product-shell {
+        width: 100%;
+        height: 690px;
+        overflow: hidden;
+        border: 1px solid rgba(116, 238, 239, 0.42);
+        border-radius: 20px;
+        background: #050b12;
+        box-shadow:
+          0 46px 118px rgba(0, 0, 0, 0.46),
+          0 0 0 5px rgba(116, 238, 239, 0.06);
+      }
+
+      .decision-product-chrome {
+        height: 62px;
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 22px;
+        padding: 0 22px;
+        color: #eff7f6;
+        background: #050b12;
+        border-bottom: 1px solid rgba(116, 238, 239, 0.16);
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .decision-product-chrome strong {
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      .decision-timecode {
+        color: #74eeef;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .decision-product-camera {
+        width: 100%;
+        height: calc(100% - 62px);
+        overflow: hidden;
+        transform-origin: 72% 28%;
+      }
+
+      .decision-product-camera img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center top;
+      }
+
+      .audit-sequence {
+        position: relative;
+        min-height: 116px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        border: 1px solid rgba(116, 238, 239, 0.19);
+        border-radius: 14px;
+        padding: 18px 20px;
+        background: rgba(5, 11, 18, 0.82);
+      }
+
+      .audit-event {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        align-content: center;
+        gap: 7px;
+        min-width: 0;
+        padding: 0 16px;
+        border-left: 2px solid rgba(116, 238, 239, 0.26);
+      }
+
+      .audit-event span {
+        color: #74eeef;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .audit-event strong {
+        color: #eff7f6;
+        font-size: 19px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .audit-path {
+        position: absolute;
+        z-index: 1;
+        left: 24px;
+        right: 24px;
+        top: 22px;
+        width: calc(100% - 48px);
+        height: 72px;
+        pointer-events: none;
+      }
+
+      .audit-path path {
+        fill: none;
+        stroke: rgba(116, 238, 239, 0.72);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-dasharray: 760;
+        stroke-dashoffset: 760;
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var beat4 = gsap.timeline({ paused: true });
+
+      beat4.fromTo(
+        ".decision-glow",
+        { opacity: 0, scale: 0.82 },
+        { opacity: 1, scale: 1, duration: 1.35, ease: "sine.out" },
+        0.12
+      );
+      beat4.fromTo(
+        ".decision-rule--top",
+        { opacity: 0, scaleX: 0.76, transformOrigin: "left center" },
+        { opacity: 1, scaleX: 1, duration: 0.7, ease: "power1.out" },
+        0.16
+      );
+      beat4.fromTo(
+        ".decision-rule--bottom",
+        { opacity: 0, scaleX: 0.84, transformOrigin: "right center" },
+        { opacity: 1, scaleX: 1, duration: 0.82, ease: "expo.out" },
+        0.22
+      );
+      beat4.fromTo(
+        ".decision-product-enter",
+        { opacity: 0, x: 86, rotationY: -5 },
+        { opacity: 1, x: 0, rotationY: 0, duration: 0.82, ease: "power3.out" },
+        0.18
+      );
+      beat4.fromTo(
+        ".decision-product-chrome",
+        { opacity: 0, y: -24 },
+        { opacity: 1, y: 0, duration: 0.48, ease: "circ.out" },
+        0.5
+      );
+      beat4.fromTo(
+        ".decision-register",
+        { opacity: 0, x: -42 },
+        { opacity: 1, x: 0, duration: 0.54, ease: "expo.out" },
+        0.42
+      );
+      beat4.fromTo(
+        ".decision-line--technical",
+        { opacity: 0, y: 46 },
+        { opacity: 1, y: 0, duration: 0.68, ease: "power4.out" },
+        0.56
+      );
+      beat4.fromTo(
+        ".decision-line--human",
+        { opacity: 0, y: 68 },
+        { opacity: 1, y: 0, duration: 1.05, ease: "sine.out" },
+        0.82
+      );
+      beat4.fromTo(
+        ".decision-copy > p",
+        { opacity: 0, x: -24 },
+        { opacity: 1, x: 0, duration: 0.56, ease: "back.out(1.12)" },
+        1.34
+      );
+      beat4.fromTo(
+        ".audit-event",
+        { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.46, stagger: 0.18, ease: "power2.out" },
+        1.18
+      );
+      beat4.to(
+        ".audit-path path",
+        { strokeDashoffset: 0, duration: 1.2, ease: "power2.inOut" },
+        1.28
+      );
+      beat4.fromTo(
+        ".signoff-plate",
+        { opacity: 0, scale: 0.94 },
+        { opacity: 1, scale: 1, duration: 0.38, ease: "back.out(1.5)" },
+        1.86
+      );
+      beat4.fromTo(
+        ".decision-product-camera",
+        { scale: 1.02, x: 0, y: 0 },
+        { scale: 1.085, x: -24, y: -14, duration: 5.7, ease: "sine.inOut" },
+        0.54
+      );
+      beat4.to(
+        ".human-decision-composition",
+        { opacity: 0.92, duration: 0.25, ease: "sine.in" },
+        6.272
+      );
+
+      window.__timelines["beat-4-human-decision"] = beat4;
+    </script>
+  </div>
+</template>
