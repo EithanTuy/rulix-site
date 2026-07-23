@@ -217,8 +217,14 @@ describe("Rulix ECCN API", () => {
       .get("/sitemap.xml")
       .set("Host", "www.rulix.cloud")
       .expect(200);
+    expect(sitemap.text).toContain("https://rulix.cloud/product");
+    expect(sitemap.text).toContain("https://rulix.cloud/use-cases");
+    expect(sitemap.text).toContain("https://rulix.cloud/trust");
+    expect(sitemap.text).toContain("https://rulix.cloud/contact");
     expect(sitemap.text).toContain("https://rulix.cloud/export-control-memo-review");
     expect(sitemap.text).toContain("https://rulix.cloud/manufacturer-eccn-review");
+    expect(sitemap.text).not.toContain("https://rulix.cloud/site");
+    expect(sitemap.text).not.toContain("https://rulix.cloud/security");
     expect(sitemap.headers["content-type"]).toContain("application/xml");
   });
 

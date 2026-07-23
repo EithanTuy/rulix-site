@@ -36,6 +36,11 @@ import type {
   WorkspaceNotification
 } from "../src/types";
 import {
+  MARKETING_SITEMAP_PAGES,
+  marketingCanonicalPath,
+  marketingPageForPath as sharedMarketingPageForPath
+} from "../src/marketingPages";
+import {
   createLocalPublicMemoTemplate,
   buildCouncilProviderRequest,
   buildMemoBuilderProviderRequest,
@@ -144,45 +149,6 @@ const ACCESS_REQUEST_VOLUMES = new Set([
   "21-50 reviews / month",
   "50+ reviews / month"
 ]);
-const MARKETING_SITE_PAGES = [
-  {
-    path: "/",
-    title: "Rulix - Defensible export-control memo review",
-    description:
-      "Rulix checks classification memos for missing thresholds, weak evidence, and reviewer questions before human export-control reviewers sign off."
-  },
-  {
-    path: "/export-control-memo-review",
-    title: "Export-control memo review software | Rulix",
-    description:
-      "Review export-control classification memos for evidence gaps, missing technical thresholds, reviewer questions, and audit-ready signoff."
-  },
-  {
-    path: "/eccn-classification-assistant",
-    title: "ECCN classification assistant for reviewers | Rulix",
-    description:
-      "Rulix helps export-control reviewers structure ECCN classification review, evidence gaps, and human signoff without replacing expert judgment."
-  },
-  {
-    path: "/ai-export-compliance-review",
-    title: "AI export compliance review with human signoff | Rulix",
-    description:
-      "Use AI decision support to spot export-control memo gaps while keeping final determinations with trained human reviewers."
-  },
-  {
-    path: "/university-export-control-review",
-    title: "University export-control memo review | Rulix",
-    description:
-      "Rulix helps universities and research operations triage public or sanitized export-control memo drafts before empowered officials spend review time."
-  },
-  {
-    path: "/manufacturer-eccn-review",
-    title: "Manufacturer ECCN review support | Rulix",
-    description:
-      "Rulix helps manufacturers and labs reduce back-and-forth on ECCN memo evidence, product specifications, and reviewer-ready questions."
-  }
-];
-
 interface CreateAppOptions {
   store?: AccountStore;
   edgeSharedSecret?: string;
@@ -2683,7 +2649,7 @@ function shouldNoindexApp(req: Request) {
 }
 
 function marketingSitemapXml() {
-  const urls = MARKETING_SITE_PAGES.map((page) => {
+  const urls = MARKETING_SITEMAP_PAGES.map((page) => {
     const priority = page.path === "/" ? "1.0" : "0.8";
     const changefreq = page.path === "/" ? "weekly" : "monthly";
     return [
@@ -2700,7 +2666,7 @@ function marketingSitemapXml() {
 function renderIndexHtml(indexHtml: string, req: Request) {
   if (!isPublicMarketingHost(req)) return indexHtml;
   const meta = marketingMetaForPath(req.path);
-  const canonical = `https://rulix.cloud${meta.path}`;
+  const canonical = `https://rulix.cloud${marketingCanonicalPath(meta)}`;
   const cleanHtml = indexHtml
     .replace(/^\s*<meta name="description"[^>]*>\r?\n?/im, "")
     .replace(/^\s*<link rel="canonical"[^>]*>\r?\n?/im, "")
@@ -2725,7 +2691,7 @@ function renderIndexHtml(indexHtml: string, req: Request) {
 }
 
 function marketingMetaForPath(pathname: string) {
-  return MARKETING_SITE_PAGES.find((page) => page.path === pathname) ?? MARKETING_SITE_PAGES[0];
+  return sharedMarketingPageForPath(pathname);
 }
 
 function escapeHtml(value: string) {
