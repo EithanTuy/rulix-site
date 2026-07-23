@@ -50,6 +50,7 @@ import {
   aiApprovalChatHistoryEntry,
   hashAiApprovalChatHistoryEntries
 } from "./domain/aiApproval";
+import { hashReviewResult } from "./domain/hashes";
 
 const MIGRATION_BATCH_SIZE = 25;
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
@@ -755,7 +756,8 @@ function buildMigrationSpecs(
   }
 
   for (const [memoId, result] of Object.entries(source.analysisResults ?? {})) {
-    const analysisId = result.id ?? sha256Canonical(result).slice(0, 24);
+    const analysisHash = result.resultHash ?? hashReviewResult(result);
+    const analysisId = result.id ?? analysisHash.slice(0, 24);
     const generatedAt = validTimestamp(result.generatedAt, "analysis generatedAt");
     const analysisContent = stableCanonicalJson(result);
     const contents = [contentSpec(
@@ -769,7 +771,7 @@ function buildMigrationSpecs(
       entityVersion: 1,
       createdAt: generatedAt,
       updatedAt: generatedAt,
-      payload: { memoId, analysisId, summary },
+      payload: { memoId, analysisId, analysisHash, summary },
       contents
     }));
     specs.push(spec({
@@ -778,7 +780,7 @@ function buildMigrationSpecs(
       entityVersion: 1,
       createdAt: generatedAt,
       updatedAt: generatedAt,
-      payload: { memoId, analysisId, summary },
+      payload: { memoId, analysisId, analysisHash, summary },
       contents
     }));
   }

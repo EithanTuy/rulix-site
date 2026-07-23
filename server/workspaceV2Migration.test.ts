@@ -2,7 +2,7 @@
 
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { describe, expect, it } from "vitest";
-import type { AccountReviewState, AuditEvent, MemoRecord } from "../src/types";
+import type { AccountReviewState, AuditEvent, MemoRecord, ReviewResult } from "../src/types";
 import {
   InMemoryWorkspaceContentStore,
   WORKSPACE_MEMO_MAX_BYTES,
@@ -26,6 +26,7 @@ import {
   type WorkspaceMigrationBackend,
   type WorkspaceMigrationPlan
 } from "./workspaceV2Migration";
+import { hashReviewResult } from "./domain/hashes";
 
 class MemoryMigrationBackend implements WorkspaceMigrationBackend {
   readonly destinationTable = "workspace-v2";
@@ -200,6 +201,31 @@ describe("workspace v2 migration", () => {
     });
     expect(result.status).toBe("planned");
     expect(backend.calls).toEqual([]);
+  });
+
+  it("binds migrated analysis entities to their semantic result hash", async () => {
+    const state = sampleState();
+    const memoId = state.memos[0]!.id;
+    const result = {
+      memoId,
+      generatedAt: "2026-07-14T10:05:00.000Z"
+    } as ReviewResult;
+    state.analysisResults[memoId] = result;
+
+    const plan = await planWorkspaceMigration("tenant", "user", state);
+    const analysisHash = hashReviewResult(result);
+    const analysisEntities = plan.entities.filter(({ entityType }) =>
+      entityType === "AC" || entityType === "AH"
+    );
+
+    expect(analysisEntities).toHaveLength(2);
+    for (const entity of analysisEntities) {
+      expect(entity.payload).toMatchObject({
+        memoId,
+        analysisId: analysisHash.slice(0, 24),
+        analysisHash
+      });
+    }
   });
 
   it("resumes after a batch crash, remains idempotent, and verifies the semantic digest", async () => {
