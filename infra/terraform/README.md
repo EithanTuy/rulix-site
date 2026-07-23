@@ -90,7 +90,7 @@ aws_region           = "us-east-1"
 ai_data_class        = "proprietary"
 approved_provider    = "amazon-bedrock"
 approved_region      = "us-east-1" # omit to inherit aws_region
-controlled_data_mode = "disabled"
+controlled_data_mode = "blocked"
 bedrock_resource_arns = [
   # Replace with every exact model/inference-profile ARN approved for this tenant.
   "arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -110,6 +110,6 @@ an empty list, `"*"`, and malformed ARNs. Cross-region inference may require the
 approved inference-profile ARN plus each documented foundation-model ARN in its
 destination regions; use the exact set shown by AWS for the selected profile.
 
-Keep `controlled_data_mode = "disabled"` unless the selected Amazon Bedrock provider and region have been explicitly approved for controlled data. Direct Anthropic deployments must set `approved_provider = "anthropic-direct"` and `approved_region = "global"`; application credentials remain outside Terraform state.
+Keep `controlled_data_mode = "blocked"` unless the selected Amazon Bedrock provider and region have been explicitly approved for controlled data. Direct Anthropic deployments must set `approved_provider = "anthropic-direct"` and `approved_region = "global"`; application credentials remain outside Terraform state.
 
 For GovCloud, configure the AWS provider with a GovCloud account and region such as `us-gov-west-1`.

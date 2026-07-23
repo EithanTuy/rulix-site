@@ -243,7 +243,7 @@ describe("Terraform security invariants", () => {
     const secureStringDefaults = {
       ai_data_class: 'default     = "proprietary"',
       approved_provider: 'default     = "amazon-bedrock"',
-      controlled_data_mode: 'default     = "disabled"'
+      controlled_data_mode: 'default     = "blocked"'
     };
     const admissionDefaults = {
       ai_max_concurrent: DEFAULT_AI_ADMISSION_CONFIG.maxConcurrentLeases,
@@ -312,6 +312,8 @@ describe("Terraform security invariants", () => {
     expect(appLambda).toContain(
       'var.controlled_data_mode != "approved" || var.approved_provider == "amazon-bedrock"'
     );
+    expect(variables).toContain('contains(["blocked", "approved"], var.controlled_data_mode)');
+    expect(variables).not.toContain('contains(["disabled", "approved"], var.controlled_data_mode)');
     expect(appLambda).toContain("length(var.approved_model_ids) > 0");
     expect(appLambda).toContain("contains(var.approved_model_ids, model)");
     expect(appLambda).toContain('!can(regex("^(global|us|eu|apac|jp|au)\\\\.", model))');
