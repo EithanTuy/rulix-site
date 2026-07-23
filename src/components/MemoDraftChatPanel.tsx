@@ -4,10 +4,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Clipboard,
-  Database,
   Download,
   FileText,
-  FileUp,
   ListChecks,
   MessageSquare,
   PanelLeftClose,
@@ -15,6 +13,7 @@ import {
   Paperclip,
   Plus,
   RotateCcw,
+  ShieldCheck,
   Sparkles,
   Trash2,
   X
@@ -57,25 +56,12 @@ interface DraftSection {
   body: string;
 }
 
-type SessionJobStatus = "thinking" | "approval" | "error";
-
-interface SessionJob {
-  status: SessionJobStatus;
-  detail: string;
-}
-
-interface OptimisticMessage {
-  content: string;
-  visibleText: string;
-  attachments: BuilderAttachment[];
-}
-
 const ATTACHMENT_CONTEXT_MARKER = "\n\n---\nAttached source documents for Sonnet:\n";
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 const ITEM_STARTER =
-  "I need an ECCN memo for this item:";
+  "Draft a review-ready ECCN classification memo for this item. Ask only for truly blocking missing facts, and otherwise produce a complete draft with explicit verification items:\n\nItem:";
 const ATTACHMENT_STARTER =
-  "Build an ECCN memo from these source documents. Ask me only for anything that truly blocks a useful draft.";
+  "Draft a review-ready ECCN classification memo from the attached source documents. Preserve model numbers, manufacturer names, technical limits, units, and source caveats. Put unknown facts in Information still needed.";
 
 export function MemoDraftChatPanel({
   sessions,
@@ -91,49 +77,31 @@ export function MemoDraftChatPanel({
   onLoadMoreSessions = async () => undefined
 }: MemoDraftChatPanelProps) {
   const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
-  const [sessionJobs, setSessionJobs] = useState<Record<string, SessionJob>>({});
-  const [sessionErrors, setSessionErrors] = useState<Record<string, string>>({});
-  const [optimisticMessages, setOptimisticMessages] = useState<Record<string, OptimisticMessage>>({});
+  const [error, setError] = useState("");
   const [attachments, setAttachments] = useState<BuilderAttachment[]>([]);
   const [copyNotice, setCopyNotice] = useState("");
   const [writeNotice, setWriteNotice] = useState("");
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(
     () => typeof window !== "undefined" && window.innerWidth <= 760
   );
-  const sessionsRef = useRef(sessions);
-  const activeSessionIdRef = useRef(activeSessionId);
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toolsMenuRef = useRef<HTMLDivElement>(null);
   const draftCardRef = useRef<HTMLDivElement>(null);
   const draftDocumentRef = useRef<HTMLElement>(null);
-  sessionsRef.current = sessions;
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [sessions]
   );
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? sessions[0];
-  activeSessionIdRef.current = activeSession?.id;
   const messages = activeSession?.messages ?? [];
   const draft = activeSession?.draft;
   const draftSections = useMemo(() => (draft ? parseDraftSections(draft.memoText) : []), [draft]);
   const activeContextPrompt = activeSession?.starterPrompt;
-  const activeJob = activeSession ? sessionJobs[activeSession.id] : undefined;
-  const busy = activeJob?.status === "thinking";
-  const composerLocked = busy || activeJob?.status === "approval";
-  const error = activeSession ? sessionErrors[activeSession.id] ?? "" : "";
-  const optimisticMessage = activeSession ? optimisticMessages[activeSession.id] : undefined;
-  const conversationStarted = messages.length > 0 || Boolean(optimisticMessage) || Boolean(activeJob) || Boolean(draft);
-  const thinkingCount = Object.values(sessionJobs).filter((job) => job.status === "thinking").length;
-  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
-  const suggestedReplies = !busy && !draft ? replySuggestions(latestAssistantMessage?.content) : [];
-  const dataRecommendation = recommendDataClass(
-    [input, ...messages.slice(-4).map((message) => message.content)].join(" ")
-  );
+  const conversationStarted = messages.length > 0 || busy || Boolean(draft);
 
   useEffect(() => {
     if (!activeSession && sessions.length === 0) {
@@ -145,8 +113,8 @@ export function MemoDraftChatPanel({
 
   useEffect(() => {
     const el = threadRef.current;
-    if (el && (busy || optimisticMessage || !draft)) el.scrollTop = el.scrollHeight;
-  }, [activeSession?.id, messages, busy, optimisticMessage, draft]);
+    if (el && (busy || !draft)) el.scrollTop = el.scrollHeight;
+  }, [activeSession?.id, messages, busy, draft]);
 
   useEffect(() => {
     if (draft) {
@@ -156,29 +124,17 @@ export function MemoDraftChatPanel({
 
   // Restore pending input and attachments when switching sessions
   useEffect(() => {
-    const pendingWasSent = activeSession ? Boolean(optimisticMessages[activeSession.id]) : false;
-    setInput(pendingWasSent ? "" : activeSession?.pendingInput ?? "");
-    setAttachments(pendingWasSent
-      ? []
-      : (activeSession?.pendingAttachments ?? []).map((a) => ({ ...a })));
-    setToolsOpen(false);
+    setInput(activeSession?.pendingInput ?? "");
+    setAttachments(
+      (activeSession?.pendingAttachments ?? []).map((a) => ({ ...a }))
+    );
   // Only run when the session ID changes, not on every session update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSession?.id]);
 
-  useEffect(() => {
-    if (!toolsOpen) return;
-    const closeTools = (event: PointerEvent) => {
-      if (!toolsMenuRef.current?.contains(event.target as Node)) setToolsOpen(false);
-    };
-    document.addEventListener("pointerdown", closeTools);
-    return () => document.removeEventListener("pointerdown", closeTools);
-  }, [toolsOpen]);
-
   // Debounced save of draft input text to the session
   useEffect(() => {
     if (!activeSession) return;
-    if (optimisticMessages[activeSession.id] || sessionJobs[activeSession.id]) return;
     if (input === (activeSession.pendingInput ?? "")) return;
     const t = setTimeout(() => updateActiveSession({ pendingInput: input }), 600);
     return () => clearTimeout(t);
@@ -188,7 +144,6 @@ export function MemoDraftChatPanel({
   // Save ready/warning attachments to the session whenever they change
   useEffect(() => {
     if (!activeSession) return;
-    if (optimisticMessages[activeSession.id] || sessionJobs[activeSession.id]) return;
     const persistable = attachments
       .filter((a): a is BuilderAttachment & { status: "ready" | "warning" } =>
         a.status === "ready" || a.status === "warning"
@@ -200,75 +155,42 @@ export function MemoDraftChatPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachments]);
 
-  const updateSession = (
-    sessionId: string,
-    patch: Partial<MemoBuilderSession>,
-    baseSession?: MemoBuilderSession,
-    activate = false
-  ) => {
-    const current = sessionsRef.current;
-    const session = current.find((item) => item.id === sessionId) ?? baseSession;
-    if (!session) return;
+  const updateActiveSession = (patch: Partial<MemoBuilderSession>) => {
+    const session = activeSession ?? createBlankSession();
     const nextSession: MemoBuilderSession = {
       ...session,
       ...patch,
       updatedAt: new Date().toISOString()
     };
     const seen = new Set<string>();
-    const nextSessions = [nextSession, ...current.filter((item) => item.id !== nextSession.id)]
+    const nextSessions = [nextSession, ...sessions.filter((item) => item.id !== nextSession.id)]
       .filter((item) => {
         if (seen.has(item.id)) return false;
         seen.add(item.id);
         return true;
       });
-    sessionsRef.current = nextSessions;
     onSessionsChange(nextSessions);
-    if (activate) onActiveSessionChange(nextSession.id);
-  };
-
-  const updateActiveSession = (patch: Partial<MemoBuilderSession>) => {
-    const session = activeSession ?? createBlankSession();
-    if (!sessionsRef.current.some((item) => item.id === session.id)) {
-      sessionsRef.current = [session, ...sessionsRef.current];
-    }
-    updateSession(session.id, patch, session, true);
+    onActiveSessionChange(nextSession.id);
   };
 
   const startNewChat = () => {
     const session = createBlankSession();
-    const nextSessions = [session, ...sessionsRef.current];
-    sessionsRef.current = nextSessions;
-    onSessionsChange(nextSessions);
+    onSessionsChange([session, ...sessions]);
     onActiveSessionChange(session.id);
     setInput("");
+    setError("");
     setCopyNotice("");
     setWriteNotice("");
     setAttachments([]);
-    setToolsOpen(false);
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
-  const clearSessionError = (sessionId: string) => {
-    setSessionErrors((current) => {
-      if (!(sessionId in current)) return current;
-      const next = { ...current };
-      delete next[sessionId];
-      return next;
-    });
-  };
-
-  const useQuickStart = (kind: "item" | "attachments" | "sample" | "review" | "other") => {
-    if (activeSession) clearSessionError(activeSession.id);
+  const useQuickStart = (kind: "item" | "attachments" | "sample" | "review") => {
+    setError("");
     setCopyNotice("");
     setWriteNotice("");
     if (kind === "item") {
       setInput(ITEM_STARTER);
-      window.setTimeout(() => textareaRef.current?.focus(), 0);
-      return;
-    }
-
-    if (kind === "other") {
-      setInput("");
       window.setTimeout(() => textareaRef.current?.focus(), 0);
       return;
     }
@@ -303,24 +225,14 @@ export function MemoDraftChatPanel({
 
   const send = async (
     overrideText?: string,
-    explicitSource?: MemoBuilderDraftSource,
-    overrideAttachments?: BuilderAttachment[]
+    explicitSource?: MemoBuilderDraftSource
   ) => {
-    const targetSession = activeSession ?? createBlankSession();
-    const targetSessionId = targetSession.id;
     const text = (overrideText ?? input).trim();
-    const attachmentSource = overrideAttachments ?? attachments;
-    const readyAttachments = attachmentSource.filter((attachment) => attachment.content.trim());
-    const unsentAttachments = attachmentSource;
-    if (
-      (!text && readyAttachments.length === 0)
-      || sessionJobs[targetSessionId]?.status === "thinking"
-    ) return;
-    if (attachmentSource.some((attachment) => attachment.status === "reading")) {
-      setSessionErrors((current) => ({
-        ...current,
-        [targetSessionId]: "Wait for the attachment text extraction to finish before sending."
-      }));
+    const readyAttachments = attachments.filter((attachment) => attachment.content.trim());
+    const unsentAttachments = attachments;
+    if ((!text && readyAttachments.length === 0) || busy) return;
+    if (attachments.some((attachment) => attachment.status === "reading")) {
+      setError("Wait for the attachment text extraction to finish before sending to Sonnet.");
       return;
     }
 
@@ -330,31 +242,19 @@ export function MemoDraftChatPanel({
       role: "user",
       content: buildUserContentForSonnet(visibleText, readyAttachments)
     };
-    const targetMessages = [...targetSession.messages];
-    const targetDraft = targetSession.draft;
-    const nextMessages = [...targetMessages, userMsg];
+    const nextMessages = [...messages, userMsg];
     setInput("");
     setAttachments([]);
-    setToolsOpen(false);
-    clearSessionError(targetSessionId);
-    setOptimisticMessages((current) => ({
-      ...current,
-      [targetSessionId]: { content: userMsg.content, visibleText, attachments: unsentAttachments }
-    }));
-    setSessionJobs((current) => ({
-      ...current,
-      [targetSessionId]: {
-        status: "thinking",
-        detail: thinkingLabel(visibleText, readyAttachments.length)
-      }
-    }));
+    setBusy(true);
+    setError("");
     setCopyNotice("");
     setWriteNotice("");
 
     try {
+      const session = activeSession ?? createBlankSession();
       const preparedSession = await onPrepareSessionForAi({
-        ...targetSession,
-        title: conversationTitle(targetSession, visibleText, readyAttachments),
+        ...session,
+        title: activeSessionTitle(activeSession, visibleText),
         pendingInput: userMsg.content
       });
       const fingerprint = JSON.stringify({
@@ -375,71 +275,33 @@ export function MemoDraftChatPanel({
         if (userRole !== "export-control-officer" &&
             error instanceof ApiError && error.code === "ai_officer_approval_required") {
           await requestMemoBuilderApproval(preparedSession.id, fingerprint);
-          setSessionJobs((current) => ({
-            ...current,
-            [targetSessionId]: {
-              status: "approval",
-              detail: "Waiting for an export-control officer to approve this exact message."
-            }
-          }));
+          setInput(text);
+          setAttachments(unsentAttachments);
+          setWriteNotice("Approval requested. This exact saved message is ready for an export-control officer to inspect.");
           return;
         }
         throw error;
       }
       const assistantMsg: MemoBuildMessage = { role: "assistant", content: result.reply };
       const returnedDraft = result.draft
-        ? normalizeDraft(
-            result.draft,
-            readyAttachments,
-            targetDraft,
-            nextMessages,
-            draftSource,
-            targetSession.contextMemoId
-          )
+        ? normalizeDraft(result.draft, readyAttachments, draft, nextMessages, draftSource, activeSession?.contextMemoId)
         : undefined;
       if (result.draft && !returnedDraft) {
-        setSessionErrors((current) => ({
-          ...current,
-          [targetSessionId]: "The draft needs more detail. Ask Rulix to produce the full sectioned memo."
-        }));
+        setError("Sonnet returned a draft that is too thin for review. Ask it to produce the full sectioned memo.");
       }
-      updateSession(targetSessionId, {
-        title: finishedConversationTitle(preparedSession.title, returnedDraft),
+      updateActiveSession({
         messages: [...nextMessages, assistantMsg],
-        draft: returnedDraft ?? targetDraft,
-        pendingInput: undefined,
-        pendingAttachments: undefined
-      }, preparedSession);
-      if (activeSessionIdRef.current === targetSessionId) {
-        setInput("");
-        setAttachments([]);
-      }
-      setOptimisticMessages((current) => omitRecordKey(current, targetSessionId));
-      setSessionJobs((current) => omitRecordKey(current, targetSessionId));
+        draft: returnedDraft ?? draft,
+        pendingInput: ""
+      });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong. Try again.";
-      setSessionErrors((current) => ({ ...current, [targetSessionId]: message }));
-      setSessionJobs((current) => ({
-        ...current,
-        [targetSessionId]: { status: "error", detail: message }
-      }));
-      updateSession(targetSessionId, {
-        pendingInput: text,
-        pendingAttachments: unsentAttachments.filter(
-          (attachment): attachment is BuilderAttachment & { status: "ready" | "warning" } =>
-            attachment.status === "ready" || attachment.status === "warning"
-        )
-      }, targetSession);
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setInput(text);
+      setAttachments(unsentAttachments);
     } finally {
-      if (activeSessionIdRef.current === targetSessionId) textareaRef.current?.focus();
+      setBusy(false);
+      textareaRef.current?.focus();
     }
-  };
-
-  const retryActiveMessage = () => {
-    if (!activeSession) return;
-    const pending = optimisticMessages[activeSession.id];
-    if (!pending) return;
-    void send(pending.visibleText, undefined, pending.attachments);
   };
 
   const handleAttachmentChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -501,7 +363,7 @@ export function MemoDraftChatPanel({
   const handleWrite = async (analyze: boolean) => {
     if (!draft || !draft.memoText.trim() || writeBusy) return;
     setWriteBusy(true);
-    if (activeSession) clearSessionError(activeSession.id);
+    setError("");
     setWriteNotice(analyze ? "Adding review before analysis..." : "Adding review...");
     try {
       const reviewId = await (analyze ? onCreateAndAnalyze(draft) : onCreateMemo(draft));
@@ -513,12 +375,7 @@ export function MemoDraftChatPanel({
       setInput("");
       setWriteNotice(reviewId ? `Added to Reviews as ${reviewId}.` : "Added to Reviews.");
     } catch (err) {
-      if (activeSession) {
-        setSessionErrors((current) => ({
-          ...current,
-          [activeSession.id]: err instanceof Error ? err.message : "The review could not be created. Try again."
-        }));
-      }
+      setError(err instanceof Error ? err.message : "The review could not be created. Try again.");
       setWriteNotice("");
     } finally {
       setWriteBusy(false);
@@ -574,11 +431,7 @@ export function MemoDraftChatPanel({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (
-      event.key === "Enter"
-      && !event.shiftKey
-      && !event.nativeEvent.isComposing
-    ) {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       void send();
     }
@@ -591,15 +444,8 @@ export function MemoDraftChatPanel({
 
   const composer = (
     <div className="memo-builder-compose">
-      {error && (
-        <div className="memo-chat-error" role="alert">
-          <span>{error}</span>
-          {activeJob?.status === "error" && optimisticMessage && (
-            <button type="button" onClick={retryActiveMessage}>Try again</button>
-          )}
-        </div>
-      )}
-      <div className={`memo-builder-composer-box ${busy ? "is-thinking" : ""}`}>
+      {error && <p className="memo-chat-error">{error}</p>}
+      <div className="memo-builder-composer-box">
         {attachments.length > 0 && (
           <div className="memo-builder-attachments" aria-label="Memo Builder attachments">
             {attachments.map((attachment) => (
@@ -616,108 +462,58 @@ export function MemoDraftChatPanel({
             ))}
           </div>
         )}
-        {dataRecommendation && dataRecommendation.value !== activeSession?.dataClass && (
-          <div className="memo-builder-data-nudge">
-            <Sparkles size={15} />
-            <span>
-              <strong>{dataRecommendation.label} data may fit this chat</strong>
-              <small>{dataRecommendation.reason}</small>
-            </span>
-            <button
-              type="button"
-              onClick={() => updateActiveSession({ dataClass: dataRecommendation.value })}
-              disabled={composerLocked}
-            >
-              Use {dataRecommendation.label}
-            </button>
-          </div>
-        )}
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={draft ? "Ask Rulix to refine this draft..." : "Message Rulix about the item..."}
+          placeholder={draft ? "Ask Rulix to refine this draft..." : "Describe the item, paste the key facts, or attach source documents..."}
           aria-label="Message Rulix AI"
           rows={conversationStarted ? 2 : 3}
-          disabled={composerLocked}
+          disabled={busy}
         />
         <div className="memo-builder-composer-actions">
-          <div className="memo-builder-tools" ref={toolsMenuRef}>
-            <button
-              type="button"
-              className="memo-builder-plus"
-              onClick={() => setToolsOpen((open) => !open)}
-              disabled={composerLocked}
-              aria-label="Add files or set data handling"
-              aria-haspopup="dialog"
-              aria-expanded={toolsOpen}
-            >
-              <Plus size={19} />
-            </button>
-            {toolsOpen && (
-              <div className="memo-builder-tools-menu" role="dialog" aria-label="Memo tools">
-                <button
-                  type="button"
-                  className="memo-builder-tool-row"
-                  onClick={() => {
-                    setToolsOpen(false);
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  <FileUp size={17} />
-                  <span><strong>Add source files</strong><small>Datasheets, manuals, images, or notes</small></span>
-                </button>
-
-                <div className="memo-builder-data-picker">
-                  <div className="memo-builder-tools-heading">
-                    <Database size={15} />
-                    <span><strong>Data handling</strong><small>Choose what this conversation contains</small></span>
-                  </div>
-                  <div className="memo-builder-data-options" aria-label="Memo Builder classification">
-                    {(["public", "proprietary", "export-controlled", "itar-risk", "cui"] as const).map((value) => (
-                      <button
-                        type="button"
-                        key={value}
-                        className={value === (activeSession?.dataClass ?? "proprietary") ? "active" : ""}
-                        aria-pressed={value === (activeSession?.dataClass ?? "proprietary")}
-                        onClick={() => updateActiveSession({ dataClass: value })}
-                      >
-                        {dataClassLabel(value)}
-                      </button>
-                    ))}
-                  </div>
-                  {dataRecommendation && dataRecommendation.value !== activeSession?.dataClass && (
-                    <div className="memo-builder-data-recommendation">
-                      <Sparkles size={14} />
-                      <span>
-                        <strong>Rulix suggests {dataRecommendation.label}</strong>
-                        <small>{dataRecommendation.reason}</small>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateActiveSession({ dataClass: dataRecommendation.value })}
-                      >
-                        Use
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="memo-builder-tools-note">
-                  Rulix uses this boundary for AI routing. Final classifications still require reviewer signoff.
-                </div>
-              </div>
-            )}
+          <button
+            type="button"
+            className="memo-builder-attach"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            aria-label="Attach source documents"
+            title="Attach source documents"
+          >
+            <Paperclip size={18} />
+          </button>
+          <div className="memo-builder-model" aria-label="Active assistant">
+            <Sparkles size={14} />
+            <span>Rulix AI</span>
           </div>
-          <span className="memo-builder-enter-hint">Enter to send · Shift+Enter for a new line</span>
+          <label className="memo-builder-classification memo-builder-classification-inline">
+            <span>Data</span>
+            <select
+              aria-label="Memo Builder classification"
+              value={activeSession?.dataClass ?? "proprietary"}
+              disabled={busy}
+              onChange={(event) => updateActiveSession({
+                dataClass: event.target.value as MemoBuilderSession["dataClass"]
+              })}
+            >
+              <option value="public">Public</option>
+              <option value="proprietary">Proprietary</option>
+              <option value="export-controlled">Export-controlled</option>
+              <option value="itar-risk">ITAR risk</option>
+              <option value="cui">CUI</option>
+            </select>
+          </label>
+          <span className="memo-builder-source-boundary">Approved data only</span>
           <button
             type="button"
             className="memo-builder-send"
             onClick={() => void send()}
-            disabled={composerLocked || (!input.trim() && !attachments.some((attachment) => attachment.content.trim()))}
-            aria-label="Send message"
-            title="Send message"
+            disabled={busy || (!input.trim() && !attachments.some((attachment) => attachment.content.trim()))}
+            aria-label={userRole === "export-control-officer" ? "Approve and send" : "Request officer approval"}
+            title={userRole === "export-control-officer"
+              ? "Approve this exact saved conversation and send one provider request"
+              : "Submit this exact saved conversation for officer approval"}
           >
             <ArrowUp size={18} strokeWidth={2.4} />
           </button>
@@ -730,6 +526,14 @@ export function MemoDraftChatPanel({
             hidden
           />
         </div>
+      </div>
+      <div className="memo-builder-compose-foot">
+        <span>
+          {userRole === "export-control-officer"
+            ? "Ctrl+Enter approves this exact saved message and sends it"
+            : "Ctrl+Enter requests officer approval for this exact saved message"}
+        </span>
+        <span><ShieldCheck size={13} /> AI-assisted draft · human review required</span>
       </div>
     </div>
   );
@@ -745,18 +549,18 @@ export function MemoDraftChatPanel({
   ) : null;
 
   const quickStarts = (
-    <section className="memo-builder-quickstarts" aria-label="Choose how to begin">
+    <section className="memo-builder-quickstarts" aria-label="Memo Builder quick starts">
       <button type="button" onClick={() => useQuickStart("item")} disabled={busy}>
         <Sparkles size={16} />
-        <span><strong>I have an item</strong><small>Describe it in your own words</small></span>
+        <span><strong>Draft from an item</strong><small>Start with a description</small></span>
       </button>
       <button type="button" onClick={() => useQuickStart("attachments")} disabled={busy}>
         <Paperclip size={16} />
-        <span><strong>I have source files</strong><small>Add a datasheet or manual</small></span>
+        <span><strong>Use source documents</strong><small>Add a datasheet or manual</small></span>
       </button>
       <button type="button" onClick={() => useQuickStart("sample")} disabled={busy}>
         <FileText size={16} />
-        <span><strong>Show me an example</strong><small>Explore a complete memo</small></span>
+        <span><strong>Open an example</strong><small>Explore a complete memo</small></span>
       </button>
       {activeContextPrompt && (
         <button type="button" onClick={() => useQuickStart("review")} disabled={busy}>
@@ -764,10 +568,6 @@ export function MemoDraftChatPanel({
           <span><strong>Improve this review</strong><small>Use the loaded findings</small></span>
         </button>
       )}
-      <button type="button" onClick={() => useQuickStart("other")} disabled={busy}>
-        <MessageSquare size={16} />
-        <span><strong>Something else</strong><small>Tell Rulix what you need</small></span>
-      </button>
     </section>
   );
 
@@ -799,29 +599,23 @@ export function MemoDraftChatPanel({
           <small>{sessions.length}</small>
         </div>
         <div className="memo-builder-session-list">
-          {sortedSessions.map((session) => {
-            const job = sessionJobs[session.id];
-            const optimistic = optimisticMessages[session.id];
-            return (
+          {sortedSessions.map((session) => (
             <button
               type="button"
               key={session.id}
-              className={`memo-builder-session ${session.id === activeSession?.id ? "active" : ""} ${job ? `is-${job.status}` : ""}`}
+              className={`memo-builder-session ${session.id === activeSession?.id ? "active" : ""}`}
               onClick={() => {
                 onActiveSessionChange(session.id);
                 if (window.innerWidth <= 760) setSessionsCollapsed(true);
               }}
             >
-              <span className="memo-builder-session-icon" aria-hidden="true">
-                {job?.status === "thinking" ? <Sparkles size={14} /> : <MessageSquare size={14} />}
-              </span>
+              <MessageSquare size={14} />
               <span>
-                <strong>{optimistic ? conversationTitle(session, optimistic.visibleText, optimistic.attachments) : session.title}</strong>
-                <small>{sessionStatus(session, job)}</small>
+                <strong>{session.title}</strong>
+                <small>{session.draft ? "Draft ready" : session.starterPrompt ? "Review context ready" : session.messages.length ? "In progress" : "New conversation"}</small>
               </span>
             </button>
-            );
-          })}
+          ))}
           {hasMoreSessions && (
             <button
               type="button"
@@ -847,26 +641,8 @@ export function MemoDraftChatPanel({
             {sessionsCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
           <div>
-            <strong>
-              {activeSession
-                ? optimisticMessage
-                  ? conversationTitle(activeSession, optimisticMessage.visibleText, optimisticMessage.attachments)
-                  : activeSession.title
-                : "Memo Builder"}
-            </strong>
-            <span>
-              {busy
-                ? activeJob?.detail
-                : draft
-                  ? "Draft ready for reviewer action"
-                  : activeJob?.status === "approval"
-                    ? activeJob.detail
-                    : activeContextPrompt
-                      ? "Existing review context loaded"
-                      : thinkingCount > 0
-                        ? `${thinkingCount} other memo${thinkingCount === 1 ? " is" : "s are"} drafting in the background`
-                        : "AI memo workspace"}
-            </span>
+            <strong>{activeSession?.title || "Memo Builder"}</strong>
+            <span>{draft ? "Draft ready for reviewer action" : activeContextPrompt ? "Existing review context loaded" : "AI memo workspace"}</span>
           </div>
           <button type="button" className="memo-builder-header-new" onClick={startNewChat}>
             <Plus size={15} />
@@ -879,6 +655,7 @@ export function MemoDraftChatPanel({
             <div className="memo-builder-empty-copy">
               <span className="memo-builder-empty-mark" aria-hidden="true"><Sparkles size={24} /></span>
               <h1>What are we classifying today?</h1>
+              <p>Describe the item in plain language or attach the source material. Rulix will ask only for facts that truly block a useful memo draft.</p>
             </div>
             {contextBanner}
             {composer}
@@ -898,51 +675,15 @@ export function MemoDraftChatPanel({
                 </div>
               ))}
 
-              {optimisticMessage && (
-                <div className="mb-msg mb-msg--user mb-msg--optimistic">
-                  <div
-                    className="mb-bubble"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(displayMessageContent(optimisticMessage.content)) }}
-                  />
-                </div>
-              )}
-
               {busy && (
                 <div className="mb-msg mb-msg--assistant">
-                  <div className="mb-thinking" aria-label="Rulix is drafting">
-                    <span className="mb-thinking-orb" aria-hidden="true"><Sparkles size={16} /></span>
-                    <span className="mb-thinking-copy">
-                      <strong>{activeJob?.detail ?? "Building your memo"}</strong>
-                      <small>Reading context, checking facts, and shaping the draft</small>
-                    </span>
-                    <span className="mb-thinking-wave" aria-hidden="true"><i /><i /><i /><i /></span>
+                  <div className="mb-bubble mb-typing" aria-label="Rulix is drafting">
+                    <span /><span /><span />
                   </div>
                 </div>
               )}
 
-              {activeJob?.status === "approval" && (
-                <div className="mb-msg mb-msg--assistant">
-                  <div className="mb-status-card">
-                    <span className="mb-status-icon"><ListChecks size={16} /></span>
-                    <span><strong>Approval requested</strong><small>{activeJob.detail}</small></span>
-                    <button type="button" onClick={retryActiveMessage}>Check approval</button>
-                  </div>
-                </div>
-              )}
-
-              {suggestedReplies.length > 0 && (
-                <section className="mb-reply-choices" aria-label="Suggested replies">
-                  <span>Suggested replies</span>
-                  <div>
-                    {suggestedReplies.map((reply) => (
-                      <button type="button" key={reply} onClick={() => void send(reply)}>{reply}</button>
-                    ))}
-                    <button type="button" onClick={() => useQuickStart("other")}>Other</button>
-                  </div>
-                </section>
-              )}
-
-              {draft && (
+              {draft && !busy && (
                 <div className="mb-draft-card" ref={draftCardRef}>
                   <div className="mb-draft-actionbar">
                     <div>
@@ -1071,127 +812,9 @@ function createBlankSession(): MemoBuilderSession {
   };
 }
 
-function conversationTitle(
-  session: MemoBuilderSession,
-  firstUserText: string,
-  attachments: BuilderAttachment[] = []
-) {
-  if (session.messages.length || (session.title && session.title !== "New memo chat")) return session.title;
-  if (attachments.length > 0) {
-    const firstFile = attachments[0].name
-      .replace(/\.[a-z0-9]{1,8}$/i, "")
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (firstFile) {
-      const suffix = attachments.length > 1 ? ` + ${attachments.length - 1} sources` : " source memo";
-      return `${sentenceCase(firstFile).slice(0, 42)}${suffix}`.slice(0, 56);
-    }
-  }
-  const cleaned = firstUserText
-    .replace(ATTACHMENT_CONTEXT_MARKER, " ")
-    .replace(/\[[^\]]*attached source document[^\]]*\]/gi, " ")
-    .replace(/^(please\s+)?(help me\s+)?(build|create|draft|write|make)\s+(an?\s+)?/i, "")
-    .replace(/^(from|about|for)\s+(the\s+)?/i, "")
-    .replace(/^i (need|want|have)\s+(an?\s+)?/i, "")
-    .replace(/\b(review-ready|classification|classify|eccn|memo|for this item|from these source documents)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .replace(/^[\s:.,-]+|[\s:.,-]+$/g, "")
-    .trim();
-  if (!cleaned) return "New ECCN memo";
-  const words = cleaned.split(" ").slice(0, 7).join(" ");
-  return sentenceCase(words).slice(0, 56);
-}
-
-function finishedConversationTitle(currentTitle: string, draft?: MemoBuildDraft) {
-  if (!draft?.title) return currentTitle;
-  const cleaned = draft.title
-    .replace(/\b(test memo|eccn|classification|draft memo|memo draft|memo)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .replace(/^[\s:.,-]+|[\s:.,-]+$/g, "")
-    .trim();
-  if (!cleaned || /^(ai drafted|new draft|untitled)$/i.test(cleaned)) return currentTitle;
-  return sentenceCase(cleaned).slice(0, 56);
-}
-
-function sentenceCase(value: string) {
-  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
-}
-
-function sessionStatus(session: MemoBuilderSession, job?: SessionJob) {
-  if (job?.status === "thinking") return "Drafting now";
-  if (job?.status === "approval") return "Waiting for approval";
-  if (job?.status === "error") return "Needs attention";
-  if (session.draft) return "Draft ready";
-  if (session.starterPrompt) return "Review context ready";
-  if (session.messages.length) return "Continue conversation";
-  return "New conversation";
-}
-
-function thinkingLabel(message: string, attachmentCount: number) {
-  if (attachmentCount > 0) {
-    return `Reading ${attachmentCount} source${attachmentCount === 1 ? "" : "s"}`;
-  }
-  if (/\b(refine|revise|improve|update|change)\b/i.test(message)) return "Refining your memo";
-  if (/\b(compare|screen|check|analy[sz]e)\b/i.test(message)) return "Checking the details";
-  return "Building your memo";
-}
-
-function replySuggestions(content?: string) {
-  if (!content || !/[?]|\b(confirm|provide|tell me|need to know|which|what is)\b/i.test(content)) return [];
-  if (/\bmanufacturer|made by\b/i.test(content)) {
-    return ["I know the manufacturer", "The manufacturer is unknown"];
-  }
-  if (/\bmodel|part number|sku\b/i.test(content)) {
-    return ["I have the model number", "There is no model number"];
-  }
-  if (/\bend use|intended use|used for\b/i.test(content)) {
-    return ["Commercial use", "Research or testing", "Military or defense use"];
-  }
-  if (/\bpublic|proprietary|controlled data|cui|itar\b/i.test(content)) {
-    return ["Public information", "Proprietary information", "Export-controlled information"];
-  }
-  if (/\bdatasheet|manual|source document|technical specification\b/i.test(content)) {
-    return ["I can attach a source", "Use the facts I provided", "I do not have a source yet"];
-  }
-  if (/\bcountry|origin\b/i.test(content)) {
-    return ["United States", "Another country", "I do not know yet"];
-  }
-  return ["I can answer that", "I’m not sure yet"];
-}
-
-function recommendDataClass(content: string): {
-  value: MemoBuilderSession["dataClass"];
-  label: string;
-  reason: string;
-} | undefined {
-  if (/\b(itar|usml|defen[cs]e article|military technical data)\b/i.test(content)) {
-    return { value: "itar-risk", label: "ITAR risk", reason: "The conversation mentions defense or ITAR-sensitive material." };
-  }
-  if (/\b(cui|controlled unclassified information)\b/i.test(content)) {
-    return { value: "cui", label: "CUI", reason: "The conversation explicitly references CUI." };
-  }
-  if (/\b(export-controlled|controlled technical data|ear-controlled)\b/i.test(content)) {
-    return { value: "export-controlled", label: "Export-controlled", reason: "The content may include controlled technical information." };
-  }
-  if (/\b(public datasheet|public website|published brochure|public information)\b/i.test(content)) {
-    return { value: "public", label: "Public", reason: "The source appears to be publicly available." };
-  }
-  return undefined;
-}
-
-function dataClassLabel(value: MemoBuilderSession["dataClass"]) {
-  if (value === "export-controlled") return "Export-controlled";
-  if (value === "itar-risk") return "ITAR risk";
-  if (value === "cui") return "CUI";
-  return sentenceCase(value);
-}
-
-function omitRecordKey<T>(record: Record<string, T>, key: string) {
-  if (!(key in record)) return record;
-  const next = { ...record };
-  delete next[key];
-  return next;
+function activeSessionTitle(session: MemoBuilderSession | undefined, firstUserText: string) {
+  if (session?.messages.length || (session?.title && session.title !== "New memo chat")) return session.title;
+  return firstUserText.replace(/\s+/g, " ").slice(0, 46) || "Memo draft";
 }
 
 function buildUserContentForSonnet(text: string, attachments: BuilderAttachment[]) {

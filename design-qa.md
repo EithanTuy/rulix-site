@@ -1,65 +1,58 @@
-# Memo Builder design QA — concurrent conversation redesign
+# Rulix product experience design QA
 
 ## Comparison target
 
-- Product target: the latest `EithanTuy/rulix-site` signed-in Memo Builder, updated to use the calm, conversation-first interaction pattern in the supplied ChatGPT, Claude, and Codex references.
-- ChatGPT source visual: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094445.png` (`2542 × 1262` pixels).
-- Claude source visual: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094421.png` (`2556 × 1354` pixels).
-- Codex source visual: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094348.png` (`2552 × 1592` pixels).
-- Final browser-rendered implementation: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\implementation-empty-final.png` (`1280 × 720` pixels).
-- Data recommendation state: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\implementation-data-recommendation.png`.
-- Plus-menu state: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\implementation-plus-menu.png`.
-- Generated-memo artifact state: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\implementation-artifact.png`.
-- Four-up full-view comparison: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\comparison-full.png` (`1800 × 1420` pixels).
-- Focused prompt/composer comparison: `C:\Users\prana\.codex\visualizations\2026\07\23\019f8f37-6dec-7a03-8aca-022425886559\comparison-focused.png` (`1800 × 1030` pixels).
+- Source visual truth: `C:\Users\prana\.codex\generated_images\019f68cb-0342-7b40-955e-6cc22ca92430\exec-c2da2145-072b-4ee3-8350-9847f92a9b03.png`
+- Browser-rendered implementation: `C:\Users\prana\.codex\visualizations\2026\07\16\019f68cb-0342-7b40-955e-6cc22ca92430\rulix-workbench-final-1487x1058.png`
+- Source frame: 1487 × 1058.
+- Browser viewport override: 1487 × 1103; the in-app browser captured a 1487 × 979 effective page viewport after application chrome.
+- Route: `/app#/reviews/review-8aadbba6-80e2-4729-aafb-760b04cf8e49/overview`.
+- State: signed-in export-control officer, proprietary review awaiting exact-content AI approval, artifact context menu open.
 
-The browser viewport was `1280 × 720` CSS pixels at device pixel ratio `2`; the in-app browser returned a normalized `1280 × 720` PNG. The source screenshots have different desktop chrome, density, theme, and application navigation, so the full captures were aspect-fit into equal comparison cards and the prompt/composer regions were separately cropped into equal `836 × 376` evidence regions. The comparison judges the shared conversation hierarchy rather than treating different product chrome as drift.
-
-State: signed-in export-control officer, local application route `/app/#/memo-builder`, light theme for the final full-view capture. Dark theme was also opened and checked. Dynamic fixture chat titles differ intentionally from the static references.
+The source and implementation were opened together in the same comparison input at native width. The 79-pixel effective-height difference was treated as a capture-surface constraint; the shared above-the-fold product region was compared directly.
 
 ## Full-view comparison evidence
 
-- Layout and spacing: Rulix now shares the references' dominant centered prompt, wide integrated composer, generous task canvas, compact history navigation, and low-noise header. The existing Rulix primary navigation and recent-memo rail remain because they are product requirements, not a fidelity mistake.
-- Typography: the repository's Inter product typography remains intact. The prompt uses a clear display scale, while history metadata, action hints, and quick choices use compact optical weights without competing with the primary task.
-- Color and tokens: the implementation uses Rulix's existing navy, cool-gray, white, and teal tokens. Focus, selected-chat, recommendation, disabled, error, and dark-theme states are coherent and readable.
-- Image and asset fidelity: the existing Rulix logo and Lucide icon family are used. No source asset was replaced with CSS art, custom SVG, emoji, placeholder illustration, or fake product imagery.
-- Copy and content: the removed instruction paragraph and approval footer no longer crowd the empty state. Prompt text, choices, loading labels, data recommendations, retry messaging, and artifact actions are concise and specific to memo work.
-- Affordances: the composer now has one obvious send action, Enter sends, Shift+Enter creates a line break, and the bottom-left plus opens attachments and data handling. Dynamic recommendations appear as a compact, accept-in-place suggestion.
+- Layout and hierarchy: the implementation preserves the deep-navy global shell, white task header, horizontal review progress, approval-scope banner, and high-contrast three-pane workbench. Panel proportions, active navigation, and the right-side artifact/menu relationship remain faithful.
+- Typography: both use a compact sans-serif product hierarchy with clear weight changes. The implementation uses the repository's Inter files, preserves readable small labels, and avoids accidental marketing/display typography in the product shell.
+- Spacing and rhythm: 24-pixel page gutters, restrained card padding, thin separators, compact tabs, and dense metadata match the reference intent. The implementation removes ornamental space and keeps the main task above the fold.
+- Colors and tokens: navy, white/cool-gray surfaces, blue-gray borders, and restrained teal active/status treatment match the selected direction with WCAG-oriented contrast. Destructive menu content remains red and separated.
+- Assets and icons: the existing Rulix brand asset and Lucide icon family are used throughout. No source asset was replaced with CSS art, emoji, handcrafted SVG, or placeholder imagery.
+- Copy/content: dynamic review content intentionally differs from the concept fixture. Product copy preserves the same meaning while making exact approval scope, source provenance, human signoff, and empty AI state explicit.
 
-## Focused region comparison evidence
+## Focused region evidence
 
-The focused four-up comparison keeps each prompt, composer, and first-choice action readable. Rulix intentionally adds a two-by-two choice set beneath the composer because the requested workflow includes one-click answers and an `Other` path. The plus action occupies the same bottom-left composer position as ChatGPT and Claude, and the send action occupies the same bottom-right position as all three references.
-
-The additional focused browser captures verify details too small in the full view:
-
-- `implementation-data-recommendation.png`: recommendation hierarchy, source-based explanation, and one-click adoption.
-- `implementation-plus-menu.png`: attachments, all five data boundaries, current selection, AI recommendation, and concise reviewer-signoff note.
-- `implementation-artifact.png`: generated memo title, reviewer actions, review notes, section navigation, readable document surface, and follow-up composer.
+A separate crop was not required because the native-width combined comparison keeps the header, progress path, artifact card, and complete context menu readable. The browser DOM snapshot independently verified accessible names and Windows-native shortcut labels (`Ctrl K`, `Ctrl L`, `Ctrl ↵`).
 
 ## Primary interactions tested
 
-- Created a new memo and verified an independent composer while another session could remain active.
-- Enter sent the prompt; the user message stayed visible immediately and the chat title changed to `XA-2400 public datasheet`.
-- The local provider was intentionally unavailable; the message remained visible, the session changed to `Needs attention`, and a clear `Try again` action appeared instead of losing the prompt.
-- Opened the plus menu and checked attachments, current data-class selection, recommendation, and reviewer-signoff explanation.
-- Opened an existing generated memo and verified the artifact, Copy, Download, Add to Reviews, Add & Analyze, review notes, and follow-up composer.
-- Opened light and dark themes.
-- Checked browser logs after the interaction sequence: no console warnings, console errors, or framework error overlay. Vite development notices were the only entries.
+- Home → stable review route and browser-restored selection.
+- Command search open/close.
+- Help drawer open/close.
+- Artifact right-click menu, Arrow/Escape behavior, duplicate action availability, outside-click cleanup, and resize cleanup.
+- Reviewer progress/section navigation and AI action affordance.
+- Dashboard Operations → Usage → Accounts → Growth → Lead Review routing.
+- 390, 768, and 1440 responsive journeys for submitter, reviewer, counsel, and export-control officer.
 
-Automated interaction coverage additionally verifies the real loading interval, immediate optimistic message, Enter/Shift+Enter behavior, two simultaneous memo requests, session-specific completion, automatic titles, data recommendation controls, generated artifacts, copy/download, and create/analyze actions.
+Browser console warnings/errors: none. Same-origin failed requests: none in the passing journeys. Critical Axe violations: none.
 
 ## Comparison history
 
 ### Iteration 1
 
-- [P2] Quick-start labels were compressed into a single four-card row at the browser's `1280 × 720` viewport.
-  - Evidence: the first browser capture truncated `Show me an example` and secondary labels, making the requested guided choices harder to scan.
-  - Fix: changed the desktop quick-start layout to a balanced two-column grid while retaining a one-column mobile layout.
-  - Post-fix evidence: `implementation-empty-final.png`, `comparison-full.png`, and `comparison-focused.png` show complete labels with consistent spacing and no clipping.
+- [P1] Responsive Help lost its accessible name when the visible label was hidden at tablet width.
+  - Fix: added a stable `aria-label="Help"` to the header control.
+  - Post-fix evidence: the tablet reviewer journey locates and operates Help; all four tablet roles pass.
+- [P2] The context menu displayed Command shortcuts on Windows.
+  - Fix: introduced platform-aware shortcut formatting shared by the header and context menu, with unit coverage for Apple, Windows, and Linux.
+  - Post-fix evidence: the final browser snapshot exposes `Ctrl K`, `Ctrl L`, and `Ctrl ↵`.
+- [P2] An open context menu could persist offscreen after a responsive resize or hash-route transition.
+  - Fix: close on resize, user wheel/touch scroll, and hash change, in addition to outside click, blur, and Escape. Programmatic scroll-to-target remains safe so right-click can reveal and open an offscreen artifact in one action.
+  - Post-fix evidence: menu count changes from one to zero immediately after viewport resize; unit coverage exercises resize, wheel, touch movement, and hash change.
 
 ### Final comparison
 
-No actionable P0, P1, or P2 mismatch remains. The extra quick choices, Rulix application chrome, and light-theme final capture are intentional product differences; they preserve the interaction hierarchy of the references while satisfying the requested guided memo workflow.
+No actionable P0, P1, or P2 mismatch remains. The implementation intentionally adds Home / My Work, collaboration, notification, Evidence Library, and role-gated administration destinations because those are product requirements beyond the selected static concept. The awaiting-AI empty state is also intentional and preferable to fabricated analysis data.
 
 ## Findings
 
@@ -71,18 +64,57 @@ None.
 
 ## Implementation checklist
 
-- [x] Keep sent messages visible immediately.
-- [x] Send with Enter and reserve Shift+Enter for line breaks.
-- [x] Give every memo an independent request state and background status.
-- [x] Update conversation titles from the first meaningful context.
-- [x] Keep completed memo artifacts visible with reviewer actions.
-- [x] Consolidate attachments and data handling behind the plus button.
-- [x] Present data recommendations and suggested answers as easy one-click choices.
-- [x] Add reduced-motion-aware AI drafting glow and progress treatment.
-- [x] Verify the full repository test suite, production build, browser interactions, and visual comparison.
+- [x] Match the selected navy/teal high-contrast shell and three-pane workbench.
+- [x] Preserve readable hierarchy and responsive task order.
+- [x] Implement the complete right-click interaction with keyboard and viewport behavior.
+- [x] Verify reviewer and dashboard core routes across 390, 768, and 1440 pixels.
+- [x] Verify console, network, accessibility, unit, integration, build, Lambda, and bundle gates.
 
 ## Follow-up polish
 
-- [P3] The small Rulix sparkle mark adds more brand presence than the nearly unadorned ChatGPT prompt. It is consistent with the existing product and does not compete with the task, so no change is recommended.
+No P3 item is being deferred as part of this handoff.
 
 final result: passed
+
+---
+
+# Memo Builder design QA
+
+## Target
+
+The latest `EithanTuy/rulix-site` application at commit `c20a52addfb8742bb9c1c718ef69245601a06251`, with the signed-in Memo Builder updated to use the calm, conversation-first workspace pattern shown in the supplied ChatGPT, Claude, and Codex references.
+
+## Evidence
+
+- ChatGPT reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094445.png`
+- Claude reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094421.png`
+- Codex reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094348.png`
+- Combined reference and implementation comparison: `C:\Users\prana\AppData\Local\Temp\rulix-memo-reference-comparison-019f8f37.png`
+- Desktop implementation, 1440 x 900: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-final-desktop-019f8f37.png`
+- Mobile implementation, 390 x 844: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-mobile-019f8f37.png`
+- Generated memo action state, 390 x 844: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-generated-mobile-fixed-019f8f37.png`
+
+All implementation captures use the same authenticated local application state, dark theme, production component tree, and a disposable local export-control-officer account.
+
+## Comparison
+
+- Layout: the memo task is centered in a large, calm canvas with a persistent recent-chat rail, compact conversation header, and dominant integrated composer. This matches the spatial hierarchy of the three references while retaining Rulix's existing global navigation.
+- Typography: the existing Rulix sans-serif system remains intact. The headline, supporting copy, placeholder, action labels, and history metadata have distinct, readable hierarchy at desktop and mobile sizes.
+- Color and surfaces: the implementation uses the current Rulix navy and teal tokens. Borders, radii, shadows, focus treatment, disabled state, and selected history state are restrained and consistent with the product.
+- Icons: every visible action uses the existing Lucide icon family. No custom SVG, CSS illustration, emoji, or placeholder art was introduced.
+- Content: the empty-state copy is specific to classification work. Data classification, approved-data boundaries, exact-message approval, and human-review requirements remain visible without competing with the composer.
+- States and interactions: new chat, recent chat selection, history collapse/expand, quick starts, generated memo, copy/download/review actions, data-class selection, attachments, and explicit Ctrl+Enter approval remain functional.
+- Accessibility: the composer, classifications, history, quick starts, reviewer actions, and toggle controls have semantic labels. Focus states and reduced-motion behavior are preserved.
+- Responsiveness: desktop 1440 x 900 and mobile 390 x 844 render without overlap, clipping, or unusable controls. The mobile history rail opens as an overlay and closes back to the composer.
+- Runtime: authenticated browser checks completed with no console warnings, console errors, or framework error overlay.
+
+## Iteration history
+
+1. Compared the three supplied references with the first 1440 x 900 implementation capture in one four-up image.
+2. Exercised the generated memo state at 390 x 844 and found excess vertical space in the stacked mobile action bar.
+3. Removed the inherited flex basis from the mobile action-bar identity block.
+4. Re-captured the generated memo state and confirmed compact reviewer actions, visible review notes, and usable section navigation.
+
+## Final result
+
+passed

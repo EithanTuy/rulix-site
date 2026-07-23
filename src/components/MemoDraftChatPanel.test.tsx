@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { MemoDraftChatPanel } from "./MemoDraftChatPanel";
@@ -115,7 +115,7 @@ describe("MemoDraftChatPanel", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Message Rulix AI" }), {
       target: { value: "Draft from the TSL-580-C-E datasheet." }
     });
-    fireEvent.click(screen.getByLabelText("Send message"));
+    fireEvent.click(screen.getByLabelText("Approve and send"));
 
     await screen.findByText("Your memo draft is ready.");
     expect(screen.getByRole("article", { name: "Generated memo draft" })).toHaveTextContent("TSL-580-C-E tunable source");
@@ -139,7 +139,7 @@ describe("MemoDraftChatPanel", () => {
     const onCreateMemo = vi.fn(async () => undefined);
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /show me an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /copy/i }));
     await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith(expect.stringContaining("ECCN Self-Classification Draft Memo")));
     expect(screen.getByText("Memo copied.")).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe("MemoDraftChatPanel", () => {
     });
     render(<ControlledBuilder onCreateMemo={onCreateMemo} onCreateAndAnalyze={onCreateAndAnalyze} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /show me an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /add & analyze/i }));
 
     expect(onCreateMemo).not.toHaveBeenCalled();
@@ -190,7 +190,7 @@ describe("MemoDraftChatPanel", () => {
     });
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /show me an example/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     const draft = screen.getByRole("article", { name: "Generated memo draft" });
     fireEvent.click(screen.getByRole("button", { name: /add to reviews/i }));
 
@@ -199,92 +199,15 @@ describe("MemoDraftChatPanel", () => {
     expect(screen.getByRole("button", { name: /add to reviews/i })).toBeEnabled();
   });
 
-  it("sends with Enter and keeps Shift+Enter for a new line", async () => {
+  it("keeps the explicit Ctrl+Enter approval gesture", async () => {
     render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} />);
     const composer = screen.getByRole("textbox", { name: "Message Rulix AI" });
 
     fireEvent.change(composer, { target: { value: "Draft a memo for this RF amplifier." } });
-    fireEvent.keyDown(composer, { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(composer, { key: "Enter" });
     expect(sendMemoBuildChat).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(composer, { key: "Enter" });
+    fireEvent.keyDown(composer, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(sendMemoBuildChat).toHaveBeenCalledTimes(1));
-  });
-
-  it("shows the sent message and contextual title before the AI returns", async () => {
-    let resolveRequest: ((value: Awaited<ReturnType<typeof sendMemoBuildChat>>) => void) | undefined;
-    vi.mocked(sendMemoBuildChat).mockImplementationOnce(() => new Promise((resolve) => {
-      resolveRequest = resolve;
-    }));
-    render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} />);
-    const composer = screen.getByRole("textbox", { name: "Message Rulix AI" });
-
-    fireEvent.change(composer, { target: { value: "Draft from the TSL-580-C-E public datasheet." } });
-    fireEvent.keyDown(composer, { key: "Enter" });
-
-    expect(screen.getByText("Draft from the TSL-580-C-E public datasheet.")).toBeInTheDocument();
-    expect(screen.getAllByText("TSL-580-C-E public datasheet").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Rulix is drafting")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Message Rulix AI" })).toBeDisabled();
-    await waitFor(() => expect(sendMemoBuildChat).toHaveBeenCalledTimes(1));
-
-    await act(async () => {
-      resolveRequest?.({
-        reply: "I need the manufacturer. Do you know who made it?",
-      });
-    });
-    expect(await screen.findByText("I need the manufacturer. Do you know who made it?")).toBeInTheDocument();
-  });
-
-  it("keeps separate memo sessions drafting at the same time", async () => {
-    const requests: Array<{
-      sessionId: string;
-      resolve: (value: Awaited<ReturnType<typeof sendMemoBuildChat>>) => void;
-    }> = [];
-    vi.mocked(sendMemoBuildChat).mockImplementation((sessionId) => new Promise((resolve) => {
-      requests.push({ sessionId, resolve });
-    }));
-    render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} />);
-
-    const firstComposer = screen.getByRole("textbox", { name: "Message Rulix AI" });
-    fireEvent.change(firstComposer, { target: { value: "Build a memo for the XA-2400 amplifier." } });
-    fireEvent.keyDown(firstComposer, { key: "Enter" });
-    await waitFor(() => expect(requests).toHaveLength(1));
-
-    fireEvent.click(screen.getByRole("button", { name: "New memo" }));
-    const secondComposer = screen.getByRole("textbox", { name: "Message Rulix AI" });
-    expect(secondComposer).toBeEnabled();
-    fireEvent.change(secondComposer, { target: { value: "Build a memo for the TSL-580 laser." } });
-    fireEvent.keyDown(secondComposer, { key: "Enter" });
-
-    await waitFor(() => expect(requests).toHaveLength(2));
-    expect(new Set(requests.map((request) => request.sessionId)).size).toBe(2);
-    expect(screen.getAllByText("Drafting now")).toHaveLength(2);
-
-    await act(async () => {
-      requests[1].resolve({ reply: "The laser memo is ready." });
-      requests[0].resolve({ reply: "The amplifier memo is ready." });
-    });
-    await waitFor(() => expect(screen.queryByText("Drafting now")).not.toBeInTheDocument());
-  });
-
-  it("puts attachments and data handling in the plus menu", () => {
-    render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} />);
-
-    expect(screen.queryByText(/Ctrl\+Enter approves/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/AI-assisted draft/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Describe the item in plain language/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Add files or set data handling" }));
-    expect(screen.getByRole("dialog", { name: "Memo tools" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add source files/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Proprietary" })).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.change(screen.getByRole("textbox", { name: "Message Rulix AI" }), {
-      target: { value: "This comes from a public datasheet." }
-    });
-    expect(screen.getByText("Rulix suggests Public")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Use" }));
-    expect(screen.getByRole("button", { name: "Public" })).toHaveAttribute("aria-pressed", "true");
   });
 });
