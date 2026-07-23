@@ -334,7 +334,9 @@ describe("Terraform security invariants", () => {
     expect(table).toContain('attribute_name = "expiresAt"');
     expect(appPolicy).not.toContain('"dynamodb:Scan"');
     expect(appPolicy).not.toContain('"s3:DeleteObjectVersion"');
-    expect(appPolicy).toContain('actions   = ["s3:GetObject", "s3:PutObject"]');
+    expect(appPolicy).toContain(
+      'actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"]'
+    );
     expect(migrationPolicy).toContain('actions   = ["dynamodb:GetItem", "dynamodb:Scan"]');
     expect(migrationPolicy).toContain('"dynamodb:ConditionCheckItem"');
     expect(migrationPolicy).toContain('sid       = "DecryptLegacyAccountStateViaDynamoDB"');

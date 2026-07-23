@@ -126,8 +126,10 @@ data "aws_iam_policy_document" "lambda_auth" {
   }
 
   statement {
-    sid       = "ImmutableWorkspaceContent"
-    actions   = ["s3:GetObject", "s3:PutObject"]
+    sid = "ImmutableWorkspaceContent"
+    # Review hydration pins immutable content by VersionId, which S3
+    # authorizes separately from an unversioned GetObject request.
+    actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"]
     resources = ["${aws_s3_bucket.workspace_content.arn}/tenant/${var.tenant_slug}/*"]
   }
 
