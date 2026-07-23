@@ -17,7 +17,7 @@ describe("Rulix help center", () => {
       />
     );
     expect(screen.getByRole("dialog", { name: /from memo to defensible decision/i })).toBeTruthy();
-    expect(screen.getByText(/you can approve the exact current content/i)).toBeTruthy();
+    expect(screen.getByText(/approve and run ai for the exact current revision/i)).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /close rulix guide/i }));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
@@ -35,7 +35,7 @@ describe("Rulix help center", () => {
         onMemoBuilder={onMemoBuilder}
       />
     );
-    expect(screen.getByText(/request officer approval for the exact current content/i)).toBeTruthy();
+    expect(screen.getByText(/request officer approval for the exact current revision/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /open memo builder/i }));
     expect(onClose).toHaveBeenCalledOnce();
     expect(onMemoBuilder).toHaveBeenCalledOnce();

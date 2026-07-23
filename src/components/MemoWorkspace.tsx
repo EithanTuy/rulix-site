@@ -99,12 +99,12 @@ export function MemoWorkspace({
   };
 
   return (
-    <main className="memo-workspace">
+    <section className="memo-workspace" aria-label="Memo editor">
       <div className="memo-header">
         <div className="memo-title">
           <FileText size={24} strokeWidth={1.5} />
           <div>
-            <h1>{memo.title}</h1>
+            <h2>{memo.title}</h2>
             <p>
               {memo.documentCode} | {formatDate(memo.updatedAt)} | Owner: {memo.owner}
             </p>
@@ -279,7 +279,7 @@ export function MemoWorkspace({
           <LegendItem status="conflict" label="Conflicting Claim" />
         </div>
       </div>
-    </main>
+    </section>
   );
 }
 

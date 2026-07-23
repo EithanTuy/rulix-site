@@ -27,15 +27,18 @@ test("the workbench fits common demo laptop widths without clipping", async ({ p
 
   await page.goto(`/app#/reviews/${reviewId}/overview`);
   await expect(page.getByRole("heading", { name: `${testInfo.project.name} layout review`, level: 1 })).toBeVisible();
-  await expect(page.getByText("Public/sample", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review the current revision" })).toBeVisible();
+  await page.getByRole("button", { name: "Context", exact: true }).click();
+  await expect(page.getByText(/Public\/sample · revision 1/)).toBeVisible();
 
   const layout = await page.evaluate(() => {
     const selectors = [
       ".px-app-content",
-      ".px-workbench-grid",
-      ".px-case-overview",
-      ".px-evidence-analysis",
-      ".px-artifact-pane"
+      ".review-workbench",
+      ".review-stages",
+      ".review-layout",
+      ".review-focus",
+      ".review-context"
     ];
     const overflow = selectors.map((selector) => {
       const element = document.querySelector<HTMLElement>(selector);
@@ -45,7 +48,7 @@ test("the workbench fits common demo laptop widths without clipping", async ({ p
         scrollWidth: element?.scrollWidth ?? 0
       };
     });
-    const grid = document.querySelector<HTMLElement>(".px-workbench-grid");
+    const grid = document.querySelector<HTMLElement>(".review-layout");
     const gridRect = grid?.getBoundingClientRect();
     const clippedChildren = grid && gridRect
       ? [...grid.children].filter((child) => {
@@ -67,7 +70,7 @@ test("the workbench fits common demo laptop widths without clipping", async ({ p
   }
   expect(layout.documentScrollWidth).toBeLessThanOrEqual(layout.documentClientWidth + 1);
   expect(layout.clippedChildren).toBe(0);
-  expect(layout.gridColumns).toBe(testInfo.project.name === "demo-1280" ? 2 : 3);
+  expect(layout.gridColumns).toBe(2);
 
   await assertPageHealth(page, runtime);
 });
@@ -78,44 +81,45 @@ test("an officer completes the reviewer golden path and downloads a complete rep
   const session = await provisionAccount(page, "export-control-officer", "golden-path");
 
   await page.goto("/app#/home");
-  await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
-  await page.getByRole("button", { name: "New review", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/#\/work$/);
+  await page.locator("button.work-start").click();
 
-  const modal = page.getByRole("dialog", { name: "New Review" });
+  const modal = page.getByRole("dialog", { name: "Start review" });
   await expect(modal).toBeVisible();
-  await modal.getByLabel("Memo title").fill(demoTitle);
+  await modal.getByLabel("Review title").fill(demoTitle);
+  await modal.getByLabel("Memo content").fill(demoMemo);
+  await modal.getByText("Review details", { exact: true }).click();
   await modal.getByLabel("Manufacturer or source").fill("Rulix Synthetic Instruments");
   await modal.getByLabel("Data class").selectOption("public");
   await expect(modal.getByLabel("Data class")).toHaveValue("public");
-  await modal.getByLabel("Memo text").fill(demoMemo);
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.request().method() === "POST" && new URL(response.url()).pathname === "/api/reviews"
   );
-  await modal.getByRole("button", { name: "Create Review" }).click();
+  await modal.getByRole("button", { name: "Create review" }).click();
   const createResponse = await createResponsePromise;
   expect(createResponse.status()).toBe(201);
   const created = await createResponse.json() as { review: { id: string; dataClass?: string } };
   expect(created.review.dataClass).toBe("public");
 
   await expect(page.getByRole("heading", { name: demoTitle, level: 1 })).toBeVisible();
-  await expect(page.getByText("Public/sample", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Request / run AI" }).click();
+  await expect(page.getByRole("button", { name: /Data and provenance Public\/sample/ })).toBeVisible();
+  await page.getByRole("button", { name: "Continue to Review" }).click();
+  await page.getByRole("button", { name: "Approve & run AI review" }).click();
 
-  await expect(page.getByText("AI classification: 3A001.a.5")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "3A001.a.5" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Verify the controlled cryogenic threshold" })).toBeVisible();
-  await expect(page.getByText("chunk-3a001-cryogenic", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Exact content reviewed (scope)" })).toBeVisible();
+  await expect(page.getByText("Exact-content approval", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Record human decision" }).click();
+  await page.getByRole("button", { name: "Continue to Decide & Export" }).click();
   const rationale = "Accepted for the synthetic demo after verifying the cited threshold and evidence trail.";
-  await page.getByPlaceholder("Decision rationale is required for the audit trail.").fill(rationale);
+  await page.getByPlaceholder("Explain the evidence, judgment, and any conditions for this decision.").fill(rationale);
   await page.getByRole("button", { name: "Accept & sign" }).click();
-  await expect(page.getByText("Human decision recorded")).toBeVisible();
-  await expect(page.getByText(`Accept · ${session.user.name}`)).toBeVisible();
+  await expect(page.getByText("Accept recorded", { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: "Export signed result" }).first().click();
   const download = await downloadPromise;
   const downloadPath = await download.path();
   expect(downloadPath).toBeTruthy();
@@ -131,8 +135,8 @@ test("an officer completes the reviewer golden path and downloads a complete rep
   expect(report).toContain("## Audit Trail");
   expect(report).toContain("Review created");
 
-  await page.getByRole("button", { name: "View audit trail" }).click();
-  await expect(page.getByRole("heading", { name: "Activity and audit trail" })).toBeVisible();
+  await page.getByRole("button", { name: "View audit history" }).click();
+  await expect(page.getByRole("complementary", { name: "Review context" })).toBeVisible();
   await expect(page.getByText("Reviewer decision: accept", { exact: true })).toBeVisible();
 
   await assertPageHealth(page, runtime);

@@ -64,22 +64,28 @@ import type {
   WorkspacePreferences
 } from "./types";
 import { AdminConsole } from "./components/AdminConsole";
-import { AnalysisPanel } from "./components/AnalysisPanel";
 import { BrandLogo } from "./components/BrandLogo";
 import { MemoDraftChatPanel } from "./components/MemoDraftChatPanel";
 import { MemoWorkspace } from "./components/MemoWorkspace";
-import { NewReviewModal } from "./components/NewReviewModal";
+import { ReviewStartDialog } from "./components/ReviewStartDialog";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { SidebarRail } from "./components/SidebarRail";
 import { HelpCenter } from "./components/HelpCenter";
 import { TopBar } from "./components/TopBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { EvidenceLibraryView } from "./components/EvidenceLibraryView";
-import { HomeView } from "./components/HomeView";
 import { NotificationsDrawer } from "./components/NotificationsDrawer";
-import { ReviewQueueView } from "./components/ReviewQueueView";
 import { ReviewWorkbench } from "./components/ReviewWorkbench";
-import { navigateApp, parseAppHash, type ReviewSection } from "./lib/appRoutes";
+import { WorkView } from "./components/WorkView";
+import {
+  appRouteHash,
+  navigateApp,
+  normalizeAppHash,
+  parseAppHash,
+  type ReviewPanel,
+  type ReviewStage
+} from "./lib/appRoutes";
+import "./app-workflow.css";
 
 type AnalysisRunState =
   | { status: "unanalyzed"; message: string }
@@ -136,7 +142,7 @@ export function consumeAuthLinkFragment(): AuthLinkBootstrap {
 }
 
 export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthLinkBootstrap }) {
-  const initialRouteRef = useRef(parseAppHash(typeof window === "undefined" ? "#/home" : window.location.hash));
+  const initialRouteRef = useRef(parseAppHash(typeof window === "undefined" ? "#/work" : window.location.hash));
   const [auth, setAuth] = useState<AuthState>({ status: "checking" });
   const [stateReady, setStateReady] = useState(false);
   const [memos, setMemos] = useState<MemoRecord[]>([]);
@@ -158,8 +164,11 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   const [memoBuilderSessions, setMemoBuilderSessions] = useState<MemoBuilderSession[]>([]);
   const [activeMemoBuilderSessionId, setActiveMemoBuilderSessionId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<AppView>(initialRouteRef.current.view);
-  const [reviewSection, setReviewSection] = useState<ReviewSection>(
-    initialRouteRef.current.view === "reviews" ? initialRouteRef.current.section ?? "overview" : "overview"
+  const [reviewStage, setReviewStage] = useState<ReviewStage>(
+    initialRouteRef.current.view === "work" ? initialRouteRef.current.stage ?? "review" : "review"
+  );
+  const [reviewPanel, setReviewPanel] = useState<ReviewPanel | undefined>(
+    initialRouteRef.current.view === "work" ? initialRouteRef.current.panel : undefined
   );
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>({});
   const [tenantMembers, setTenantMembers] = useState<Array<Pick<UserProfile, "id" | "name" | "email" | "role">>>([]);
@@ -189,6 +198,17 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   const loadedReviewDetailsRef = useRef(new Set<string>());
   const detailRequestsRef = useRef(new Map<string, Promise<void>>());
   const restoredSelectionRef = useRef<string | undefined>(undefined);
+  const appContentRef = useRef<HTMLDivElement>(null);
+  const resetAppContentScroll = () => {
+    const content = appContentRef.current;
+    if (!content) return;
+    if (typeof content.scrollTo === "function") {
+      content.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    } else {
+      content.scrollTop = 0;
+      content.scrollLeft = 0;
+    }
+  };
 
   const activeMemos = useMemo(() => memos.filter((memo) => !memo.archivedAt), [memos]);
   const selectedMemo = selectedMemoId && loadedReviewDetailsRef.current.has(selectedMemoId)
@@ -213,12 +233,20 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   }, [memos]);
 
   useEffect(() => {
+    resetAppContentScroll();
+  }, [activeView, reviewStage, selectedMemoId]);
+
+  useEffect(() => {
     const applyRoute = () => {
       const route = parseAppHash(window.location.hash);
-      if (memoDraftDirty && route.view !== activeView) {
+      const changesReview = route.view === "work" && (
+        route.memoId !== selectedMemoId
+        || (route.memoId && route.stage !== reviewStage)
+      );
+      if (memoDraftDirty && (route.view !== activeView || changesReview)) {
         navigateApp(
-          activeView === "reviews" && selectedMemoId
-            ? { view: "reviews", memoId: selectedMemoId, section: reviewSection }
+          activeView === "work" && selectedMemoId
+            ? { view: "work", memoId: selectedMemoId, stage: reviewStage, ...(reviewPanel ? { panel: reviewPanel } : {}) }
             : activeView === "memo-builder"
               ? { view: "memo-builder", sessionId: activeMemoBuilderSessionId }
               : { view: activeView } as Parameters<typeof navigateApp>[0],
@@ -228,11 +256,13 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         return;
       }
       setActiveView(route.view);
-      setWorkspacePreferences((current) => current.lastAppRoute === window.location.hash
+      const normalizedRoute = appRouteHash(route);
+      setWorkspacePreferences((current) => current.lastAppRoute === normalizedRoute
         ? current
-        : { ...current, lastAppRoute: window.location.hash });
-      if (route.view === "reviews") {
-        setReviewSection(route.section ?? "overview");
+        : { ...current, lastAppRoute: normalizedRoute });
+      if (route.view === "work") {
+        setReviewStage(route.stage ?? "review");
+        setReviewPanel(route.panel);
         if (route.memoId) setSelectedMemoId(route.memoId);
       } else if (route.view === "memo-builder" && route.sessionId) {
         setActiveMemoBuilderSessionId(route.sessionId);
@@ -250,7 +280,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       window.removeEventListener("hashchange", applyRoute);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeMemoBuilderSessionId, activeView, memoDraftDirty, reviewSection, selectedMemoId]);
+  }, [activeMemoBuilderSessionId, activeView, memoDraftDirty, reviewPanel, reviewStage, selectedMemoId]);
 
   useEffect(() => {
     if (auth.status !== "signed-in") return;
@@ -518,6 +548,9 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
           loadedReviewDetailsRef.current.delete(memoId);
           setMemos((current) => current.filter((memo) => memo.id !== memoId));
           setSelectedMemoId((current) => current === memoId ? nextMemoId : current);
+          navigateApp(nextMemoId
+            ? { view: "work", memoId: nextMemoId, stage: "prepare" }
+            : { view: "work" }, true);
           setIntakeWarning(failure.message);
           setDetailFailure(undefined);
         } else {
@@ -604,26 +637,42 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
 
   const selectMemo = (memoId: string) => {
     if (memoId === selectedMemo?.id) {
-      navigateApp({ view: "reviews", memoId, section: reviewSection });
+      navigateApp({ view: "work", memoId, stage: reviewStage, ...(reviewPanel ? { panel: reviewPanel } : {}) });
       return;
     }
     if (blockDirtyDraft("switching memos")) return;
     setSelectedMemoId(memoId);
-    navigateApp({ view: "reviews", memoId, section: "overview" });
+    const summary = memosRef.current.find((memo) => memo.id === memoId);
+    const nextStage: ReviewStage = summary?.lifecycleStage === "ready-for-decision"
+      || summary?.lifecycleStage === "approved"
+      || summary?.lifecycleStage === "rejected"
+      ? "decide"
+      : summary?.lifecycleStage === "ready-for-analysis"
+        || summary?.lifecycleStage === "in-review"
+        ? "review"
+        : "prepare";
+    setReviewStage(nextStage);
+    setReviewPanel(undefined);
+    navigateApp({ view: "work", memoId, stage: nextStage });
   };
 
   const changeActiveView = (view: AppView) => {
-    if (view === activeView) return;
+    const currentHashRoute = parseAppHash(window.location.hash);
+    const exitsReviewDetail = view === "work" && currentHashRoute.view === "work" && Boolean(currentHashRoute.memoId);
+    if (view === activeView && !exitsReviewDetail) return;
     if (blockDirtyDraft("opening another workspace")) return;
-    if (view === "reviews") navigateApp({ view: "reviews" });
+    resetAppContentScroll();
+    if (view === "work") navigateApp({ view: "work" });
     else if (view === "memo-builder") navigateApp({ view: "memo-builder", sessionId: activeMemoBuilderSessionId });
     else navigateApp({ view } as Parameters<typeof navigateApp>[0]);
   };
 
-  const changeReviewSection = (section: ReviewSection) => {
+  const changeReviewStage = (stage: ReviewStage, panel?: ReviewPanel) => {
     if (!selectedMemoId) return;
-    setReviewSection(section);
-    navigateApp({ view: "reviews", memoId: selectedMemoId, section });
+    if (stage !== reviewStage && blockDirtyDraft("changing review stages")) return;
+    setReviewStage(stage);
+    setReviewPanel(panel);
+    navigateApp({ view: "work", memoId: selectedMemoId, stage, ...(panel ? { panel } : {}) });
   };
 
   const openNewReview = () => {
@@ -656,14 +705,6 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     setActiveMemoBuilderSessionId(session.id);
     navigateApp({ view: "memo-builder", sessionId: session.id });
     setSyncNotice("Memo Builder loaded with review context.");
-  };
-
-  const focusSignoff = () => {
-    if (blockDirtyDraft("recording a decision")) return;
-    if (selectedMemoId) navigateApp({ view: "reviews", memoId: selectedMemoId, section: "analysis" });
-    window.setTimeout(() => {
-      document.querySelector(".decision-box")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 0);
   };
 
   const completeAuthentication = async (response: { user: UserProfile | null }) => {
@@ -765,7 +806,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
           message: "This review is waiting for reviewer-initiated AI analysis."
         }
       }));
-      navigateApp({ view: "reviews", memoId: response.review.id, section: "overview" });
+      navigateApp({ view: "work", memoId: response.review.id, stage: "prepare" });
       setIntakeWarning(undefined);
       setSyncNotice(response.replayed ? "Existing review restored after a safe retry" : "Review created");
       return response.review;
@@ -776,7 +817,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   };
 
   const handleFile = async (file: File, dataClass: DataClass) => {
-    if (blockDirtyDraft("uploading another memo")) return;
+    if (blockDirtyDraft("uploading another memo")) throw new Error("Save or discard memo edits before uploading another memo.");
     try {
       setIntakeWarning(`Reading ${file.name}...`);
       const result = await memoFromFile(file, dataClass);
@@ -798,23 +839,21 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
           message: "Uploaded memo is waiting for reviewer-initiated AI analysis."
         }
       }));
-      navigateApp({ view: "reviews", memoId: reviewedMemo.id, section: "overview" });
+      navigateApp({ view: "work", memoId: reviewedMemo.id, stage: "prepare" });
     } catch (error) {
-      setIntakeWarning(readableApiError(error instanceof Error ? error.message : "Document extraction failed."));
+      const message = readableApiError(error instanceof Error ? error.message : "Document extraction failed.");
+      setIntakeWarning(message);
+      throw new Error(message);
     }
   };
 
-  const handlePasteMemo = async (title: string, text: string) => {
-    if (blockDirtyDraft("pasting another memo")) return;
+  const handlePasteMemo = async (input: NewReviewInput) => {
+    if (blockDirtyDraft("pasting another memo")) throw new Error("Save or discard memo edits before pasting another memo.");
     const memo = await persistNewReview({
-      title: title.trim() || "Pasted ECCN Memo",
-      itemFamily: "Pasted memo",
-      manufacturer: "",
-      intendedUse: "",
-      dataClass: "proprietary",
-      sourcePath: "self-classification",
-      attachments: [],
-      memoText: text
+      ...input,
+      title: input.title.trim() || "Pasted ECCN Memo",
+      itemFamily: input.itemFamily.trim() || "Pasted memo",
+      memoText: input.memoText
     }, "Creating pasted review...");
     setAnalysisStates((current) => ({
       ...current,
@@ -824,7 +863,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       }
     }));
     setIntakeWarning(undefined);
-    navigateApp({ view: "reviews", memoId: memo.id, section: "overview" });
+    navigateApp({ view: "work", memoId: memo.id, stage: "prepare" });
   };
 
   const handleCreatePublicDraftMemo = async (title: string, memoText: string) => {
@@ -846,7 +885,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         message: "Public-source draft is waiting for reviewer-initiated AI analysis."
       }
     }));
-    navigateApp({ view: "reviews", memoId: memo.id, section: "overview" });
+    navigateApp({ view: "work", memoId: memo.id, stage: "prepare" });
   };
 
   const prepareBuilderSessionForAi = async (session: MemoBuilderSession) => {
@@ -890,7 +929,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         message: "AI-drafted memo is waiting for reviewer-initiated AI analysis."
       }
     }));
-    navigateApp({ view: "reviews", memoId: memo.id, section: "overview" });
+    navigateApp({ view: "work", memoId: memo.id, stage: "prepare" });
     setIntakeWarning(undefined);
     setSyncNotice("AI draft added to Reviews");
     return memo.id;
@@ -912,11 +951,6 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     }, "Creating AI-assisted review...");
     await runAnalysisForMemo(memo);
     return memo.id;
-  };
-
-  const handleCreateReview = async (input: NewReviewInput) => {
-    if (blockDirtyDraft("creating a new review")) return;
-    await persistNewReview(input, "Creating review...");
   };
 
   const updateMemoText = async (memoId: string, memoText: string) => {
@@ -1029,9 +1063,18 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       window.setTimeout(() => setExportNotice(""), 3200);
       return;
     }
-    if (!decision) {
+    if (!decision || decision.action === "request-info") {
       setExportNotice("Record decision before export");
       window.setTimeout(() => setExportNotice(""), 3200);
+      return;
+    }
+    const staleResult = reviewResult.memoRevision !== undefined && reviewResult.memoRevision !== selectedMemo.revision;
+    const staleDecision = (decision.memoRevision !== undefined && decision.memoRevision !== selectedMemo.revision)
+      || (decision.memoHash !== undefined && decision.memoHash !== selectedMemo.contentHash)
+      || (decision.analysisId !== undefined && decision.analysisId !== reviewResult.id);
+    if (staleResult || staleDecision) {
+      setExportNotice("Re-run review and record a decision for the current revision before export");
+      window.setTimeout(() => setExportNotice(""), 4200);
       return;
     }
     const report = buildReviewReport(
@@ -1196,7 +1239,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     if (!selectedMemo) return;
     if (!window.confirm(`Archive “${selectedMemo.title}”? The review remains available in history.`)) return;
     await archiveMemo(selectedMemo.id);
-    navigateApp({ view: "reviews" });
+    navigateApp({ view: "work" });
   };
 
   const handleUpdateSelectedMetadata = async (
@@ -1219,6 +1262,22 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       savedReviewViews: [...(current.savedReviewViews ?? []).filter((saved) => saved.id !== view.id), view]
     }));
     setSyncNotice(`Saved view “${view.name}”`);
+  };
+
+  const handleBulkReviewUpdate = async (
+    memoIds: string[],
+    patch: Parameters<typeof updateReviewMetadata>[1]
+  ) => {
+    const targets = memosRef.current.filter((memo) => memoIds.includes(memo.id));
+    if (!targets.length) return;
+    try {
+      const responses = await Promise.all(targets.map((memo) => updateReviewMetadata(memo, patch)));
+      responses.forEach(acceptReviewCommand);
+      setSyncNotice(`${responses.length} review${responses.length === 1 ? "" : "s"} updated`);
+    } catch (error) {
+      await refreshReviewState("Bulk update conflicted; authoritative review list reloaded", null).catch(() => undefined);
+      throw error;
+    }
   };
 
   const runAnalysis = async () => {
@@ -1350,13 +1409,18 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     resetWorkspace();
     const storedSessions = builderPage.items;
     const summaryMemos = mergeReviewSummaries([], reviewPage.items, true);
-    const route = parseAppHash(window.location.hash);
+    const requestedRoute = window.location.hash || preferences.lastAppRoute || "#/work";
+    const route = parseAppHash(requestedRoute);
+    const normalizedRoute = appRouteHash(route);
+    if (window.location.hash !== normalizedRoute) {
+      window.history.replaceState(null, "", normalizedRoute);
+    }
     const extraPreferences: WorkspacePreferences = {
       ...(preferences.onboardingCompletedAt ? { onboardingCompletedAt: preferences.onboardingCompletedAt } : {}),
       ...(preferences.dismissedGuidance ? { dismissedGuidance: preferences.dismissedGuidance } : {}),
       ...(preferences.savedReviewViews ? { savedReviewViews: preferences.savedReviewViews } : {}),
       ...(preferences.activeWorkspace ? { activeWorkspace: preferences.activeWorkspace } : {}),
-      ...(preferences.lastAppRoute ? { lastAppRoute: preferences.lastAppRoute } : {}),
+      lastAppRoute: normalizeAppHash(preferences.lastAppRoute ?? normalizedRoute),
       ...(preferences.lastDashboardRoute ? { lastDashboardRoute: preferences.lastDashboardRoute } : {})
     };
     setWorkspacePreferences(extraPreferences);
@@ -1368,7 +1432,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       activeMemoBuilderSessionId: preferences.activeMemoBuilderSessionId ?? null,
       ...extraPreferences
     });
-    const routedMemoId = route.view === "reviews" && isReviewId(route.memoId) ? route.memoId : undefined;
+    const routedMemoId = route.view === "work" && isReviewId(route.memoId) ? route.memoId : undefined;
     const restoredMemoId = routedMemoId ?? (isReviewId(preferences.selectedMemoId) ? preferences.selectedMemoId : undefined);
     restoredSelectionRef.current = restoredMemoId
       && !summaryMemos.some((memo) => memo.id === restoredMemoId)
@@ -1390,7 +1454,10 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     setActiveMemoBuilderSessionId(preferences.activeMemoBuilderSessionId ?? builderSessions[0]?.id);
     setBuilderCursor(builderPage.nextCursor);
     setActiveView(route.view);
-    if (route.view === "reviews") setReviewSection(route.section ?? "overview");
+    if (route.view === "work") {
+      setReviewStage(route.stage ?? "review");
+      setReviewPanel(route.panel);
+    }
   };
 
   const mergeAuditEvents = (events: AuditEvent[]) => {
@@ -1431,7 +1498,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   }
 
   const currentRoute = parseAppHash(window.location.hash);
-  const reviewRouteOpen = activeView === "reviews" && currentRoute.view === "reviews" && Boolean(currentRoute.memoId);
+  const reviewRouteOpen = activeView === "work" && currentRoute.view === "work" && Boolean(currentRoute.memoId);
   const selectedAuditEvents = selectedMemo
     ? auditEvents.filter((event) => event.memoId === selectedMemo.id)
     : [];
@@ -1448,37 +1515,6 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       onDirtyChange={setMemoDraftDirty}
     />
   ) : null;
-  const reviewTools = selectedMemo ? (
-    <AnalysisPanel
-      memo={selectedMemo}
-      result={reviewResult}
-      analysisState={analysisState}
-      analysisMode={analysisMode}
-      onAnalysisModeChange={setAnalysisMode}
-      backendNotice={backendNotice}
-      liveAnalysisAvailable={backendHealth?.provider.configured !== false}
-      onRunAnalysis={runAnalysis}
-      userRole={auth.user.role}
-      councilApproval={councilApproval}
-      approvalBusy={approvalBusy}
-      onRevokeCouncilApproval={handleRevokeCouncilApproval}
-      decision={decision}
-      auditEvents={selectedAuditEvents}
-      chatMessages={chatMessages[selectedMemo.id] ?? []}
-      analysisLocked={analysisState.status === "running"}
-      memoDraftDirty={memoDraftDirty}
-      onDecision={handleDecision}
-      onSendChat={handleSendMemoChat}
-      onApplyChatSuggestion={handleApplyChatSuggestion}
-      chatHasMore={Boolean(chatCursors[selectedMemo.id])}
-      auditHasMore={Boolean(auditCursors[selectedMemo.id])}
-      onLoadMoreChat={loadMoreChatMessages}
-      onLoadMoreAudit={loadMoreAuditEvents}
-      selectedFindingId={selectedFindingId}
-      onFindingSelect={setSelectedFindingId}
-    />
-  ) : null;
-
   return (
     <div className="px-app-shell">
       <a className="px-skip-link" href="#main-content">Skip to main content</a>
@@ -1513,33 +1549,25 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
           activeView={activeView}
           userRole={auth.user.role}
           mobileOpen={mobileNavOpen}
-          serviceReady={Boolean(backendHealth?.ok)}
           onViewChange={changeActiveView}
           onMobileClose={() => setMobileNavOpen(false)}
         />
-        <div className="px-app-content">
-          {activeView === "home" ? (
-            <HomeView
-              user={auth.user}
+        <div className="px-app-content" ref={appContentRef}>
+          {activeView === "work" && !reviewRouteOpen ? (
+            <WorkView
               reviews={memos}
-              results={analysisResults}
-              decisions={decisions}
-              preferences={workspacePreferences}
-              onOpenReview={selectMemo}
-              onOpenQueue={() => navigateApp({ view: "reviews" })}
-              onNewReview={openNewReview}
-              onOpenMemoBuilder={openMemoBuilderForNewDraft}
-              onCompleteOnboarding={() => setWorkspacePreferences((current) => ({ ...current, onboardingCompletedAt: new Date().toISOString() }))}
-            />
-          ) : activeView === "reviews" && !reviewRouteOpen ? (
-            <ReviewQueueView
               user={auth.user}
+              members={tenantMembers}
               savedViews={workspacePreferences.savedReviewViews ?? []}
+              hasMore={Boolean(reviewCursor)}
+              loadingMore={reviewsLoadingMore}
               onOpenReview={selectMemo}
               onNewReview={openNewReview}
+              onLoadMore={loadMoreReviews}
               onSaveView={handleSaveReviewView}
+              onBulkUpdate={handleBulkReviewUpdate}
             />
-          ) : activeView === "reviews" && selectedMemo ? (
+          ) : activeView === "work" && selectedMemo ? (
             <ReviewWorkbench
               memo={selectedMemo}
               result={reviewResult}
@@ -1547,32 +1575,45 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
               auditEvents={selectedAuditEvents}
               user={auth.user}
               members={tenantMembers}
-              section={reviewSection}
+              stage={reviewStage}
+              panel={reviewPanel}
               analysisStatus={analysisState.status}
               analysisMessage={analysisState.message}
+              analysisMode={analysisMode}
+              backendNotice={backendNotice}
+              liveAnalysisAvailable={backendHealth?.provider.configured !== false}
               councilApproval={councilApproval}
               approvalBusy={approvalBusy}
               memoEditor={memoEditor}
-              reviewTools={reviewTools}
-              onSectionChange={changeReviewSection}
-              onBack={() => navigateApp({ view: "reviews" })}
+              memoDraftDirty={memoDraftDirty}
+              chatMessages={chatMessages[selectedMemo.id] ?? []}
+              chatHasMore={Boolean(chatCursors[selectedMemo.id])}
+              auditHasMore={Boolean(auditCursors[selectedMemo.id])}
+              selectedFindingId={selectedFindingId}
+              onFindingSelect={setSelectedFindingId}
+              onStageChange={changeReviewStage}
+              onBack={() => navigateApp({ view: "work" })}
               onRunAnalysis={() => void runAnalysis()}
               onCancelAnalysis={cancelAnalysis}
+              onAnalysisModeChange={setAnalysisMode}
+              onRevokeCouncilApproval={handleRevokeCouncilApproval}
               onExport={exportReport}
               onOpenMemoBuilder={openMemoBuilderForSelectedReview}
-              onDuplicate={duplicateSelectedReview}
-              onArchive={archiveSelectedReview}
               onUpdateMetadata={handleUpdateSelectedMetadata}
               onDecision={handleDecision}
+              onSendChat={handleSendMemoChat}
+              onApplyChatSuggestion={handleApplyChatSuggestion}
+              onLoadMoreChat={loadMoreChatMessages}
+              onLoadMoreAudit={loadMoreAuditEvents}
             />
-          ) : activeView === "reviews" ? (
+          ) : activeView === "work" ? (
             <main className="px-page px-loading-page" id="main-content">
               <div className="px-empty-state">
                 <span className="px-loader" />
                 <h1>{detailLoadingId === selectedMemoId ? "Loading review details" : "Review details unavailable"}</h1>
                 <p>{detailFailure?.memoId === selectedMemoId ? detailFailure?.message : "Fetching the memo, analysis, collaboration, and audit history."}</p>
                 {selectedMemoId && detailLoadingId !== selectedMemoId ? <button type="button" className="button" onClick={() => void loadReviewDetail(selectedMemoId, true)}>Retry loading review</button> : null}
-                <button type="button" className="px-text-button" onClick={() => navigateApp({ view: "reviews" })}>Back to Review Queue</button>
+                <button type="button" className="px-text-button" onClick={() => navigateApp({ view: "work" })}>Back to Work</button>
               </div>
             </main>
           ) : activeView === "memo-builder" ? (
@@ -1611,10 +1652,13 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         </div>
       </div>
       {(exportNotice || intakeWarning) ? <div className="px-toast" role="status">{exportNotice || intakeWarning}</div> : null}
-      <NewReviewModal
+      <ReviewStartDialog
         open={newReviewOpen}
+        userRole={auth.user.role}
         onClose={() => setNewReviewOpen(false)}
-        onCreate={handleCreateReview}
+        onPaste={handlePasteMemo}
+        onUpload={handleFile}
+        onDraftWithAi={openMemoBuilderForNewDraft}
       />
       <HelpCenter
         open={helpOpen}

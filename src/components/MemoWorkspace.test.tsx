@@ -1,9 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useState } from "react";
-import { AnalysisPanel } from "./AnalysisPanel";
 import { MemoWorkspace } from "./MemoWorkspace";
-import { ReviewList } from "./ReviewList";
 import type { MemoRecord, ReviewResult } from "../types";
 
 const baseMemo: MemoRecord = {
@@ -18,14 +15,6 @@ const baseMemo: MemoRecord = {
   dataClass: "proprietary",
   sourcePath: "self-classification",
   memoText: "The laser has pulse energy of 10 mJ. The memo omits end-use restrictions."
-};
-
-const secondMemo: MemoRecord = {
-  ...baseMemo,
-  id: "memo-2",
-  title: "Cryostat Memo",
-  documentCode: "CRYO-1",
-  memoText: "The cryostat reaches 1.2 K for fundamental research."
 };
 
 const findingStart = baseMemo.memoText.indexOf("pulse energy");
@@ -177,94 +166,3 @@ describe("MemoWorkspace", () => {
     expect(screen.getByRole("button", { name: /edit/i })).toBeDisabled();
   });
 });
-
-describe("document editing dirty guard", () => {
-  it("blocks memo switching and analysis while draft edits are unsaved", () => {
-    const runAnalysis = vi.fn();
-    render(<DocumentGuardHarness onRunAnalysis={runAnalysis} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
-    fireEvent.change(screen.getByLabelText("Memo text editor"), {
-      target: { value: `${baseMemo.memoText}\nUnsaved note.` }
-    });
-    fireEvent.click(screen.getByRole("button", { name: /cryostat memo/i }));
-
-    expect(screen.getByTestId("guard-notice")).toHaveTextContent("Save or discard memo edits before switching memos.");
-    expect(screen.getByRole("heading", { name: "Laser Memo" })).toBeInTheDocument();
-
-    expect(screen.getByRole("button", { name: /approve & analyze/i })).toBeDisabled();
-
-    fireEvent.click(screen.getByRole("button", { name: /discard/i }));
-    fireEvent.click(screen.getByRole("button", { name: /cryostat memo/i }));
-
-    expect(screen.getByRole("heading", { name: "Cryostat Memo" })).toBeInTheDocument();
-    expect(runAnalysis).not.toHaveBeenCalled();
-  });
-});
-
-function DocumentGuardHarness({ onRunAnalysis }: { onRunAnalysis: () => void }) {
-  const [selectedMemoId, setSelectedMemoId] = useState(baseMemo.id);
-  const [memoDraftDirty, setMemoDraftDirty] = useState(false);
-  const [notice, setNotice] = useState("Saved to account");
-  const memos = [baseMemo, secondMemo];
-  const selectedMemo = memos.find((memo) => memo.id === selectedMemoId)!;
-
-  const selectMemo = (memoId: string) => {
-    if (memoDraftDirty) {
-      setNotice("Save or discard memo edits before switching memos.");
-      return;
-    }
-    setSelectedMemoId(memoId);
-  };
-
-  return (
-    <div>
-      <div data-testid="guard-notice">{notice}</div>
-      <ReviewList
-        memos={memos}
-        selectedMemoId={selectedMemoId}
-        search=""
-        corpusLabel="Fixture corpus"
-        onSearch={vi.fn()}
-        onSelect={selectMemo}
-        onFile={async () => undefined}
-        onPasteMemo={vi.fn()}
-        onBuildWithAi={vi.fn()}
-        userRole="export-control-officer"
-      />
-      <MemoWorkspace
-        memo={selectedMemo}
-        result={selectedMemo.id === baseMemo.id ? reviewResult : undefined}
-        analysisLocked={false}
-        onMemoTextChange={vi.fn()}
-        onArchiveMemo={vi.fn()}
-        onCreatePublicDraft={vi.fn()}
-        onImproveWithAi={vi.fn()}
-        onDirtyChange={setMemoDraftDirty}
-      />
-      <AnalysisPanel
-        memo={selectedMemo}
-        analysisState={{
-          status: "unanalyzed",
-          message: "Waiting for analysis."
-        }}
-        analysisMode="standard"
-        onAnalysisModeChange={vi.fn()}
-        backendNotice="Backend ready"
-        liveAnalysisAvailable={true}
-        onRunAnalysis={onRunAnalysis}
-        userRole="export-control-officer"
-        approvalBusy={false}
-        onRevokeCouncilApproval={vi.fn()}
-        auditEvents={[]}
-        chatMessages={[]}
-        analysisLocked={false}
-        memoDraftDirty={memoDraftDirty}
-        onDecision={vi.fn()}
-        onSendChat={async () => "sent"}
-        onApplyChatSuggestion={vi.fn()}
-        onFindingSelect={vi.fn()}
-      />
-    </div>
-  );
-}

@@ -1,9 +1,11 @@
+import { useState } from "react";
 import {
   BookOpen,
+  BriefcaseBusiness,
+  ChevronDown,
+  ExternalLink,
   FileText,
-  Home,
   Library,
-  Settings,
   ShieldCheck,
   UsersRound,
   Wand2,
@@ -11,61 +13,116 @@ import {
 } from "lucide-react";
 import type { AppView, UserProfile } from "../types";
 
-interface NavItem {
-  icon: typeof FileText;
-  label: string;
-  view: AppView;
-  roles?: UserProfile["role"][];
-}
-
-const navItems: NavItem[] = [
-  { icon: Home, label: "Home / My Work", view: "home" },
-  { icon: FileText, label: "Reviews", view: "reviews" },
-  { icon: Wand2, label: "Memo Builder", view: "memo-builder" },
-  { icon: Library, label: "Evidence Library", view: "evidence" },
-  { icon: BookOpen, label: "Sources", view: "corpus", roles: ["reviewer", "counsel", "export-control-officer"] },
-  { icon: ShieldCheck, label: "Controls", view: "controls", roles: ["reviewer", "counsel", "export-control-officer"] },
-  { icon: UsersRound, label: "Administration", view: "users", roles: ["export-control-officer"] },
-  { icon: Settings, label: "Settings", view: "settings", roles: ["export-control-officer"] }
-];
-
 interface SidebarRailProps {
   activeView: AppView;
   userRole: UserProfile["role"];
   mobileOpen: boolean;
-  serviceReady: boolean;
   onViewChange: (view: AppView) => void;
   onMobileClose: () => void;
 }
 
-export function SidebarRail({ activeView, userRole, mobileOpen, serviceReady, onViewChange, onMobileClose }: SidebarRailProps) {
+export function SidebarRail({
+  activeView,
+  userRole,
+  mobileOpen,
+  onViewChange,
+  onMobileClose
+}: SidebarRailProps) {
+  const [toolsOpen, setToolsOpen] = useState(["memo-builder", "evidence", "corpus"].includes(activeView));
+  const [officerOpen, setOfficerOpen] = useState(["controls", "users"].includes(activeView));
+  const open = (view: AppView) => {
+    onViewChange(view);
+    onMobileClose();
+  };
+
   return (
     <>
       {mobileOpen ? <button className="px-nav-backdrop" type="button" aria-label="Close navigation" onClick={onMobileClose} /> : null}
-      <nav className={`px-sidebar${mobileOpen ? " mobile-open" : ""}`} aria-label="Primary">
-        <div className="px-sidebar-mobile-head"><strong>Navigate</strong><button type="button" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button></div>
+      <nav className={`px-sidebar simplified${mobileOpen ? " mobile-open" : ""}`} aria-label="Primary">
+        <div className="px-sidebar-mobile-head">
+          <strong>Navigate</strong>
+          <button type="button" onClick={onMobileClose} aria-label="Close navigation"><X size={19} /></button>
+        </div>
         <div className="px-nav-items">
-          {navItems.filter((item) => !item.roles || item.roles.includes(userRole)).map((item) => {
-            const Icon = item.icon;
-            return (
+          <button
+            type="button"
+            className={activeView === "work" ? "px-nav-button active" : "px-nav-button"}
+            aria-current={activeView === "work" ? "page" : undefined}
+            onClick={() => open("work")}
+          >
+            <FileText size={19} strokeWidth={1.8} />
+            <span>Work</span>
+          </button>
+
+          <div className="px-nav-disclosure">
+            <button
+              type="button"
+              className={["memo-builder", "evidence", "corpus"].includes(activeView) ? "px-nav-button active-parent" : "px-nav-button"}
+              aria-expanded={toolsOpen}
+              onClick={() => setToolsOpen((current) => !current)}
+            >
+              <BriefcaseBusiness size={19} strokeWidth={1.8} />
+              <span>Tools</span>
+              <ChevronDown className={toolsOpen ? "open" : ""} size={16} />
+            </button>
+            {toolsOpen ? (
+              <div className="px-nav-submenu">
+                <SubmenuButton icon={Wand2} label="Memo Builder" view="memo-builder" activeView={activeView} onOpen={open} />
+                <SubmenuButton icon={Library} label="Evidence Library" view="evidence" activeView={activeView} onOpen={open} />
+                {userRole !== "submitter" ? <SubmenuButton icon={BookOpen} label="Sources" view="corpus" activeView={activeView} onOpen={open} /> : null}
+              </div>
+            ) : null}
+          </div>
+
+          {userRole === "export-control-officer" ? (
+            <div className="px-nav-disclosure officer">
               <button
                 type="button"
-                className={activeView === item.view ? "px-nav-button active" : "px-nav-button"}
-                aria-current={activeView === item.view ? "page" : undefined}
-                key={item.view}
-                onClick={() => { onViewChange(item.view); onMobileClose(); }}
+                className={["controls", "users"].includes(activeView) ? "px-nav-button active-parent" : "px-nav-button"}
+                aria-expanded={officerOpen}
+                onClick={() => setOfficerOpen((current) => !current)}
               >
-                <Icon size={19} strokeWidth={1.8} />
-                <span>{item.label}</span>
+                <ShieldCheck size={19} strokeWidth={1.8} />
+                <span>Officer</span>
+                <ChevronDown className={officerOpen ? "open" : ""} size={16} />
               </button>
-            );
-          })}
-        </div>
-        <div className="px-sidebar-footer">
-          <div className="px-service-card"><i className={serviceReady ? "ready" : ""} /><span><strong>Rulix service</strong><small>{serviceReady ? "Operational" : "Checking status"}</small></span></div>
-          <a href="https://dashboard.rulix.cloud/">Open operator dashboard</a>
+              {officerOpen ? (
+                <div className="px-nav-submenu">
+                  <SubmenuButton icon={ShieldCheck} label="Approvals & controls" view="controls" activeView={activeView} onOpen={open} />
+                  <SubmenuButton icon={UsersRound} label="Administration" view="users" activeView={activeView} onOpen={open} />
+                  <a href="https://dashboard.rulix.cloud/"><ExternalLink size={16} />Operator dashboard</a>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </nav>
     </>
+  );
+}
+
+function SubmenuButton({
+  icon: Icon,
+  label,
+  view,
+  activeView,
+  onOpen
+}: {
+  icon: typeof FileText;
+  label: string;
+  view: AppView;
+  activeView: AppView;
+  onOpen: (view: AppView) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={activeView === view ? "active" : ""}
+      aria-current={activeView === view ? "page" : undefined}
+      onClick={() => onOpen(view)}
+    >
+      <Icon size={16} />
+      {label}
+    </button>
   );
 }

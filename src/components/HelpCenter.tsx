@@ -4,7 +4,6 @@ import {
   ClipboardCheck,
   FilePlus2,
   ScanSearch,
-  ShieldCheck,
   Wand2,
   X
 } from "lucide-react";
@@ -92,24 +91,20 @@ export function HelpCenter({
         <ol className="help-steps">
           <li>
             <FilePlus2 size={20} />
-            <div><strong>1. Add the exact memo</strong><span>Paste text, upload a classified file, or use Memo Builder. Choose the data class before any file extraction.</span></div>
+            <div><strong>1. Prepare</strong><span>Paste, upload, or draft the memo; then confirm its data class, sources, attachments, and provenance.</span></div>
           </li>
           <li>
             <ScanSearch size={20} />
-            <div><strong>2. Check the source record</strong><span>Confirm the memo text, item facts, intended use, attachments, and data classification before analysis.</span></div>
-          </li>
-          <li>
-            <ShieldCheck size={20} />
             <div>
-              <strong>3. Approve the exact AI request</strong>
+              <strong>2. Review</strong>
               <span>{isOfficer
-                ? "As an export-control officer, you can approve the exact current content and provider lane. Editing the memo makes that approval stale."
-                : "Request officer approval for the exact current content. Do not edit it while approval is pending; any change intentionally makes the request stale."}</span>
+                ? "Approve and run AI for the exact current revision, then inspect citations and resolve evidence gaps. Editing the memo makes the result stale."
+                : "Request officer approval for the exact current revision, then inspect citations and resolve evidence gaps. Any edit intentionally makes the result stale."}</span>
             </div>
           </li>
           <li>
             <ClipboardCheck size={20} />
-            <div><strong>4. Resolve and sign off</strong><span>Inspect cited evidence, answer information requests, record notes, and make the human accept, request-info, or override decision.</span></div>
+            <div><strong>3. Decide & Export</strong><span>Review remaining blockers, record the human rationale and decision, then export only the valid signed result.</span></div>
           </li>
         </ol>
 

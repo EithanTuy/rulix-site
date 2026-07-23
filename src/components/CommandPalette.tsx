@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Home, Library, MessageSquareText, Search, Settings, WandSparkles } from "lucide-react";
+import { FileText, Library, MessageSquareText, Search, Settings, WandSparkles } from "lucide-react";
 import type { AppView, MemoRecord } from "../types";
 
 interface CommandPaletteProps {
@@ -48,8 +48,7 @@ export function CommandPalette({ open, reviews, onClose, onNavigate, onOpenRevie
         <div className="px-command-groups">
           <div>
             <p className="px-command-label">Go to</p>
-            <button type="button" onClick={() => run(() => onNavigate("home"))}><Home size={17} />Home / My Work</button>
-            <button type="button" onClick={() => run(() => onNavigate("reviews"))}><FileText size={17} />Review Queue</button>
+            <button type="button" onClick={() => run(() => onNavigate("work"))}><FileText size={17} />Work</button>
             <button type="button" onClick={() => run(() => onNavigate("memo-builder"))}><WandSparkles size={17} />Memo Builder</button>
             <button type="button" onClick={() => run(() => onNavigate("evidence"))}><Library size={17} />Evidence Library</button>
             <button type="button" onClick={() => run(() => onNavigate("settings"))}><Settings size={17} />Settings</button>

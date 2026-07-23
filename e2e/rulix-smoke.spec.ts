@@ -20,10 +20,12 @@ for (const role of roles) {
     await page.goto("/app#/home");
 
     await expect(page).toHaveTitle("Rulix ECCN");
-    await expect(page.getByRole("heading", { name: /Good (morning|afternoon|evening)/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/#\/work$/);
     await page.goto(`/app#/reviews/${reviewId}/overview`);
     await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Review progress" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Review stages" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^2\s*Review$/ })).toHaveAttribute("aria-current", "step");
     await page.getByRole("button", { name: "Help" }).click();
     await expect(page.getByRole("heading", { name: "From memo to defensible decision" })).toBeVisible();
     await page.getByRole("button", { name: "Close Rulix guide" }).click();
@@ -31,11 +33,9 @@ for (const role of roles) {
     await page.keyboard.press("Control+K");
     await expect(page.getByRole("dialog", { name: "Command search" })).toBeVisible();
     await page.keyboard.press("Escape");
-    const artifact = page.getByRole("button", { name: /AI memo draft/i });
-    await artifact.click({ button: "right" });
-    await expect(page.getByRole("menu", { name: "Artifact actions" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Duplicate as draft" })).toBeEnabled();
-    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Context" }).click();
+    await expect(page.getByRole("complementary", { name: "Review context" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sources" })).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

@@ -1,39 +1,43 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Archive,
+  AlertCircle,
   ArrowLeft,
   Check,
   CheckCircle2,
-  ClipboardCopy,
+  ChevronRight,
   Clock3,
   Download,
-  FileDiff,
   FileText,
   History,
-  Link2,
   MessageSquare,
-  MoreHorizontal,
-  PanelRightOpen,
-  Paperclip,
+  PanelRight,
   RefreshCw,
-  Save,
   Send,
   ShieldCheck,
   Sparkles,
-  XCircle
+  X
 } from "lucide-react";
-import type { CouncilApprovalView } from "../lib/apiClient";
-import { createReviewComment, listReviewComments, resolveReviewComment } from "../lib/apiClient";
+import { getSourceChunk } from "../data/corpus";
+import {
+  ANALYSIS_MODE_CONFIG,
+  createReviewComment,
+  listReviewComments,
+  resolveReviewComment,
+  type AnalysisMode,
+  type CouncilApprovalView
+} from "../lib/apiClient";
+import type { ReviewPanel, ReviewStage } from "../lib/appRoutes";
+import { summarizeReadiness } from "../lib/reviewLifecycle";
 import type {
   AuditEvent,
   CaseComment,
+  MemoChatMessage,
   MemoRecord,
   ReviewResult,
   ReviewerDecision,
   UserProfile
 } from "../types";
-import type { ReviewSection } from "../lib/appRoutes";
-import { ContextMenu, type ContextMenuAction } from "./ui/ContextMenu";
+import { MemoChatPanel } from "./MemoChatPanel";
 
 interface ReviewWorkbenchProps {
   memo: MemoRecord;
@@ -42,26 +46,48 @@ interface ReviewWorkbenchProps {
   auditEvents: AuditEvent[];
   user: UserProfile;
   members: Array<Pick<UserProfile, "id" | "name" | "email" | "role">>;
-  section: ReviewSection;
+  stage: ReviewStage;
+  panel?: ReviewPanel;
   analysisStatus: "unanalyzed" | "running" | "live" | "failed";
   analysisMessage: string;
+  analysisMode: AnalysisMode;
+  backendNotice: string;
+  liveAnalysisAvailable: boolean;
   councilApproval?: CouncilApprovalView;
   approvalBusy: boolean;
   memoEditor: ReactNode;
-  reviewTools: ReactNode;
-  onSectionChange: (section: ReviewSection) => void;
+  memoDraftDirty: boolean;
+  chatMessages: MemoChatMessage[];
+  chatHasMore: boolean;
+  auditHasMore: boolean;
+  selectedFindingId?: string;
+  onFindingSelect: (findingId: string | undefined) => void;
+  onStageChange: (stage: ReviewStage, panel?: ReviewPanel) => void;
   onBack: () => void;
   onRunAnalysis: () => void;
   onCancelAnalysis?: () => void;
+  onAnalysisModeChange: (mode: AnalysisMode) => void;
+  onRevokeCouncilApproval: () => Promise<void> | void;
   onExport: () => void;
   onOpenMemoBuilder: () => void;
-  onDuplicate: () => Promise<void>;
-  onArchive: () => Promise<void>;
-  onUpdateMetadata: (patch: Partial<Pick<MemoRecord, "priority" | "tags" | "lifecycleStage">> & { assignedTo?: string | null; dueAt?: string | null }) => Promise<void>;
+  onUpdateMetadata: (
+    patch: Partial<Pick<MemoRecord, "priority" | "tags" | "lifecycleStage">> & {
+      assignedTo?: string | null;
+      dueAt?: string | null;
+    }
+  ) => Promise<void>;
   onDecision: (action: ReviewerDecision["action"], notes: string) => Promise<void>;
+  onSendChat: (memoId: string, message: string) => Promise<"sent" | "queued">;
+  onApplyChatSuggestion: (memoId: string, messageId: string) => Promise<void>;
+  onLoadMoreChat: (memoId: string) => Promise<void>;
+  onLoadMoreAudit: (memoId: string) => Promise<void>;
 }
 
-const steps = ["Intake", "Evidence", "AI approval", "Resolve findings", "Human decision", "Export"] as const;
+const stages: Array<{ id: ReviewStage; label: string; short: string }> = [
+  { id: "prepare", label: "Prepare", short: "Prepare" },
+  { id: "review", label: "Review", short: "Review" },
+  { id: "decide", label: "Decide & Export", short: "Decide" }
+];
 
 export function ReviewWorkbench({
   memo,
@@ -70,34 +96,68 @@ export function ReviewWorkbench({
   auditEvents,
   user,
   members,
-  section,
+  stage,
+  panel,
   analysisStatus,
   analysisMessage,
+  analysisMode,
+  backendNotice,
+  liveAnalysisAvailable,
   councilApproval,
   approvalBusy,
   memoEditor,
-  reviewTools,
-  onSectionChange,
+  memoDraftDirty,
+  chatMessages,
+  chatHasMore,
+  auditHasMore,
+  selectedFindingId,
+  onFindingSelect,
+  onStageChange,
   onBack,
   onRunAnalysis,
   onCancelAnalysis,
+  onAnalysisModeChange,
+  onRevokeCouncilApproval,
   onExport,
   onOpenMemoBuilder,
-  onDuplicate,
-  onArchive,
   onUpdateMetadata,
-  onDecision
+  onDecision,
+  onSendChat,
+  onApplyChatSuggestion,
+  onLoadMoreChat,
+  onLoadMoreAudit
 }: ReviewWorkbenchProps) {
-  const [selectedFindingId, setSelectedFindingId] = useState(result?.findings[0]?.id);
-  const [context, setContext] = useState<{ x: number; y: number }>();
-  const [notes, setNotes] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(Boolean(panel));
+  const [activePanel, setActivePanel] = useState<ReviewPanel>(panel ?? defaultPanel(stage));
   const [comments, setComments] = useState<CaseComment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(section === "conversation");
+  const [decisionNotes, setDecisionNotes] = useState(decision?.notes ?? "");
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionError, setDecisionError] = useState("");
   const stale = Boolean(result && result.memoRevision !== undefined && result.memoRevision !== memo.revision);
-  const progress = progressIndex(memo, result, decision);
+  const readiness = result ? summarizeReadiness(result) : undefined;
+  const blockingFinding = result?.findings.find((finding) => finding.status === "conflict" || finding.status === "missing");
   const selectedFinding = result?.findings.find((finding) => finding.id === selectedFindingId) ?? result?.findings[0];
+  const decisionCurrent = Boolean(
+    decision
+    && (!decision.memoRevision || decision.memoRevision === memo.revision)
+    && (!decision.memoHash || decision.memoHash === memo.contentHash)
+    && (!decision.analysisId || decision.analysisId === result?.id)
+  );
+  const exportReady = Boolean(decisionCurrent && decision && decision.action !== "request-info" && result && !stale);
+  const canDecide = user.role !== "submitter";
+  const canOverride = user.role === "export-control-officer" || user.role === "counsel";
+
+  const citations = useMemo(() => result
+    ? [...new Set([
+      ...result.jurisdiction.sourceChunkIds,
+      ...result.recommended.sourceChunkIds,
+      ...result.findings.flatMap((finding) => finding.sourceChunkIds)
+    ])]
+      .map((id) => getSourceChunk(id))
+      .filter((chunk): chunk is NonNullable<ReturnType<typeof getSourceChunk>> => Boolean(chunk))
+    : [], [result]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -107,20 +167,30 @@ export function ReviewWorkbench({
     return () => controller.abort();
   }, [memo.id]);
 
-  const actions = useMemo<ContextMenuAction[]>(() => [
-    { id: "split", label: "Open in split view", icon: PanelRightOpen, shortcut: "⌘ ↵", onSelect: () => setToolsOpen(true) },
-    { id: "compare", label: "Compare with approved version", icon: FileDiff, onSelect: () => onSectionChange("memo") },
-    { id: "link", label: "Copy secure link", icon: Link2, shortcut: "⌘ L", onSelect: () => void navigator.clipboard.writeText(window.location.href) },
-    { id: "attach", label: "Attach to review", icon: Paperclip, onSelect: onOpenMemoBuilder },
-    { id: "duplicate", label: "Duplicate as draft", icon: ClipboardCopy, onSelect: () => void onDuplicate() },
-    { id: "download", label: "Download memo", icon: Download, onSelect: () => downloadText(memo) },
-    { id: "history", label: "View audit history", icon: History, onSelect: () => onSectionChange("activity") },
-    { id: "archive", label: "Archive review…", icon: Archive, tone: "danger", separatorBefore: true, disabled: user.role === "submitter", onSelect: () => void onArchive() }
-  ], [memo, onArchive, onDuplicate, onOpenMemoBuilder, onSectionChange, user.role]);
+  useEffect(() => {
+    setDecisionNotes(decision?.notes ?? "");
+    setDecisionError("");
+  }, [decision?.notes, memo.id]);
+
+  useEffect(() => {
+    if (!panel) return;
+    setActivePanel(panel);
+    setDrawerOpen(true);
+  }, [panel]);
+
+  useEffect(() => {
+    if (!selectedFindingId && result?.findings[0]) onFindingSelect(result.findings[0].id);
+  }, [onFindingSelect, result?.generatedAt, selectedFindingId]);
+
+  const openPanel = (next: ReviewPanel) => {
+    setActivePanel(next);
+    setDrawerOpen(true);
+    onStageChange(stage, next);
+  };
 
   const submitComment = async (kind: "comment" | "request-information") => {
     const body = commentText.trim();
-    if (!body) return;
+    if (!body || commentBusy) return;
     setCommentBusy(true);
     try {
       const mentions = members.filter((member) => body.includes(`@${member.name}`)).map((member) => member.id);
@@ -132,126 +202,672 @@ export function ReviewWorkbench({
     }
   };
 
+  const submitDecision = async (action: ReviewerDecision["action"]) => {
+    if (!decisionNotes.trim() || decisionBusy || !canDecide) return;
+    setDecisionBusy(true);
+    setDecisionError("");
+    try {
+      await onDecision(action, decisionNotes.trim());
+    } catch (reason) {
+      setDecisionError(reason instanceof Error ? reason.message : "The decision was not recorded. Review the current revision and try again.");
+    } finally {
+      setDecisionBusy(false);
+    }
+  };
+
   return (
-    <main className="px-workbench" id="main-content">
-      <header className="px-review-context">
-        <button type="button" className="px-icon-button" onClick={onBack} aria-label="Back to Review Queue"><ArrowLeft size={19} /></button>
-        <div className="px-review-identity"><FileText size={22} /><span><h1>{memo.title}</h1><small>{memo.documentCode}</small></span></div>
-        <label><span>Assignee</span><select value={memo.assignedTo ?? ""} disabled={user.role === "submitter"} onChange={(event) => void onUpdateMetadata({ assignedTo: event.target.value || null })}><option value="">Unassigned</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></label>
-        <label><span>Due date</span><input type="date" value={memo.dueAt?.slice(0, 10) ?? ""} disabled={user.role === "submitter"} onChange={(event) => void onUpdateMetadata({ dueAt: event.target.value ? `${event.target.value}T17:00:00.000Z` : null })} /></label>
-        <label><span>Priority</span><select value={memo.priority ?? "normal"} disabled={user.role === "submitter"} onChange={(event) => void onUpdateMetadata({ priority: event.target.value as MemoRecord["priority"] })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label>
-        <button type="button" className="button" onClick={() => document.querySelector<HTMLTextAreaElement>(".px-comment-composer textarea")?.focus()}><MessageSquare size={16} />Request information</button>
-        <button type="button" className="px-icon-button" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setContext({ x: rect.right, y: rect.bottom + 4 }); }} aria-label="Review actions"><MoreHorizontal size={19} /></button>
+    <main className="review-workbench" id="main-content">
+      <header className="review-heading">
+        <button type="button" className="review-back" onClick={onBack}><ArrowLeft size={17} />Back to Work</button>
+        <div className="review-title-row">
+          <div>
+            <h1>{memo.title}</h1>
+            <p>
+              {memo.documentCode}
+              <span aria-hidden="true">•</span>
+              Revision {memo.revision ?? 1}
+              <span aria-hidden="true">•</span>
+              Updated {new Date(memo.updatedAt).toLocaleString()}
+            </p>
+          </div>
+          <button type="button" className="button review-context-toggle" aria-expanded={drawerOpen} onClick={() => setDrawerOpen((open) => !open)}>
+            <PanelRight size={17} />Context
+          </button>
+        </div>
       </header>
 
-      <nav className="px-review-progress" aria-label="Review progress">
-        {steps.map((step, index) => <button type="button" key={step} className={index < progress ? "complete" : index === progress ? "current" : "future"} onClick={() => index <= 1 ? onSectionChange("memo") : index === 5 ? onExport() : onSectionChange("analysis")}><span>{index < progress ? <Check size={14} /> : index + 1}</span>{step}</button>)}
+      <nav className="review-stages" aria-label="Review stages">
+        {stages.map((item, index) => (
+          <button
+            type="button"
+            key={item.id}
+            className={stage === item.id ? "active" : ""}
+            aria-current={stage === item.id ? "step" : undefined}
+            onClick={() => onStageChange(item.id)}
+          >
+            <span>{index + 1}</span>
+            <strong>{item.label}</strong>
+          </button>
+        ))}
       </nav>
 
-      <div className={`px-approval-banner${stale ? " warning" : ""}`}>
-        {stale ? <RefreshCw size={17} /> : <ShieldCheck size={17} />}
-        <span><strong>{stale ? "AI result is stale because the review changed." : "Approval scope"}</strong>{stale ? "Re-approve the exact current content before using AI findings." : "A human reviewer records the final determination for the exact content shown."}</span>
-        <button type="button" className="px-text-button" onClick={() => onSectionChange("activity")}>View audit trail</button>
-      </div>
-
-      <nav className="px-workbench-tabs" aria-label="Review sections">
-        {(["overview", "memo", "analysis", "conversation", "activity"] as ReviewSection[]).map((item) => <button type="button" key={item} className={section === item ? "active" : ""} onClick={() => onSectionChange(item)}>{labelize(item)}</button>)}
-      </nav>
-
-      {section === "memo" ? <section className="px-embedded-workspace">{memoEditor}</section> : null}
-      {section === "conversation" ? <section className="px-embedded-tools">{reviewTools}</section> : null}
-      {section === "activity" ? (
-        <section className="px-activity-page"><div className="px-section-head"><div><h2>Activity and audit trail</h2><p>Edits, assignments, approvals, comments, decisions, and exports in authoritative order.</p></div></div>{combinedActivity(auditEvents, comments).map((item) => <article key={item.id}><span className={`px-activity-icon ${item.severity}`}>{item.icon}</span><div><strong>{item.title}</strong><p>{item.detail}</p><small>{new Date(item.at).toLocaleString()} · {item.actor}</small></div></article>)}</section>
-      ) : null}
-      {(section === "overview" || section === "analysis") ? (
-        <div className="px-workbench-grid">
-          <aside className="px-case-overview">
-            <h2>Case overview</h2>
-            <dl><div><dt>Classification</dt><dd>{result?.recommended.eccn ?? "Pending analysis"}</dd></div><div><dt>Requester</dt><dd>{memo.owner}</dd></div><div><dt>Item description</dt><dd>{memo.itemFamily}</dd></div><div><dt>Review ID</dt><dd>{memo.id}</dd></div><div><dt>Created</dt><dd>{new Date(memo.createdAt ?? memo.updatedAt).toLocaleString()}</dd></div></dl>
-            <div className="px-provenance"><h3>Source provenance</h3><span><FileText size={16} /><span><strong>{memo.attachments?.[0] ?? "Pasted memo"}</strong><small>{dataClassLabel(memo.dataClass)}</small></span></span><small>SHA-256: {memo.contentHash?.slice(0, 12)}… <button type="button" onClick={() => void navigator.clipboard.writeText(memo.contentHash ?? "")}>Copy</button></small></div>
-            <div className="px-review-record"><h3>Review record</h3><span className={result ? "approved" : "pending"}><ShieldCheck size={17} /><span><strong>{result ? "AI run completed" : "AI approval pending"}</strong><small>{result ? `${result.provider.label} · ${new Date(result.generatedAt).toLocaleString()}` : analysisMessage}</small></span></span></div>
-            <div className="px-mini-activity"><h3>Activity</h3>{auditEvents.slice(0, 4).map((event) => <button type="button" key={event.id} onClick={() => onSectionChange("activity")}><Clock3 size={15} /><span><strong>{event.action}</strong><small>{new Date(event.at).toLocaleString()}</small></span></button>)}</div>
-          </aside>
-
-          <section className="px-evidence-analysis">
-            <header><div><h2>Evidence and AI findings</h2><nav><button type="button" className="active" onClick={() => document.querySelector(".px-ai-summary")?.scrollIntoView({ behavior: "smooth", block: "start" })}>AI summary</button><button type="button" onClick={() => document.querySelector(".px-findings")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Key findings {result?.findings.length ? <b>{result.findings.length}</b> : null}</button><button type="button" onClick={() => onSectionChange("memo")}>Full evidence</button><button type="button" onClick={() => document.querySelector(".px-citations")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Citations</button></nav></div><button type="button" className="button" onClick={onExport}><Download size={15} />Download report</button></header>
-            {analysisStatus === "running" ? <AnalysisProgress message={analysisMessage} onCancel={onCancelAnalysis} /> : null}
-            {analysisStatus === "failed" ? <div className="px-inline-error"><strong>AI analysis did not finish</strong><span>{analysisMessage}</span><button className="button" type="button" onClick={onRunAnalysis}>Retry analysis</button></div> : null}
-            {!result && analysisStatus !== "running" && analysisStatus !== "failed" ? <div className="px-empty-state"><Sparkles size={28} /><h2>Ready for exact-content AI review</h2><p>Rulix will bind approval to this revision, data class, provider lane, and analysis depth.</p><button className="button primary" type="button" onClick={onRunAnalysis} disabled={approvalBusy}>{approvalBusy ? "Preparing approval…" : "Request / run AI"}</button></div> : null}
-            {result ? (
-              <>
-                <div className="px-ai-classification"><CheckCircle2 size={18} /><span><strong>AI classification: {result.recommended.eccn}</strong><small>{result.recommended.label} · {result.provider.label}</small></span><time>{new Date(result.generatedAt).toLocaleString()}</time></div>
-                <article className="px-ai-summary"><h3>What the AI found</h3><p>{result.recommended.summary}</p><h3>Exact content reviewed (scope)</h3><p>AI approval applies only to revision {result.memoRevision ?? memo.revision} of the current memo and the cited source material.</p><button type="button" className="px-text-button" onClick={() => onSectionChange("memo")}>View full evidence</button></article>
-                <section className="px-findings"><h3>Findings ({result.findings.length})</h3>{result.findings.length ? <div className="px-findings-grid"><div>{result.findings.map((finding, index) => <button type="button" key={finding.id} className={selectedFinding?.id === finding.id ? "active" : ""} onClick={() => setSelectedFindingId(finding.id)}><span>{index + 1}</span><span><strong>{finding.title}</strong><small>{labelize(finding.severity)} · {labelize(finding.status)}</small></span></button>)}</div>{selectedFinding ? <article><div><h4>{selectedFinding.title}</h4><span className={`px-severity ${selectedFinding.severity}`}>{labelize(selectedFinding.severity)}</span></div><strong>Claim</strong><p>{selectedFinding.claim}</p><strong>Rationale</strong><p>{selectedFinding.rationale}</p>{selectedFinding.excerpt ? <blockquote>{selectedFinding.excerpt}</blockquote> : null}</article> : null}</div> : <div className="px-success-state"><CheckCircle2 size={20} /><strong>No unresolved evidence findings</strong></div>}</section>
-                <section className="px-citations"><h3>Citations ({uniqueCitations(result).length})</h3>{uniqueCitations(result).map((citation) => <button type="button" key={citation} onClick={() => onSectionChange("memo")}><FileText size={14} /><span>{citation}</span><Link2 size={13} /></button>)}</section>
-              </>
-            ) : null}
-          </section>
-
-          <aside className="px-artifact-pane">
-            <header><h2>Memos and artifacts</h2><button type="button" className="button" onClick={onOpenMemoBuilder}>+ New</button></header>
-            <button type="button" className="px-artifact selected" onContextMenu={(event) => { event.preventDefault(); setContext({ x: event.clientX, y: event.clientY }); }}><MessageSquare size={17} /><span><strong>AI memo draft</strong><small>Review context ready · Updated {new Date(memo.updatedAt).toLocaleString()}</small></span><MessageSquare size={15} /><MoreHorizontal size={16} /></button>
-            <div className="px-artifact-empty"><p>Attach or create</p><span>Add a document, screenshot, quote, or dataset to support your decision.</span><button type="button" className="button" onClick={onOpenMemoBuilder}><Paperclip size={15} />Attach document</button></div>
-            <section className="px-notes"><h3>Notes</h3><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Focus on the decision, evidence gaps, and storage scope." maxLength={1_000} /><div><span>{notes.length} / 1000</span><button type="button" onClick={() => setCommentText(notes)} disabled={!notes.trim()}><Save size={14} />Stage as comment</button></div></section>
-            <section className="px-comment-composer"><h3>Collaboration</h3><textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Comment or type @Name to mention a tenant member…" /><div><button type="button" className="button" disabled={!commentText.trim() || commentBusy} onClick={() => void submitComment("request-information")}>Request info</button><button type="button" className="button primary" disabled={!commentText.trim() || commentBusy} onClick={() => void submitComment("comment")}><Send size={15} />Comment</button></div></section>
-            <div className="px-comment-list">{comments.slice(0, 4).map((comment) => <article className={comment.resolvedAt ? "resolved" : ""} key={comment.id}><span className="px-avatar small">{initials(comment.authorName)}</span><div><strong>{comment.authorName}</strong><p>{comment.body}</p><small>{new Date(comment.createdAt).toLocaleString()}</small>{!comment.resolvedAt && (comment.authorId === user.id || user.role === "export-control-officer") ? <button type="button" onClick={() => void resolveReviewComment(memo.id, comment.id).then((resolved) => setComments((current) => current.map((item) => item.id === resolved.id ? resolved : item)))}>Resolve</button> : null}</div></article>)}</div>
-            <p className="px-human-note">Ctrl+Enter approves only the exact current action. Human signoff remains final.</p>
-            {result && !decision ? <DecisionBar onDecision={onDecision} /> : decision ? <div className="px-decision-complete"><CheckCircle2 size={18} /><span><strong>Human decision recorded</strong><small>{labelize(decision.action)} · {decision.signedBy}</small></span><button type="button" className="button primary" onClick={onExport}>Export</button></div> : <button type="button" className="button primary px-primary-action" onClick={onRunAnalysis} disabled={analysisStatus === "running" || approvalBusy}>{analysisStatus === "running" ? <><RefreshCw className="spin" size={17} />Analysis running</> : <><ShieldCheck size={17} />Review AI findings</>}</button>}
-          </aside>
+      <div className={`review-layout${drawerOpen ? " with-drawer" : ""}`}>
+        <div className="review-focus">
+          {memoDraftDirty ? (
+            <div className="review-inline-notice warning" role="status">
+              <AlertCircle size={17} />
+              <span><strong>Unsaved memo edits</strong>Save or discard them before changing stages, running AI, deciding, or exporting.</span>
+            </div>
+          ) : null}
+          {stage === "prepare" ? (
+            <PrepareStage
+              memo={memo}
+              memoEditor={memoEditor}
+              onOpenMemoBuilder={onOpenMemoBuilder}
+              onContinue={() => onStageChange("review")}
+              onOpenDetails={() => openPanel("details")}
+            />
+          ) : null}
+          {stage === "review" ? (
+            <ReviewStageView
+              memo={memo}
+              result={result}
+              selectedFinding={selectedFinding}
+              stale={stale}
+              analysisStatus={analysisStatus}
+              analysisMessage={analysisMessage}
+              analysisMode={analysisMode}
+              backendNotice={backendNotice}
+              liveAnalysisAvailable={liveAnalysisAvailable}
+              councilApproval={councilApproval}
+              approvalBusy={approvalBusy}
+              user={user}
+              memoDraftDirty={memoDraftDirty}
+              onRunAnalysis={onRunAnalysis}
+              onCancelAnalysis={onCancelAnalysis}
+              onAnalysisModeChange={onAnalysisModeChange}
+              onRevokeCouncilApproval={onRevokeCouncilApproval}
+              onFindingSelect={onFindingSelect}
+              onResolveFinding={(findingId) => {
+                onFindingSelect(findingId);
+                onStageChange("prepare");
+              }}
+              onRequestInformation={(findingId) => {
+                onFindingSelect(findingId);
+                setCommentText(`Please provide information needed to resolve: ${result?.findings.find((finding) => finding.id === findingId)?.title ?? "this finding"}`);
+                openPanel("comments");
+              }}
+              onContinue={() => onStageChange("decide")}
+            />
+          ) : null}
+          {stage === "decide" ? (
+            <DecideStage
+              result={result}
+              decision={decision}
+              stale={stale}
+              readiness={readiness}
+              blockingFinding={blockingFinding}
+              notes={decisionNotes}
+              busy={decisionBusy}
+              error={decisionError}
+              canDecide={canDecide}
+              canOverride={canOverride}
+              exportReady={exportReady}
+              memoDraftDirty={memoDraftDirty}
+              onNotesChange={setDecisionNotes}
+              onDecision={submitDecision}
+              onExport={onExport}
+              onReviewBlocker={() => {
+                if (blockingFinding) onFindingSelect(blockingFinding.id);
+                onStageChange("review");
+              }}
+              onOpenAudit={() => openPanel("activity")}
+            />
+          ) : null}
         </div>
-      ) : null}
 
-      {toolsOpen && section !== "conversation" ? <div className="px-tools-drawer"><header><h2>Review tools</h2><button type="button" onClick={() => setToolsOpen(false)} aria-label="Close review tools"><XCircle size={19} /></button></header>{reviewTools}</div> : null}
-      <ContextMenu open={Boolean(context)} x={context?.x ?? 0} y={context?.y ?? 0} label="Artifact actions" actions={actions} onClose={() => setContext(undefined)} />
+        {drawerOpen ? (
+          <aside className="review-context" aria-label="Review context">
+            <header>
+              <h2>Context</h2>
+              <button type="button" className="px-icon-button" onClick={() => setDrawerOpen(false)} aria-label="Close context"><X size={18} /></button>
+            </header>
+            <nav aria-label="Context sections">
+              {contextTabs(stage).map((item) => (
+                <button type="button" key={item.id} className={activePanel === item.id ? "active" : ""} onClick={() => setActivePanel(item.id)}>
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="review-context-body">
+              {activePanel === "details" ? (
+                <DetailsPanel memo={memo} user={user} members={members} onUpdateMetadata={onUpdateMetadata} />
+              ) : null}
+              {activePanel === "sources" ? <SourcesPanel memo={memo} citations={citations} result={result} /> : null}
+              {activePanel === "comments" ? (
+                <CommentsPanel
+                  comments={comments}
+                  commentText={commentText}
+                  busy={commentBusy}
+                  user={user}
+                  onTextChange={setCommentText}
+                  onSubmit={submitComment}
+                  onResolve={(commentId) => void resolveReviewComment(memo.id, commentId).then((resolved) => {
+                    setComments((current) => current.map((comment) => comment.id === resolved.id ? resolved : comment));
+                  })}
+                />
+              ) : null}
+              {activePanel === "chat" ? (
+                <MemoChatPanel
+                  memo={memo}
+                  chatMessages={chatMessages}
+                  analysisLocked={analysisStatus === "running"}
+                  memoDraftDirty={memoDraftDirty}
+                  onSendChat={onSendChat}
+                  onApplyChatSuggestion={onApplyChatSuggestion}
+                  hasMore={chatHasMore}
+                  onLoadMore={onLoadMoreChat}
+                  userRole={user.role}
+                />
+              ) : null}
+              {activePanel === "activity" ? (
+                <ActivityPanel memoId={memo.id} events={auditEvents} hasMore={auditHasMore} onLoadMore={onLoadMoreAudit} />
+              ) : null}
+            </div>
+          </aside>
+        ) : null}
+      </div>
     </main>
   );
 }
 
-function DecisionBar({ onDecision }: { onDecision: ReviewWorkbenchProps["onDecision"] }) {
-  const [open, setOpen] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (action: ReviewerDecision["action"]) => {
-    if (!notes.trim() || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      await onDecision(action, notes);
-    } catch (decisionError) {
-      setError(decisionError instanceof Error ? decisionError.message : "The decision was not recorded. Review the current findings and try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!open) return <button type="button" className="button primary px-primary-action" onClick={() => setOpen(true)}><ShieldCheck size={17} />Record human decision</button>;
-  return <div className="px-decision-bar"><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Decision rationale is required for the audit trail." />{error ? <p className="px-decision-error" role="alert">{error}</p> : null}<div><button type="button" className="button" onClick={() => void submit("request-info")} disabled={!notes.trim() || busy}>Request info</button><button type="button" className="button" onClick={() => void submit("override")} disabled={!notes.trim() || busy}>Override</button><button type="button" className="button primary" onClick={() => void submit("accept")} disabled={!notes.trim() || busy}>{busy ? "Recording…" : "Accept & sign"}</button></div></div>;
+function PrepareStage({
+  memo,
+  memoEditor,
+  onOpenMemoBuilder,
+  onContinue,
+  onOpenDetails
+}: {
+  memo: MemoRecord;
+  memoEditor: ReactNode;
+  onOpenMemoBuilder: () => void;
+  onContinue: () => void;
+  onOpenDetails: () => void;
+}) {
+  return (
+    <>
+      <section className="review-primary-card">
+        <div>
+          <p className="review-stage-label">Prepare</p>
+          <h2>Confirm the review package</h2>
+          <p>Check the current memo, attachments, provenance, and essential metadata before requesting AI review.</p>
+        </div>
+        <button type="button" className="button primary" disabled={!memo.memoText.trim()} onClick={onContinue}>
+          Continue to Review <ChevronRight size={17} />
+        </button>
+      </section>
+      <section className="review-package-summary" aria-label="Review package">
+        <button type="button" onClick={onOpenDetails}>
+          <FileText size={18} />
+          <span><strong>Data and provenance</strong><small>{dataClassLabel(memo.dataClass)} · {sourcePathLabel(memo.sourcePath)}</small></span>
+          <ChevronRight size={16} />
+        </button>
+        <button type="button" onClick={onOpenMemoBuilder}>
+          <Sparkles size={18} />
+          <span><strong>Improve with Memo Builder</strong><small>Draft changes remain subject to exact-content approval.</small></span>
+          <ChevronRight size={16} />
+        </button>
+      </section>
+      <section className="review-memo-section" aria-label="Current memo">{memoEditor}</section>
+    </>
+  );
 }
 
-function AnalysisProgress({ message, onCancel }: { message: string; onCancel?: () => void }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => { const started = Date.now(); const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1_000)), 1_000); return () => window.clearInterval(timer); }, []);
-  return <div className="px-analysis-progress"><div><RefreshCw className="spin" size={19} /><span><strong>AI council is working</strong><small>{message}</small></span><time>{elapsed}s</time></div><div className="px-indeterminate"><i /></div>{onCancel ? <button type="button" className="px-text-button" onClick={onCancel}>Cancel run</button> : null}</div>;
+function ReviewStageView({
+  memo,
+  result,
+  selectedFinding,
+  stale,
+  analysisStatus,
+  analysisMessage,
+  analysisMode,
+  backendNotice,
+  liveAnalysisAvailable,
+  councilApproval,
+  approvalBusy,
+  user,
+  memoDraftDirty,
+  onRunAnalysis,
+  onCancelAnalysis,
+  onAnalysisModeChange,
+  onRevokeCouncilApproval,
+  onFindingSelect,
+  onResolveFinding,
+  onRequestInformation,
+  onContinue
+}: {
+  memo: MemoRecord;
+  result?: ReviewResult;
+  selectedFinding?: ReviewResult["findings"][number];
+  stale: boolean;
+  analysisStatus: ReviewWorkbenchProps["analysisStatus"];
+  analysisMessage: string;
+  analysisMode: AnalysisMode;
+  backendNotice: string;
+  liveAnalysisAvailable: boolean;
+  councilApproval?: CouncilApprovalView;
+  approvalBusy: boolean;
+  user: UserProfile;
+  memoDraftDirty: boolean;
+  onRunAnalysis: () => void;
+  onCancelAnalysis?: () => void;
+  onAnalysisModeChange: (mode: AnalysisMode) => void;
+  onRevokeCouncilApproval: () => Promise<void> | void;
+  onFindingSelect: (findingId: string | undefined) => void;
+  onResolveFinding: (findingId: string) => void;
+  onRequestInformation: (findingId: string) => void;
+  onContinue: () => void;
+}) {
+  const isOfficer = user.role === "export-control-officer";
+  const actionLabel = analysisStatus === "running"
+    ? "Analysis running"
+    : isOfficer
+      ? "Approve & run AI review"
+      : councilApproval?.usable
+        ? "Run approved AI review"
+        : "Request officer approval";
+  const readiness = result ? summarizeReadiness(result) : undefined;
+
+  return (
+    <>
+      <section className={`review-primary-card${stale ? " warning" : ""}`}>
+        <div>
+          <p className="review-stage-label">Review</p>
+          <h2>{stale ? "Re-review the current revision" : "Review the current revision"}</h2>
+          <p>{stale ? "The memo changed after this AI result. Approve and run the exact current content again." : "AI findings support this review; a human remains responsible for the decision."}</p>
+          <label className="review-analysis-mode">
+            Analysis depth
+            <select value={analysisMode} disabled={analysisStatus === "running"} onChange={(event) => onAnalysisModeChange(event.target.value as AnalysisMode)}>
+              {(Object.keys(ANALYSIS_MODE_CONFIG) as AnalysisMode[]).map((mode) => <option key={mode} value={mode}>{ANALYSIS_MODE_CONFIG[mode].label}</option>)}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          className="button primary"
+          disabled={analysisStatus === "running" || approvalBusy || memoDraftDirty || !liveAnalysisAvailable}
+          onClick={onRunAnalysis}
+        >
+          {analysisStatus === "running" ? <RefreshCw className="spin" size={17} /> : <Sparkles size={17} />}
+          {approvalBusy ? "Preparing approval…" : actionLabel}
+        </button>
+      </section>
+
+      <div className={`review-approval-scope${councilApproval?.usable ? " approved" : ""}`}>
+        <ShieldCheck size={18} />
+        <span>
+          <strong>{councilApproval?.usable ? "Approved for one exact dispatch" : "Exact-content approval"}</strong>
+          <small>Revision {memo.revision ?? 1} · {analysisMode} · hash {(memo.contentHash ?? "not loaded").slice(0, 10)}…</small>
+        </span>
+        {isOfficer && councilApproval?.approval?.current && councilApproval.approval.dispatchesReserved === 0 ? (
+          <button type="button" className="review-link-button" disabled={approvalBusy} onClick={() => void onRevokeCouncilApproval()}>Revoke</button>
+        ) : null}
+      </div>
+
+      {analysisStatus === "running" ? (
+        <section className="review-analysis-progress" aria-live="polite">
+          <div><RefreshCw className="spin" size={19} /><span><strong>AI review is running</strong><small>{analysisMessage}</small></span></div>
+          {onCancelAnalysis ? <button type="button" className="review-link-button" onClick={onCancelAnalysis}>Cancel</button> : null}
+        </section>
+      ) : null}
+      {analysisStatus === "failed" ? (
+        <div className="review-inline-notice error" role="alert">
+          <AlertCircle size={18} /><span><strong>AI review did not finish</strong>{analysisMessage} {backendNotice}</span>
+        </div>
+      ) : null}
+
+      {!result ? (
+        <section className="review-empty-analysis">
+          <Sparkles size={28} />
+          <h2>No AI review for this revision</h2>
+          <p>Run or request an exact-content review to see the summary and evidence findings.</p>
+        </section>
+      ) : (
+        <>
+          <section className="review-ai-summary">
+            <header>
+              <div><p className="review-stage-label">AI summary</p><h2>{result.recommended.eccn}</h2></div>
+              <span className={readiness?.blockers ? "blocked" : "ready"}>{readiness?.label}</span>
+            </header>
+            <p>{result.recommended.summary}</p>
+            <dl>
+              <div><dt>Jurisdiction</dt><dd>{labelize(result.jurisdiction.outcome)}</dd></div>
+              <div><dt>Provider</dt><dd>{result.provider.label}</dd></div>
+              <div><dt>Reviewed</dt><dd>{new Date(result.generatedAt).toLocaleString()}</dd></div>
+            </dl>
+          </section>
+
+          <section className="review-findings">
+            <header><div><p className="review-stage-label">Findings</p><h2>{result.findings.length ? `${result.findings.length} to inspect` : "No evidence findings"}</h2></div></header>
+            {result.findings.length ? (
+              <div className="review-findings-layout">
+                <div className="review-finding-list">
+                  {result.findings.map((finding) => (
+                    <button type="button" className={selectedFinding?.id === finding.id ? "active" : ""} key={finding.id} onClick={() => onFindingSelect(finding.id)}>
+                      <span className={`review-finding-state ${finding.status}`}>{finding.status === "strong" ? <Check size={14} /> : <AlertCircle size={14} />}</span>
+                      <span><strong>{finding.title}</strong><small>{labelize(finding.status)} · {labelize(finding.severity)}</small></span>
+                    </button>
+                  ))}
+                </div>
+                {selectedFinding ? (
+                  <article className="review-finding-detail" id={`finding-${selectedFinding.id}`}>
+                    <header><h3>{selectedFinding.title}</h3><span>{labelize(selectedFinding.status)}</span></header>
+                    <strong>Claim</strong><p>{selectedFinding.claim}</p>
+                    <strong>Rationale</strong><p>{selectedFinding.rationale}</p>
+                    {selectedFinding.excerpt ? <blockquote>{selectedFinding.excerpt}</blockquote> : null}
+                    <div>
+                      <button type="button" className="button" onClick={() => onRequestInformation(selectedFinding.id)}>Request information</button>
+                      <button type="button" className="button primary" onClick={() => onResolveFinding(selectedFinding.id)}>Resolve in memo</button>
+                    </div>
+                  </article>
+                ) : null}
+              </div>
+            ) : <div className="review-success"><CheckCircle2 size={20} />No unresolved evidence findings.</div>}
+          </section>
+          <div className="review-stage-next">
+            <span><strong>Finished reviewing?</strong><small>Decision and export stay in the final stage.</small></span>
+            <button type="button" className="button primary" onClick={onContinue}>Continue to Decide & Export <ChevronRight size={17} /></button>
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
-function progressIndex(memo: MemoRecord, result?: ReviewResult, decision?: ReviewerDecision) {
-  if (decision) return 5;
-  if (result?.findings.length) return 3;
-  if (result) return 4;
-  if (memo.memoText?.trim()) return 2;
-  if (memo.attachments?.length) return 1;
-  return 0;
+function DecideStage({
+  result,
+  decision,
+  stale,
+  readiness,
+  blockingFinding,
+  notes,
+  busy,
+  error,
+  canDecide,
+  canOverride,
+  exportReady,
+  memoDraftDirty,
+  onNotesChange,
+  onDecision,
+  onExport,
+  onReviewBlocker,
+  onOpenAudit
+}: {
+  result?: ReviewResult;
+  decision?: ReviewerDecision;
+  stale: boolean;
+  readiness?: ReturnType<typeof summarizeReadiness>;
+  blockingFinding?: ReviewResult["findings"][number];
+  notes: string;
+  busy: boolean;
+  error: string;
+  canDecide: boolean;
+  canOverride: boolean;
+  exportReady: boolean;
+  memoDraftDirty: boolean;
+  onNotesChange: (value: string) => void;
+  onDecision: (action: ReviewerDecision["action"]) => Promise<void>;
+  onExport: () => void;
+  onReviewBlocker: () => void;
+  onOpenAudit: () => void;
+}) {
+  const blocker = !result
+    ? "Run AI review before recording a decision."
+    : stale
+      ? "The AI result belongs to an older memo revision."
+      : readiness?.blockers
+        ? `${readiness.blockers} blocking finding${readiness.blockers === 1 ? "" : "s"} must be resolved or explicitly overridden.`
+        : undefined;
+
+  return (
+    <>
+      <section className="review-primary-card decide">
+        <div>
+          <p className="review-stage-label">Decide & Export</p>
+          <h2>Record the human decision</h2>
+          <p>Confirm remaining blockers, enter the rationale, and sign the authoritative current revision.</p>
+        </div>
+        {exportReady ? <button type="button" className="button primary" onClick={onExport}><Download size={17} />Export signed result</button> : null}
+      </section>
+
+      {blocker ? (
+        <div className="review-export-blocker" role="status">
+          <AlertCircle size={19} />
+          <span><strong>Export is blocked</strong>{blocker}</span>
+          <button type="button" className="review-link-button" onClick={onReviewBlocker}>
+            {blockingFinding ? `Open “${blockingFinding.title}”` : "Return to Review"}
+          </button>
+        </div>
+      ) : null}
+
+      <section className="review-decision-card">
+        <header>
+          <div><h2>Decision rationale</h2><p>This note becomes part of the audit trail.</p></div>
+          {decision ? <span className="review-decision-status"><CheckCircle2 size={16} />{labelize(decision.action)} recorded</span> : null}
+        </header>
+        {!canDecide ? <p className="review-role-note">A reviewer, counsel, or export-control officer must record the human decision.</p> : null}
+        <label>
+          Rationale
+          <textarea value={notes} onChange={(event) => onNotesChange(event.target.value)} rows={7} placeholder="Explain the evidence, judgment, and any conditions for this decision." />
+        </label>
+        {error ? <p className="review-decision-error" role="alert">{error}</p> : null}
+        <div className="review-decision-actions">
+          <button type="button" className="button" disabled={!notes.trim() || busy || !canDecide || memoDraftDirty} onClick={() => void onDecision("request-info")}>Request more information</button>
+          {canOverride ? <button type="button" className="button" disabled={!notes.trim() || busy || memoDraftDirty || !result || stale} onClick={() => void onDecision("override")}>Override with rationale</button> : null}
+          <button type="button" className="button primary" disabled={!notes.trim() || busy || !canDecide || memoDraftDirty || Boolean(blocker)} onClick={() => void onDecision("accept")}>
+            <ShieldCheck size={17} />{busy ? "Recording…" : "Accept & sign"}
+          </button>
+        </div>
+      </section>
+
+      <section className="review-export-card">
+        <div>
+          {exportReady ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}
+          <span>
+            <strong>{exportReady ? "Signed result ready to export" : "Export waits for a current-revision decision"}</strong>
+            <small>{exportReady ? "The report includes the memo, AI provenance, human rationale, and audit events." : "A transient notification is not used for this gate; the reason remains visible here."}</small>
+          </span>
+        </div>
+        {exportReady ? <button type="button" className="button primary" onClick={onExport}><Download size={17} />Export signed result</button> : null}
+        <button type="button" className="review-link-button" onClick={onOpenAudit}><History size={15} />View audit history</button>
+      </section>
+    </>
+  );
 }
 
-function combinedActivity(audit: AuditEvent[], comments: CaseComment[]) {
-  return [...audit.map((event) => ({ id: event.id, at: event.at, actor: event.actor, title: event.action, detail: event.detail, severity: event.severity, icon: <History size={16} /> })), ...comments.map((comment) => ({ id: comment.id, at: comment.createdAt, actor: comment.authorName, title: comment.resolvedAt ? "Comment resolved" : "Comment added", detail: comment.body, severity: "info" as const, icon: <MessageSquare size={16} /> }))].sort((left, right) => Date.parse(right.at) - Date.parse(left.at));
+function DetailsPanel({
+  memo,
+  user,
+  members,
+  onUpdateMetadata
+}: {
+  memo: MemoRecord;
+  user: UserProfile;
+  members: ReviewWorkbenchProps["members"];
+  onUpdateMetadata: ReviewWorkbenchProps["onUpdateMetadata"];
+}) {
+  const canManage = user.role !== "submitter";
+  return (
+    <div className="review-details-panel">
+      <dl>
+        <div><dt>Data class</dt><dd>{dataClassLabel(memo.dataClass)}</dd></div>
+        <div><dt>Classification path</dt><dd>{sourcePathLabel(memo.sourcePath)}</dd></div>
+        <div><dt>Manufacturer</dt><dd>{memo.manufacturer || "Not provided"}</dd></div>
+        <div><dt>Intended use</dt><dd>{memo.intendedUse || "Not provided"}</dd></div>
+        <div><dt>Content hash</dt><dd><code>{memo.contentHash?.slice(0, 16) ?? "Not loaded"}…</code></dd></div>
+      </dl>
+      <label>Assignee
+        <select value={memo.assignedTo ?? ""} disabled={!canManage} onChange={(event) => void onUpdateMetadata({ assignedTo: event.target.value || null })}>
+          <option value="">Unassigned</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+        </select>
+      </label>
+      <label>Due date
+        <input type="date" value={memo.dueAt?.slice(0, 10) ?? ""} disabled={!canManage} onChange={(event) => void onUpdateMetadata({ dueAt: event.target.value ? `${event.target.value}T17:00:00.000Z` : null })} />
+      </label>
+      <label>Priority
+        <select value={memo.priority ?? "normal"} disabled={!canManage} onChange={(event) => void onUpdateMetadata({ priority: event.target.value as MemoRecord["priority"] })}>
+          <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
+        </select>
+      </label>
+      <section>
+        <h3>Attachments</h3>
+        {memo.attachments.length ? memo.attachments.map((attachment) => <span className="review-attachment" key={attachment}><FileText size={15} />{attachment}</span>) : <p>Pasted memo · no file attachments</p>}
+      </section>
+    </div>
+  );
 }
 
-function uniqueCitations(result: ReviewResult) {
-  return [...new Set(result.findings.flatMap((finding) => finding.sourceChunkIds))];
+function SourcesPanel({
+  memo,
+  citations,
+  result
+}: {
+  memo: MemoRecord;
+  citations: Array<NonNullable<ReturnType<typeof getSourceChunk>>>;
+  result?: ReviewResult;
+}) {
+  return (
+    <div className="review-sources-panel">
+      <div className="review-provenance-card">
+        <FileText size={18} />
+        <span><strong>{memo.attachments[0] ?? "Pasted memo"}</strong><small>{dataClassLabel(memo.dataClass)} · revision {memo.revision ?? 1}</small></span>
+      </div>
+      <h3>Cited sources</h3>
+      {citations.length ? citations.map((citation) => (
+        <a href={citation!.url} target="_blank" rel="noreferrer" key={citation!.id}>
+          <span><strong>{citation!.title}</strong><small>{citation!.locator}</small></span><ChevronRight size={15} />
+        </a>
+      )) : <p>{result ? "No source chunks were cited." : "Sources appear after AI review."}</p>}
+      {result ? (
+        <details>
+          <summary>AI provenance</summary>
+          <dl>
+            <div><dt>Provider</dt><dd>{result.provider.label}</dd></div>
+            <div><dt>Model policy</dt><dd>{result.modelPolicy}</dd></div>
+            <div><dt>Corpus</dt><dd>{result.corpusId}</dd></div>
+            <div><dt>Result hash</dt><dd>{result.resultHash?.slice(0, 12) ?? "Unavailable"}…</dd></div>
+          </dl>
+        </details>
+      ) : null}
+    </div>
+  );
 }
 
-function downloadText(memo: MemoRecord) { const url = URL.createObjectURL(new Blob([memo.memoText], { type: "text/markdown" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${memo.documentCode}.md`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1_000); }
-function dataClassLabel(value: MemoRecord["dataClass"]) { if (value === "public") return "Public/sample"; if (value === "export-controlled") return "Export-controlled"; if (value === "itar-risk") return "ITAR risk"; if (value === "cui") return "CUI"; if (value === "proprietary") return "Proprietary"; return "Classification required"; }
-function labelize(value: string) { return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-function initials(name: string) { return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "RU"; }
+function CommentsPanel({
+  comments,
+  commentText,
+  busy,
+  user,
+  onTextChange,
+  onSubmit,
+  onResolve
+}: {
+  comments: CaseComment[];
+  commentText: string;
+  busy: boolean;
+  user: UserProfile;
+  onTextChange: (value: string) => void;
+  onSubmit: (kind: "comment" | "request-information") => Promise<void>;
+  onResolve: (commentId: string) => void;
+}) {
+  return (
+    <div className="review-comments-panel">
+      <label>
+        Comment or request
+        <textarea value={commentText} onChange={(event) => onTextChange(event.target.value)} rows={5} placeholder="Add context or @mention a teammate…" />
+      </label>
+      <div>
+        <button type="button" className="button" disabled={!commentText.trim() || busy} onClick={() => void onSubmit("request-information")}>Request information</button>
+        <button type="button" className="button primary" disabled={!commentText.trim() || busy} onClick={() => void onSubmit("comment")}><Send size={15} />Comment</button>
+      </div>
+      <section>
+        {comments.map((comment) => (
+          <article className={comment.resolvedAt ? "resolved" : ""} key={comment.id}>
+            <span>{initials(comment.authorName)}</span>
+            <div><strong>{comment.authorName}</strong><p>{comment.body}</p><small>{new Date(comment.createdAt).toLocaleString()}</small>
+              {!comment.resolvedAt && (comment.authorId === user.id || user.role === "export-control-officer") ? <button type="button" onClick={() => onResolve(comment.id)}>Resolve</button> : null}
+            </div>
+          </article>
+        ))}
+        {!comments.length ? <p>No comments yet.</p> : null}
+      </section>
+    </div>
+  );
+}
+
+function ActivityPanel({
+  memoId,
+  events,
+  hasMore,
+  onLoadMore
+}: {
+  memoId: string;
+  events: AuditEvent[];
+  hasMore: boolean;
+  onLoadMore: (memoId: string) => Promise<void>;
+}) {
+  return (
+    <div className="review-activity-panel">
+      {events.map((event) => (
+        <article key={event.id}>
+          <span className={`review-activity-icon ${event.severity}`}><History size={15} /></span>
+          <div><strong>{event.action}</strong><p>{event.detail}</p><small>{new Date(event.at).toLocaleString()} · {event.actor}</small></div>
+        </article>
+      ))}
+      {!events.length ? <p>No audit events loaded.</p> : null}
+      {hasMore ? <button type="button" className="button" onClick={() => void onLoadMore(memoId)}>Load earlier activity</button> : null}
+    </div>
+  );
+}
+
+function contextTabs(stage: ReviewStage): Array<{ id: ReviewPanel; label: string }> {
+  if (stage === "prepare") return [
+    { id: "details", label: "Details" },
+    { id: "activity", label: "History" }
+  ];
+  return [
+    { id: "sources", label: "Sources" },
+    { id: "comments", label: "Comments" },
+    { id: "chat", label: "AI chat" },
+    { id: "activity", label: "Activity" }
+  ];
+}
+
+function defaultPanel(stage: ReviewStage): ReviewPanel {
+  return stage === "prepare" ? "details" : "sources";
+}
+
+function dataClassLabel(value: MemoRecord["dataClass"]) {
+  if (value === "public") return "Public/sample";
+  if (value === "export-controlled") return "Export-controlled";
+  if (value === "itar-risk") return "ITAR risk";
+  if (value === "cui") return "CUI";
+  if (value === "proprietary") return "Proprietary";
+  return "Classification required";
+}
+
+function sourcePathLabel(value: MemoRecord["sourcePath"]) {
+  if (value === "self-classification") return "Self-classification";
+  if (value === "manufacturer") return "Manufacturer classification";
+  if (value === "ccats") return "BIS CCATS";
+  if (value === "cj") return "DDTC CJ";
+  return "Path not specified";
+}
+
+function labelize(value: string) {
+  return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "RU";
+}

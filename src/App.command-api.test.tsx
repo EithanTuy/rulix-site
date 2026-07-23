@@ -111,7 +111,7 @@ describe("rendered paged command workspace", () => {
 
     expect(await screen.findByText(secondary.title)).toBeInTheDocument();
     expect(api.listReviews).toHaveBeenCalledWith({ limit: 25, state: "active" }, expect.any(AbortSignal));
-    expect(api.listReviews).toHaveBeenCalledWith({ limit: 30, cursor: "page-two", state: "active", sort: "updated-desc" });
+    expect(api.listReviews).toHaveBeenCalledWith({ limit: 25, cursor: "page-two", state: "active" });
     expect(api.getReviewDetail).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: /load more reviews/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByText(primary.title).closest("button")!);
@@ -173,7 +173,8 @@ describe("rendered paged command workspace", () => {
     await waitFor(() => {
       expect(api.updateWorkspacePreferences).toHaveBeenCalledWith(7, {
         selectedMemoId: primary.id,
-        activeMemoBuilderSessionId: null
+        activeMemoBuilderSessionId: null,
+        lastAppRoute: `#/reviews/${primary.id}/prepare`
       });
     });
     expect(api.updateWorkspacePreferences).toHaveBeenCalledTimes(1);

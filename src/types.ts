@@ -210,8 +210,7 @@ export type ReviewLifecycleStage =
 export type CasePriority = "low" | "normal" | "high" | "urgent";
 
 export type AppView =
-  | "home"
-  | "reviews"
+  | "work"
   | "controls"
   | "evidence"
   | "corpus"
