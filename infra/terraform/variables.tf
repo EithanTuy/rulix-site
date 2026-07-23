@@ -200,13 +200,13 @@ variable "approved_region" {
 }
 
 variable "controlled_data_mode" {
-  description = "Explicit controlled-data AI opt-in. Keep disabled unless the deployment provider and region have been approved for controlled data."
+  description = "Explicit controlled-data AI policy. Keep blocked unless the deployment provider and region have been approved for controlled data."
   type        = string
-  default     = "disabled"
+  default     = "blocked"
 
   validation {
-    condition     = contains(["disabled", "approved"], var.controlled_data_mode)
-    error_message = "controlled_data_mode must be disabled or approved."
+    condition     = contains(["blocked", "approved"], var.controlled_data_mode)
+    error_message = "controlled_data_mode must be blocked or approved."
   }
 }
 
