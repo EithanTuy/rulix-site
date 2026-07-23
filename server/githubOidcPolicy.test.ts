@@ -17,44 +17,26 @@ const ciWorkflow = readFileSync(
   "utf8"
 );
 
-describe("production deployment identity", () => {
-  it("requires the production environment token to originate from main", () => {
-    expect(terraform).toMatch(iamStringEquals("sub", "repo:EithanTuy/rulix-site:environment:production"));
-    expect(terraform).not.toContain('"repo:EithanTuy/rulix-site:ref:refs/heads/main"');
+describe("repository deployment boundary", () => {
+  it("assigns app and dashboard deployment identity to Daculguy/Rulix", () => {
+    expect(terraform).toMatch(iamStringEquals("sub", "repo:Daculguy/Rulix:environment:production"));
+    expect(terraform).not.toContain('"repo:Daculguy/Rulix:ref:refs/heads/main"');
     expect(terraform).toMatch(iamStringEquals("ref", "refs/heads/main"));
     expect(terraform).toMatch(iamStringEquals("environment", "production"));
-    expect(terraform).toMatch(iamStringEquals("repository", "EithanTuy/rulix-site"));
+    expect(terraform).toMatch(iamStringEquals("repository", "Daculguy/Rulix"));
+    expect(terraform).not.toContain("EithanTuy/rulix-site");
   });
 
-  it("isolates OIDC to a minimal, main-only deployment job", () => {
-    const jobsIndex = workflow.indexOf("jobs:");
-    const deployIndex = workflow.indexOf("\n  deploy:");
-    const buildJob = workflow.slice(jobsIndex, deployIndex);
-    const deployJob = workflow.slice(deployIndex);
-
-    expect(workflow.slice(0, jobsIndex)).not.toContain("id-token: write");
-    expect(buildJob).not.toContain("id-token: write");
-    expect(buildJob).not.toContain("configure-aws-credentials");
-    expect(buildJob).toContain("npm test -- --run");
-    expect(buildJob).toContain("npm run build:lambda");
-    expect(buildJob).toContain("terraform validate");
-    expect(buildJob).toContain("rulix-production-${{ github.sha }}");
-
-    expect(deployJob).toContain("needs: build");
-    expect(deployJob).toContain("if: github.ref == 'refs/heads/main'");
-    expect(deployJob).toContain("environment: production");
-    expect(deployJob).toContain("id-token: write");
-    expect(deployJob).not.toContain("contents: read");
-    expect(deployJob).toContain("actions/download-artifact@");
-    expect(deployJob).toContain("sha256sum -c rulix-production.sha256");
-    expect(deployJob).toContain("aws-actions/configure-aws-credentials@");
-    expect(deployJob).not.toContain("actions/checkout@");
-    expect(deployJob).not.toContain("actions/setup-node@");
-    expect(deployJob).not.toMatch(/\bnpm\b/);
-    expect(deployJob).not.toMatch(/\bterraform\b/);
-    expect(deployJob.indexOf("sha256sum -c")).toBeLessThan(
-      deployJob.indexOf("configure-aws-credentials@")
-    );
+  it("keeps the marketing workflow unable to deploy app or dashboard infrastructure", () => {
+    expect(workflow).toContain("Verify marketing production");
+    expect(workflow).toContain("npm test -- --run");
+    expect(workflow).toContain("npm run build");
+    expect(workflow).not.toContain("id-token: write");
+    expect(workflow).not.toContain("configure-aws-credentials");
+    expect(workflow).not.toContain("npm run build:lambda");
+    expect(workflow).not.toContain("terraform validate");
+    expect(workflow).not.toContain("rulix-prod-app");
+    expect(workflow).not.toContain("dashboard.rulix.cloud");
   });
 
   it("pins every third-party workflow action to an immutable commit", () => {
