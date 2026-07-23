@@ -26,7 +26,7 @@ import {
   type WorkspaceMigrationBackend,
   type WorkspaceMigrationPlan
 } from "./workspaceV2Migration";
-import { hashReviewResult } from "./domain/hashes";
+import { hashMemoContent, hashReviewResult } from "./domain/hashes";
 
 class MemoryMigrationBackend implements WorkspaceMigrationBackend {
   readonly destinationTable = "workspace-v2";
@@ -201,6 +201,26 @@ describe("workspace v2 migration", () => {
     });
     expect(result.status).toBe("planned");
     expect(backend.calls).toEqual([]);
+  });
+
+  it("materializes authoritative review bindings for legacy memos", async () => {
+    const state = sampleState();
+    delete state.memos[0]!.version;
+    delete state.memos[0]!.revision;
+    delete state.memos[0]!.contentHash;
+
+    const plan = await planWorkspaceMigration("tenant", "user", state);
+    const reviewEntity = plan.entities.find(({ entityType }) => entityType === "R");
+
+    expect(reviewEntity?.entityVersion).toBe(1);
+    expect(reviewEntity?.payload).toMatchObject({
+      currentRevision: 1,
+      review: {
+        version: 1,
+        revision: 1,
+        contentHash: hashMemoContent(state.memos[0]!)
+      }
+    });
   });
 
   it("binds migrated analysis entities to their semantic result hash", async () => {

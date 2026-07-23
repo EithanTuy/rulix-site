@@ -50,7 +50,7 @@ import {
   aiApprovalChatHistoryEntry,
   hashAiApprovalChatHistoryEntries
 } from "./domain/aiApproval";
-import { hashReviewResult } from "./domain/hashes";
+import { hashMemoContent, hashReviewResult } from "./domain/hashes";
 
 const MIGRATION_BATCH_SIZE = 25;
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
@@ -696,18 +696,25 @@ function buildMigrationSpecs(
     const memo = validateMemo(rawMemo);
     const createdAt = validTimestamp(memo.createdAt ?? memo.updatedAt, "memo createdAt");
     const updatedAt = validTimestamp(memo.updatedAt, "memo updatedAt");
-    const { memoText, ...review } = memo;
-    const revision = positiveVersion(memo.version ?? memo.revision ?? 1);
+    const { memoText, ...reviewMetadata } = memo;
+    const version = positiveVersion(memo.version ?? memo.revision ?? 1);
+    const currentRevision = positiveVersion(memo.revision ?? version);
+    const review = {
+      ...reviewMetadata,
+      version,
+      revision: currentRevision,
+      contentHash: memo.contentHash ?? hashMemoContent(memo)
+    };
     const archived = Boolean(memo.archivedAt || memo.status === "archived");
     specs.push(spec({
       sk: workspaceSk.review(memo.id),
       entityType: "R",
-      entityVersion: revision,
+      entityVersion: version,
       createdAt,
       updatedAt,
       payload: {
         review,
-        currentRevision: positiveVersion(memo.revision ?? revision),
+        currentRevision,
         gsi1pk: `${pk}#REVIEWS`,
         gsi1sk: `R#${updatedAt}#${memo.id}`,
         gsi2pk: `${pk}#REVIEWS#${archived ? "ARCHIVED" : "ACTIVE"}`,
