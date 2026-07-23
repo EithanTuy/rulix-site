@@ -1,18 +1,21 @@
 import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowUp,
   CheckCircle2,
+  ChevronDown,
   Clipboard,
   Download,
   FileText,
   ListChecks,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Paperclip,
   Plus,
   RotateCcw,
-  Send,
+  ShieldCheck,
   Sparkles,
   Trash2,
-  Wand2,
   X
 } from "lucide-react";
 import {
@@ -53,8 +56,6 @@ interface DraftSection {
   body: string;
 }
 
-const INITIAL_GREETING =
-  "I'll help you draft a review-ready ECCN classification memo. Attach a datasheet, quote, screenshot, or manual, then tell me what you want drafted.";
 const ATTACHMENT_CONTEXT_MARKER = "\n\n---\nAttached source documents for Sonnet:\n";
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 const ITEM_STARTER =
@@ -82,6 +83,9 @@ export function MemoDraftChatPanel({
   const [attachments, setAttachments] = useState<BuilderAttachment[]>([]);
   const [copyNotice, setCopyNotice] = useState("");
   const [writeNotice, setWriteNotice] = useState("");
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 760
+  );
   const threadRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +101,7 @@ export function MemoDraftChatPanel({
   const draft = activeSession?.draft;
   const draftSections = useMemo(() => (draft ? parseDraftSections(draft.memoText) : []), [draft]);
   const activeContextPrompt = activeSession?.starterPrompt;
+  const conversationStarted = messages.length > 0 || busy || Boolean(draft);
 
   useEffect(() => {
     if (!activeSession && sessions.length === 0) {
@@ -437,18 +442,161 @@ export function MemoDraftChatPanel({
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  return (
-    <div className="memo-builder-shell">
-      <aside className="memo-builder-sessions" aria-label="Saved Memo Builder chats">
-        <div className="memo-builder-sessions-head">
-          <div>
-            <strong>Saved chats</strong>
-            <span>{sessions.length} memo thread{sessions.length === 1 ? "" : "s"}</span>
+  const composer = (
+    <div className="memo-builder-compose">
+      {error && <p className="memo-chat-error">{error}</p>}
+      <div className="memo-builder-composer-box">
+        {attachments.length > 0 && (
+          <div className="memo-builder-attachments" aria-label="Memo Builder attachments">
+            {attachments.map((attachment) => (
+              <div className={`memo-builder-attachment ${attachment.status}`} key={attachment.id}>
+                <FileText size={14} />
+                <span>
+                  <strong>{attachment.name}</strong>
+                  <small>{attachment.detail}</small>
+                </span>
+                <button type="button" aria-label={`Remove ${attachment.name}`} onClick={() => removeAttachment(attachment.id)}>
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
           </div>
-          <button type="button" className="button primary compact" onClick={startNewChat}>
-            <Plus size={14} />
-            New
+        )}
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={draft ? "Ask Rulix to refine this draft..." : "Describe the item, paste the key facts, or attach source documents..."}
+          aria-label="Message Rulix AI"
+          rows={conversationStarted ? 2 : 3}
+          disabled={busy}
+        />
+        <div className="memo-builder-composer-actions">
+          <button
+            type="button"
+            className="memo-builder-attach"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            aria-label="Attach source documents"
+            title="Attach source documents"
+          >
+            <Paperclip size={18} />
           </button>
+          <div className="memo-builder-model" aria-label="Active assistant">
+            <Sparkles size={14} />
+            <span>Rulix AI</span>
+          </div>
+          <label className="memo-builder-classification memo-builder-classification-inline">
+            <span>Data</span>
+            <select
+              aria-label="Memo Builder classification"
+              value={activeSession?.dataClass ?? "proprietary"}
+              disabled={busy}
+              onChange={(event) => updateActiveSession({
+                dataClass: event.target.value as MemoBuilderSession["dataClass"]
+              })}
+            >
+              <option value="public">Public</option>
+              <option value="proprietary">Proprietary</option>
+              <option value="export-controlled">Export-controlled</option>
+              <option value="itar-risk">ITAR risk</option>
+              <option value="cui">CUI</option>
+            </select>
+          </label>
+          <span className="memo-builder-source-boundary">Approved data only</span>
+          <button
+            type="button"
+            className="memo-builder-send"
+            onClick={() => void send()}
+            disabled={busy || (!input.trim() && !attachments.some((attachment) => attachment.content.trim()))}
+            aria-label={userRole === "export-control-officer" ? "Approve and send" : "Request officer approval"}
+            title={userRole === "export-control-officer"
+              ? "Approve this exact saved conversation and send one provider request"
+              : "Submit this exact saved conversation for officer approval"}
+          >
+            <ArrowUp size={18} strokeWidth={2.4} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp"
+            onChange={handleAttachmentChange}
+            hidden
+          />
+        </div>
+      </div>
+      <div className="memo-builder-compose-foot">
+        <span>
+          {userRole === "export-control-officer"
+            ? "Ctrl+Enter approves this exact saved message and sends it"
+            : "Ctrl+Enter requests officer approval for this exact saved message"}
+        </span>
+        <span><ShieldCheck size={13} /> AI-assisted draft · human review required</span>
+      </div>
+    </div>
+  );
+
+  const contextBanner = activeContextPrompt ? (
+    <div className="memo-builder-context-banner">
+      <ListChecks size={16} />
+      <span>Review context is ready. Use it to improve the current memo without losing its source trail.</span>
+      <button type="button" className="button small" onClick={() => useQuickStart("review")} disabled={busy}>
+        Use context
+      </button>
+    </div>
+  ) : null;
+
+  const quickStarts = (
+    <section className="memo-builder-quickstarts" aria-label="Memo Builder quick starts">
+      <button type="button" onClick={() => useQuickStart("item")} disabled={busy}>
+        <Sparkles size={16} />
+        <span><strong>Draft from an item</strong><small>Start with a description</small></span>
+      </button>
+      <button type="button" onClick={() => useQuickStart("attachments")} disabled={busy}>
+        <Paperclip size={16} />
+        <span><strong>Use source documents</strong><small>Add a datasheet or manual</small></span>
+      </button>
+      <button type="button" onClick={() => useQuickStart("sample")} disabled={busy}>
+        <FileText size={16} />
+        <span><strong>Open an example</strong><small>Explore a complete memo</small></span>
+      </button>
+      {activeContextPrompt && (
+        <button type="button" onClick={() => useQuickStart("review")} disabled={busy}>
+          <RotateCcw size={16} />
+          <span><strong>Improve this review</strong><small>Use the loaded findings</small></span>
+        </button>
+      )}
+    </section>
+  );
+
+  return (
+    <div className={`memo-builder-shell ${sessionsCollapsed ? "sessions-collapsed" : ""}`}>
+      <aside
+        className="memo-builder-sessions"
+        aria-label="Saved Memo Builder chats"
+        aria-hidden={sessionsCollapsed}
+        inert={sessionsCollapsed}
+      >
+        <div className="memo-builder-sessions-head">
+          <button type="button" className="memo-builder-new-chat" onClick={startNewChat}>
+            <Plus size={16} />
+            New memo
+          </button>
+          <button
+            type="button"
+            className="memo-builder-sidebar-toggle"
+            onClick={() => setSessionsCollapsed(true)}
+            aria-label="Collapse memo chat history"
+            title="Collapse memo chat history"
+          >
+            <PanelLeftClose size={17} />
+          </button>
+        </div>
+        <div className="memo-builder-session-label">
+          <span>Recent</span>
+          <small>{sessions.length}</small>
         </div>
         <div className="memo-builder-session-list">
           {sortedSessions.map((session) => (
@@ -456,12 +604,15 @@ export function MemoDraftChatPanel({
               type="button"
               key={session.id}
               className={`memo-builder-session ${session.id === activeSession?.id ? "active" : ""}`}
-              onClick={() => onActiveSessionChange(session.id)}
+              onClick={() => {
+                onActiveSessionChange(session.id);
+                if (window.innerWidth <= 760) setSessionsCollapsed(true);
+              }}
             >
               <MessageSquare size={14} />
               <span>
                 <strong>{session.title}</strong>
-                <small>{session.draft ? "Draft ready" : session.starterPrompt ? "Review context ready" : session.messages.length ? "In progress" : "Empty chat"}</small>
+                <small>{session.draft ? "Draft ready" : session.starterPrompt ? "Review context ready" : session.messages.length ? "In progress" : "New conversation"}</small>
               </span>
             </button>
           ))}
@@ -478,225 +629,136 @@ export function MemoDraftChatPanel({
         </div>
       </aside>
 
-      <div className="memo-builder-panel">
+      <main className={`memo-builder-panel ${conversationStarted ? "has-conversation" : "is-empty"}`}>
         <div className="memo-builder-header">
-          <Wand2 size={20} />
+          <button
+            type="button"
+            className="memo-builder-sidebar-toggle"
+            onClick={() => setSessionsCollapsed((value) => !value)}
+            aria-label={sessionsCollapsed ? "Open memo chat history" : "Collapse memo chat history"}
+            title={sessionsCollapsed ? "Open memo chat history" : "Collapse memo chat history"}
+          >
+            {sessionsCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
           <div>
-            <strong>Memo Builder</strong>
-            <span>Draft, copy, and send review-ready ECCN memos into Reviews</span>
+            <strong>{activeSession?.title || "Memo Builder"}</strong>
+            <span>{draft ? "Draft ready for reviewer action" : activeContextPrompt ? "Existing review context loaded" : "AI memo workspace"}</span>
           </div>
-          <label className="memo-builder-classification">
-            Classification
-            <select
-              aria-label="Memo Builder classification"
-              value={activeSession?.dataClass ?? "proprietary"}
-              disabled={busy}
-              onChange={(event) => updateActiveSession({
-                dataClass: event.target.value as MemoBuilderSession["dataClass"]
-              })}
-            >
-              <option value="public">Public</option>
-              <option value="proprietary">Proprietary</option>
-              <option value="export-controlled">Export-controlled</option>
-              <option value="itar-risk">ITAR risk</option>
-              <option value="cui">CUI</option>
-            </select>
-          </label>
+          <button type="button" className="memo-builder-header-new" onClick={startNewChat}>
+            <Plus size={15} />
+            New chat
+          </button>
         </div>
 
-        <div className="memo-builder-thread" ref={threadRef}>
-          <section className="memo-builder-quickstarts" aria-label="Memo Builder quick starts">
-            <button type="button" onClick={() => useQuickStart("item")} disabled={busy}>
-              <Sparkles size={16} />
-              <span>Draft from item description</span>
-            </button>
-            <button type="button" onClick={() => useQuickStart("attachments")} disabled={busy}>
-              <Paperclip size={16} />
-              <span>Draft from attachments</span>
-            </button>
-            <button type="button" onClick={() => useQuickStart("sample")} disabled={busy}>
-              <FileText size={16} />
-              <span>Create sample memo</span>
-            </button>
-            <button type="button" onClick={() => useQuickStart("review")} disabled={busy || !activeContextPrompt}>
-              <RotateCcw size={16} />
-              <span>Improve existing review</span>
-            </button>
+        {!conversationStarted ? (
+          <section className="memo-builder-empty-state">
+            <div className="memo-builder-empty-copy">
+              <span className="memo-builder-empty-mark" aria-hidden="true"><Sparkles size={24} /></span>
+              <h1>What are we classifying today?</h1>
+              <p>Describe the item in plain language or attach the source material. Rulix will ask only for facts that truly block a useful memo draft.</p>
+            </div>
+            {contextBanner}
+            {composer}
+            {quickStarts}
           </section>
+        ) : (
+          <>
+            <div className="memo-builder-thread" ref={threadRef}>
+              {contextBanner}
 
-          {activeContextPrompt && (
-            <div className="memo-builder-context-banner">
-              <ListChecks size={16} />
-              <span>Review context is loaded. Use it to draft an improved memo or ask Sonnet for a focused rewrite.</span>
-              <button type="button" className="button small" onClick={() => useQuickStart("review")} disabled={busy}>
-                Use context
-              </button>
-            </div>
-          )}
-
-          <div className="mb-msg mb-msg--assistant">
-            <div className="mb-bubble">{INITIAL_GREETING}</div>
-          </div>
-
-          {messages.map((msg, i) => (
-            <div key={`${activeSession?.id ?? "session"}-${i}`} className={`mb-msg mb-msg--${msg.role}`}>
-              <div
-                className="mb-bubble"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(displayMessageContent(msg.content)) }}
-              />
-            </div>
-          ))}
-
-          {busy && (
-            <div className="mb-msg mb-msg--assistant">
-              <div className="mb-bubble mb-typing">
-                <span /><span /><span />
-              </div>
-            </div>
-          )}
-
-          {draft && !busy && (
-            <div className="mb-draft-card" ref={draftCardRef}>
-              <div className="mb-draft-actionbar">
-                <div>
-                  <FileText size={16} />
-                  <span>
-                    <strong>{draft.title}</strong>
-                    <small>{draft.manufacturer || draft.itemFamily}</small>
-                  </span>
-                </div>
-                <div className="mb-draft-action-buttons">
-                  <button type="button" className="button small" onClick={() => void copyDraft()}>
-                    <Clipboard size={14} />
-                    Copy
-                  </button>
-                  <button type="button" className="button small" onClick={downloadDraft}>
-                    <Download size={14} />
-                    Download .md
-                  </button>
-                  <button
-                    type="button"
-                    className="button primary small"
-                    onClick={() => void handleWrite(false)}
-                    disabled={writeBusy}
-                  >
-                    <Plus size={14} />
-                    Add to Reviews
-                  </button>
-                  <button
-                    type="button"
-                    className="button small"
-                    onClick={() => void handleWrite(true)}
-                    disabled={writeBusy}
-                  >
-                    <CheckCircle2 size={14} />
-                    Add &amp; Analyze
-                  </button>
-                  <button type="button" className="tool danger" aria-label="Clear draft" title="Clear draft" onClick={clearDraft}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-
-              {(copyNotice || writeNotice) && (
-                <div className="mb-draft-notice" aria-live="polite">
-                  {copyNotice || writeNotice}
-                </div>
-              )}
-
-              <DraftQualitySummary draft={draft} />
-
-              {draftSections.length > 1 && (
-                <nav className="mb-draft-sections" aria-label="Memo sections">
-                  {draftSections.map((section, index) => (
-                    <button type="button" key={`${section.title}-${index}`} onClick={() => scrollToDraftSection(index)}>
-                      {section.title}
-                    </button>
-                  ))}
-                </nav>
-              )}
-
-              <article className="mb-draft-document" ref={draftDocumentRef} aria-label="Generated memo draft">
-                {draftSections.map((section, index) => (
-                  <section key={`${section.title}-${index}`} data-section-index={index}>
-                    {section.title !== "Memo draft" && <h3>{section.title}</h3>}
-                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(section.body) }} />
-                  </section>
-                ))}
-              </article>
-            </div>
-          )}
-        </div>
-
-        <div className="memo-builder-compose">
-          {error && <p className="memo-chat-error">{error}</p>}
-          <div className="memo-builder-compose-actions">
-            <button
-              type="button"
-              className="button ghost memo-builder-attach-wide"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={busy}
-            >
-              <Paperclip size={16} />
-              Attach document
-            </button>
-            <span>PDF, image, text, or small datasheet under 4 MB</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".txt,.md,.csv,.json,.pdf,.docx,.png,.jpg,.jpeg,.webp"
-              onChange={handleAttachmentChange}
-              hidden
-            />
-          </div>
-          {attachments.length > 0 && (
-            <div className="memo-builder-attachments" aria-label="Memo Builder attachments">
-              {attachments.map((attachment) => (
-                <div className={`memo-builder-attachment ${attachment.status}`} key={attachment.id}>
-                  <Paperclip size={14} />
-                  <span>
-                    <strong>{attachment.name}</strong>
-                    <small>{attachment.detail}</small>
-                  </span>
-                  <button type="button" aria-label={`Remove ${attachment.name}`} onClick={() => removeAttachment(attachment.id)}>
-                    <X size={13} />
-                  </button>
+              {messages.map((msg, i) => (
+                <div key={`${activeSession?.id ?? "session"}-${i}`} className={`mb-msg mb-msg--${msg.role}`}>
+                  <div
+                    className="mb-bubble"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(displayMessageContent(msg.content)) }}
+                  />
                 </div>
               ))}
+
+              {busy && (
+                <div className="mb-msg mb-msg--assistant">
+                  <div className="mb-bubble mb-typing" aria-label="Rulix is drafting">
+                    <span /><span /><span />
+                  </div>
+                </div>
+              )}
+
+              {draft && !busy && (
+                <div className="mb-draft-card" ref={draftCardRef}>
+                  <div className="mb-draft-actionbar">
+                    <div>
+                      <FileText size={16} />
+                      <span>
+                        <strong>{draft.title}</strong>
+                        <small>{draft.manufacturer || draft.itemFamily}</small>
+                      </span>
+                    </div>
+                    <div className="mb-draft-action-buttons">
+                      <button type="button" className="button small" onClick={() => void copyDraft()}>
+                        <Clipboard size={14} />
+                        Copy
+                      </button>
+                      <button type="button" className="button small" onClick={downloadDraft}>
+                        <Download size={14} />
+                        Download .md
+                      </button>
+                      <button
+                        type="button"
+                        className="button primary small"
+                        onClick={() => void handleWrite(false)}
+                        disabled={writeBusy}
+                      >
+                        <Plus size={14} />
+                        Add to Reviews
+                      </button>
+                      <button
+                        type="button"
+                        className="button small"
+                        onClick={() => void handleWrite(true)}
+                        disabled={writeBusy}
+                      >
+                        <CheckCircle2 size={14} />
+                        Add &amp; Analyze
+                      </button>
+                      <button type="button" className="tool danger" aria-label="Clear draft" title="Clear draft" onClick={clearDraft}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {(copyNotice || writeNotice) && (
+                    <div className="mb-draft-notice" aria-live="polite">
+                      {copyNotice || writeNotice}
+                    </div>
+                  )}
+
+                  <DraftQualitySummary draft={draft} />
+
+                  {draftSections.length > 1 && (
+                    <nav className="mb-draft-sections" aria-label="Memo sections">
+                      {draftSections.map((section, index) => (
+                        <button type="button" key={`${section.title}-${index}`} onClick={() => scrollToDraftSection(index)}>
+                          {section.title}
+                        </button>
+                      ))}
+                    </nav>
+                  )}
+
+                  <article className="mb-draft-document" ref={draftDocumentRef} aria-label="Generated memo draft">
+                    {draftSections.map((section, index) => (
+                      <section key={`${section.title}-${index}`} data-section-index={index}>
+                        {section.title !== "Memo draft" && <h3>{section.title}</h3>}
+                        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(section.body) }} />
+                      </section>
+                    ))}
+                  </article>
+                </div>
+              )}
             </div>
-          )}
-          <div className="memo-builder-input">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={draft ? "Continue refining the draft..." : "Attach a datasheet or describe the item to classify..."}
-              rows={3}
-              disabled={busy}
-            />
-            <button
-              type="button"
-              className="button primary memo-builder-send"
-              onClick={() => void send()}
-              disabled={busy || (!input.trim() && !attachments.some((attachment) => attachment.content.trim()))}
-              aria-label={userRole === "export-control-officer" ? "Approve and send" : "Request officer approval"}
-              title={userRole === "export-control-officer"
-                ? "Approve this exact saved conversation and send one provider request"
-                : "Submit this exact saved conversation for officer approval"}
-            >
-              <Send size={16} />
-              <span>{userRole === "export-control-officer" ? "Approve & Send" : "Request Approval"}</span>
-            </button>
-          </div>
-          <p className="memo-chat-note">
-            {userRole === "export-control-officer"
-              ? "Ctrl+Enter approves this exact saved conversation and sends one request - reviewer signoff is still required."
-              : "Ctrl+Enter submits this exact saved conversation for export-control officer approval; edits create a new request."}
-          </p>
-        </div>
-      </div>
+            {composer}
+          </>
+        )}
+      </main>
     </div>
   );
 }
@@ -707,26 +769,35 @@ function DraftQualitySummary({ draft }: { draft: MemoBuildDraft }) {
   const sourceNotes = draft.sourceNotes?.length ? draft.sourceNotes : derivedSourceNotes(draft);
 
   return (
-    <div className="mb-draft-quality" aria-label="Draft quality notes">
-      <div>
-        <strong>Ready checks</strong>
-        {qualityChecks.map((item) => (
-          <span key={item}><CheckCircle2 size={13} /> {item}</span>
-        ))}
+    <details className="mb-draft-quality" aria-label="Draft quality notes">
+      <summary>
+        <span>
+          <strong>Review notes</strong>
+          <small>{qualityChecks.length} ready · {missingFacts.length} need review · {sourceNotes.length} source note{sourceNotes.length === 1 ? "" : "s"}</small>
+        </span>
+        <ChevronDown size={16} />
+      </summary>
+      <div className="mb-draft-quality-grid">
+        <div>
+          <strong>Ready checks</strong>
+          {qualityChecks.map((item) => (
+            <span key={item}><CheckCircle2 size={13} /> {item}</span>
+          ))}
+        </div>
+        <div>
+          <strong>Still needs review</strong>
+          {missingFacts.map((item) => (
+            <span key={item}><ListChecks size={13} /> {item}</span>
+          ))}
+        </div>
+        <div>
+          <strong>Source basis</strong>
+          {sourceNotes.map((item) => (
+            <span key={item}><FileText size={13} /> {item}</span>
+          ))}
+        </div>
       </div>
-      <div>
-        <strong>Still needs review</strong>
-        {missingFacts.map((item) => (
-          <span key={item}><ListChecks size={13} /> {item}</span>
-        ))}
-      </div>
-      <div>
-        <strong>Source basis</strong>
-        {sourceNotes.map((item) => (
-          <span key={item}><FileText size={13} /> {item}</span>
-        ))}
-      </div>
-    </div>
+    </details>
   );
 }
 

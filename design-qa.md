@@ -75,3 +75,46 @@ None.
 No P3 item is being deferred as part of this handoff.
 
 final result: passed
+
+---
+
+# Memo Builder design QA
+
+## Target
+
+The latest `EithanTuy/rulix-site` application at commit `c20a52addfb8742bb9c1c718ef69245601a06251`, with the signed-in Memo Builder updated to use the calm, conversation-first workspace pattern shown in the supplied ChatGPT, Claude, and Codex references.
+
+## Evidence
+
+- ChatGPT reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094445.png`
+- Claude reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094421.png`
+- Codex reference: `C:\Users\prana\Pictures\Screenshots\Screenshot 2026-07-23 094348.png`
+- Combined reference and implementation comparison: `C:\Users\prana\AppData\Local\Temp\rulix-memo-reference-comparison-019f8f37.png`
+- Desktop implementation, 1440 x 900: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-final-desktop-019f8f37.png`
+- Mobile implementation, 390 x 844: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-mobile-019f8f37.png`
+- Generated memo action state, 390 x 844: `C:\Users\prana\AppData\Local\Temp\rulix-memo-current-generated-mobile-fixed-019f8f37.png`
+
+All implementation captures use the same authenticated local application state, dark theme, production component tree, and a disposable local export-control-officer account.
+
+## Comparison
+
+- Layout: the memo task is centered in a large, calm canvas with a persistent recent-chat rail, compact conversation header, and dominant integrated composer. This matches the spatial hierarchy of the three references while retaining Rulix's existing global navigation.
+- Typography: the existing Rulix sans-serif system remains intact. The headline, supporting copy, placeholder, action labels, and history metadata have distinct, readable hierarchy at desktop and mobile sizes.
+- Color and surfaces: the implementation uses the current Rulix navy and teal tokens. Borders, radii, shadows, focus treatment, disabled state, and selected history state are restrained and consistent with the product.
+- Icons: every visible action uses the existing Lucide icon family. No custom SVG, CSS illustration, emoji, or placeholder art was introduced.
+- Content: the empty-state copy is specific to classification work. Data classification, approved-data boundaries, exact-message approval, and human-review requirements remain visible without competing with the composer.
+- States and interactions: new chat, recent chat selection, history collapse/expand, quick starts, generated memo, copy/download/review actions, data-class selection, attachments, and explicit Ctrl+Enter approval remain functional.
+- Accessibility: the composer, classifications, history, quick starts, reviewer actions, and toggle controls have semantic labels. Focus states and reduced-motion behavior are preserved.
+- Responsiveness: desktop 1440 x 900 and mobile 390 x 844 render without overlap, clipping, or unusable controls. The mobile history rail opens as an overlay and closes back to the composer.
+- Runtime: authenticated browser checks completed with no console warnings, console errors, or framework error overlay.
+
+## Iteration history
+
+1. Compared the three supplied references with the first 1440 x 900 implementation capture in one four-up image.
+2. Exercised the generated memo state at 390 x 844 and found excess vertical space in the stacked mobile action bar.
+3. Removed the inherited flex basis from the mobile action-bar identity block.
+4. Re-captured the generated memo state and confirmed compact reviewer actions, visible review notes, and usable section navigation.
+
+## Final result
+
+passed

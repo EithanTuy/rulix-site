@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { MemoDraftChatPanel } from "./MemoDraftChatPanel";
-import type { MemoBuildDraft } from "../lib/apiClient";
+import { sendMemoBuildChat, type MemoBuildDraft } from "../lib/apiClient";
 import type { MemoBuilderSession } from "../types";
 
 vi.mock("../lib/apiClient", async () => {
@@ -49,6 +49,7 @@ const originalCreateElement = document.createElement.bind(document);
 beforeEach(() => {
   clipboardWrite.mockReset();
   anchorClick.mockReset();
+  vi.mocked(sendMemoBuildChat).mockClear();
   Object.assign(navigator, {
     clipboard: {
       writeText: clipboardWrite.mockResolvedValue(undefined)
@@ -111,14 +112,14 @@ describe("MemoDraftChatPanel", () => {
     });
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Attach a datasheet or describe the item to classify..."), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Message Rulix AI" }), {
       target: { value: "Draft from the TSL-580-C-E datasheet." }
     });
     fireEvent.click(screen.getByLabelText("Approve and send"));
 
     await screen.findByText("Your memo draft is ready.");
     expect(screen.getByRole("article", { name: "Generated memo draft" })).toHaveTextContent("TSL-580-C-E tunable source");
-    expect(screen.getByText("Saved chats")).toBeInTheDocument();
+    expect(screen.getByText("Recent")).toBeInTheDocument();
     expect(screen.getByText("Draft ready")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add to reviews/i })).toBeInTheDocument();
@@ -138,7 +139,7 @@ describe("MemoDraftChatPanel", () => {
     const onCreateMemo = vi.fn(async () => undefined);
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /create sample memo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /copy/i }));
     await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith(expect.stringContaining("ECCN Self-Classification Draft Memo")));
     expect(screen.getByText("Memo copied.")).toBeInTheDocument();
@@ -157,7 +158,7 @@ describe("MemoDraftChatPanel", () => {
     });
     render(<ControlledBuilder onCreateMemo={onCreateMemo} onCreateAndAnalyze={onCreateAndAnalyze} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /create sample memo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     fireEvent.click(screen.getByRole("button", { name: /add & analyze/i }));
 
     expect(onCreateMemo).not.toHaveBeenCalled();
@@ -178,9 +179,9 @@ describe("MemoDraftChatPanel", () => {
     };
     render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} initialSessions={[session]} />);
 
-    expect(screen.getByText("Review context is loaded. Use it to draft an improved memo or ask Sonnet for a focused rewrite.")).toBeInTheDocument();
+    expect(screen.getByText("Review context is ready. Use it to improve the current memo without losing its source trail.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^use context$/i }));
-    expect(screen.getByPlaceholderText("Attach a datasheet or describe the item to classify...")).toHaveValue("Improve this memo using finding context.");
+    expect(screen.getByRole("textbox", { name: "Message Rulix AI" })).toHaveValue("Improve this memo using finding context.");
   });
 
   it("keeps the generated draft when review creation fails", async () => {
@@ -189,12 +190,24 @@ describe("MemoDraftChatPanel", () => {
     });
     render(<ControlledBuilder onCreateMemo={onCreateMemo} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /create sample memo/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open an example/i }));
     const draft = screen.getByRole("article", { name: "Generated memo draft" });
     fireEvent.click(screen.getByRole("button", { name: /add to reviews/i }));
 
     expect(await screen.findByText("Review creation failed safely.")).toBeInTheDocument();
     expect(draft).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add to reviews/i })).toBeEnabled();
+  });
+
+  it("keeps the explicit Ctrl+Enter approval gesture", async () => {
+    render(<ControlledBuilder onCreateMemo={vi.fn(async () => undefined)} />);
+    const composer = screen.getByRole("textbox", { name: "Message Rulix AI" });
+
+    fireEvent.change(composer, { target: { value: "Draft a memo for this RF amplifier." } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+    expect(sendMemoBuildChat).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(composer, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(sendMemoBuildChat).toHaveBeenCalledTimes(1));
   });
 });
