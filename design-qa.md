@@ -1,78 +1,82 @@
-# Rulix product experience design QA
+# Rulix liquid-glass marketing design QA
 
 ## Comparison target
 
-- Source visual truth: `C:\Users\prana\.codex\generated_images\019f68cb-0342-7b40-955e-6cc22ca92430\exec-c2da2145-072b-4ee3-8350-9847f92a9b03.png`
-- Browser-rendered implementation: `C:\Users\prana\.codex\visualizations\2026\07\16\019f68cb-0342-7b40-955e-6cc22ca92430\rulix-workbench-final-1487x1058.png`
-- Source frame: 1487 × 1058.
-- Browser viewport override: 1487 × 1103; the in-app browser captured a 1487 × 979 effective page viewport after application chrome.
-- Route: `/app#/reviews/review-8aadbba6-80e2-4729-aafb-760b04cf8e49/overview`.
-- State: signed-in export-control officer, proprietary review awaiting exact-content AI approval, artifact context menu open.
+- Source visual truth: `C:\Users\prana\AppData\Local\Temp\codex-clipboard-6392d974-aaad-4b2f-82f9-f772f6e97025.png`
+- Browser-rendered implementation: `C:\Users\prana\AppData\Local\Temp\rulix-glass-fidelity-final-desktop.png`
+- Mobile browser render: `C:\Users\prana\AppData\Local\Temp\rulix-glass-fidelity-final-mobile.png`
+- Desktop comparison viewport: 1416 x 884 at DPR 1 for both source and implementation.
+- Mobile verification viewport: 390 x 844 at DPR 1.
+- Route and state: `/`, initial page load, pointer-ready state.
 
-The source and implementation were opened together in the same comparison input at native width. The 79-pixel effective-height difference was treated as a capture-surface constraint; the shared above-the-fold product region was compared directly.
+The reference and implementation were opened together in the same native-size comparison input. The browser capture contains the complete target first viewport, so no density adjustment or crop was needed.
 
 ## Full-view comparison evidence
 
-- Layout and hierarchy: the implementation preserves the deep-navy global shell, white task header, horizontal review progress, approval-scope banner, and high-contrast three-pane workbench. Panel proportions, active navigation, and the right-side artifact/menu relationship remain faithful.
-- Typography: both use a compact sans-serif product hierarchy with clear weight changes. The implementation uses the repository's Inter files, preserves readable small labels, and avoids accidental marketing/display typography in the product shell.
-- Spacing and rhythm: 24-pixel page gutters, restrained card padding, thin separators, compact tabs, and dense metadata match the reference intent. The implementation removes ornamental space and keeps the main task above the fold.
-- Colors and tokens: navy, white/cool-gray surfaces, blue-gray borders, and restrained teal active/status treatment match the selected direction with WCAG-oriented contrast. Destructive menu content remains red and separated.
-- Assets and icons: the existing Rulix brand asset and Lucide icon family are used throughout. No source asset was replaced with CSS art, emoji, handcrafted SVG, or placeholder imagery.
-- Copy/content: dynamic review content intentionally differs from the concept fixture. Product copy preserves the same meaning while making exact approval scope, source provenance, human signoff, and empty AI state explicit.
+- Layout and spacing: the 1360-pixel glass header, headline origin, three-line supporting copy, 195 x 68 CTA, and 620 x 466 product frame align to the reference within a few pixels. The reading order and negative space are preserved.
+- Typography: the exact headline and line breaks match the reference. Inter supplies the same dense, readable sans-serif hierarchy for the headline, body, navigation, CTA, and product chrome.
+- Glass treatment: the header, CTA, and product frame use layered cyan/white edge rings, inner highlights, restrained blur, glossy radial shine, and deep cool cast shadows. The treatment stays dimensional without reducing text contrast.
+- Color and background: the pale blue-white field, icy cyan rim light, dark ink type, deep teal control, and dark product screen match the target palette. The optimized WebP retains smooth gradients and refractive detail without visible banding.
+- Product imagery: the existing production product still remains crisp and readable inside the dark reviewer frame. Its crop is intentionally wider than the source still so it fills the reference geometry without introducing a video or auto-rotation.
+- Copy and content: all above-fold copy matches the supplied reference exactly. No extra label, secondary CTA, form, tab, accordion, or video was introduced.
+- Icons and brand: the existing Rulix logo is used in the header and product chrome. The CTA arrow and mobile menu keep the same quiet, high-contrast treatment.
+- Responsive behavior: at 390 x 844, the layout becomes a single readable column, the header remains 370 pixels wide with 10-pixel side insets, the product frame stays within the viewport, and document width remains exactly 390 pixels.
+- Motion: pointer movement changes the light origin and product-frame perspective with direct CSS-variable updates in a single animation frame. Scrolling shifts the background and frame subtly, hides the header on downward movement, and reveals it on upward movement. Nonessential motion is disabled under `prefers-reduced-motion`.
 
 ## Focused region evidence
 
-A separate crop was not required because the native-width combined comparison keeps the header, progress path, artifact card, and complete context menu readable. The browser DOM snapshot independently verified accessible names and Windows-native shortcut labels (`Ctrl K`, `Ctrl L`, `Ctrl ↵`).
+The full native-size comparison keeps the header rings, CTA bevel, product-frame highlights, headline edges, and product screenshot readable, so a separate crop would not add useful evidence. Measured browser bounds were:
+
+- Header: x 28, y 16, width 1360, height 74.
+- Headline: x 124, y 225, width 600, height 247.
+- CTA: x 116, y 622, width 195, height 68.
+- Product frame: x 738, y 207, width 620, height 466.
 
 ## Primary interactions tested
 
-- Home → stable review route and browser-restored selection.
-- Command search open/close.
-- Help drawer open/close.
-- Artifact right-click menu, Arrow/Escape behavior, duplicate action availability, outside-click cleanup, and resize cleanup.
-- Reviewer progress/section navigation and AI action affordance.
-- Dashboard Operations → Usage → Accounts → Growth → Lead Review routing.
-- 390, 768, and 1440 responsive journeys for submitter, reviewer, counsel, and export-control officer.
-
-Browser console warnings/errors: none. Same-origin failed requests: none in the passing journeys. Critical Axe violations: none.
+- Pointer movement updates the glass light origin, translation variables, and product-frame matrix without a React render loop.
+- A downward scroll hides the header at mid-page; a 70-pixel upward movement reveals it immediately.
+- The unique `Email Rulix` action routes to `/contact`.
+- Contact renders `mailto:tuyilin2@msu.edu?subject=Rulix%20inquiry` with no form or video.
+- The mobile menu opens, exposes Product, Use Cases, Trust, Contact, and Sign in, and closes cleanly.
+- Browser console warnings and errors: none.
+- Horizontal overflow at 1416 and 390 pixels: none.
 
 ## Comparison history
 
 ### Iteration 1
 
-- [P1] Responsive Help lost its accessible name when the visible label was hidden at tablet width.
-  - Fix: added a stable `aria-label="Help"` to the header control.
-  - Post-fix evidence: the tablet reviewer journey locates and operates Help; all four tablet roles pass.
-- [P2] The context menu displayed Command shortcuts on Windows.
-  - Fix: introduced platform-aware shortcut formatting shared by the header and context menu, with unit coverage for Apple, Windows, and Linux.
-  - Post-fix evidence: the final browser snapshot exposes `Ctrl K`, `Ctrl L`, and `Ctrl ↵`.
-- [P2] An open context menu could persist offscreen after a responsive resize or hash-route transition.
-  - Fix: close on resize, user wheel/touch scroll, and hash change, in addition to outside click, blur, and Escape. Programmatic scroll-to-target remains safe so right-click can reveal and open an offscreen artifact in one action.
-  - Post-fix evidence: menu count changes from one to zero immediately after viewport resize; unit coverage exercises resize, wheel, touch movement, and hash change.
+- [P1] The hero content sat too far left while the product frame was too wide and low.
+  - Fix: tuned the native-width grid, asymmetric tracks, frame translation, and aspect ratio to the source geometry.
+- [P2] Supporting copy wrapped differently and weakened the match.
+  - Fix: matched the reference text width, font size, line height, and exact line breaks.
+- [P2] Early frame shine spilled into the screenshot and flattened the glass bezel.
+  - Fix: confined highlights to the bezel, added an inner screen, and separated rim light from cast shadow.
+- [P2] The initial background lacked the source's optical depth.
+  - Fix: generated a UI-free icy refraction plate from the supplied image, optimized it to WebP, and layered performant pointer/scroll lighting above it.
 
 ### Final comparison
 
-No actionable P0, P1, or P2 mismatch remains. The implementation intentionally adds Home / My Work, collaboration, notification, Evidence Library, and role-gated administration destinations because those are product requirements beyond the selected static concept. The awaiting-AI empty state is also intentional and preferable to fabricated analysis data.
+No actionable P0, P1, or P2 mismatch remains. The remaining P3 differences are intentional:
+
+- The background caustic pattern is a reconstructed approximation rather than the exact baked pixels beneath the original composited UI.
+- The product content uses the current production screenshot, so its internal memo data differs from the screenshot embedded in the reference.
+- Mobile rearranges the desktop composition into one column to preserve readability and touch targets.
 
 ## Findings
 
 No actionable P0/P1/P2 findings.
 
-## Open questions
+## Verification
 
-None.
-
-## Implementation checklist
-
-- [x] Match the selected navy/teal high-contrast shell and three-pane workbench.
-- [x] Preserve readable hierarchy and responsive task order.
-- [x] Implement the complete right-click interaction with keyboard and viewport behavior.
-- [x] Verify reviewer and dashboard core routes across 390, 768, and 1440 pixels.
-- [x] Verify console, network, accessibility, unit, integration, build, Lambda, and bundle gates.
-
-## Follow-up polish
-
-No P3 item is being deferred as part of this handoff.
+- [x] Native-size reference and browser render compared together.
+- [x] Desktop and 390 x 844 mobile captures inspected.
+- [x] Reactive pointer and scroll behavior verified.
+- [x] Mobile navigation and contact route verified.
+- [x] 593 automated tests passed.
+- [x] TypeScript checks passed.
+- [x] Production build passed.
+- [x] `git diff --check` passed.
 
 final result: passed
 
