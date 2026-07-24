@@ -172,9 +172,11 @@ export function nextMarketingHeaderVisibility({
 
 export function MarketingSite() {
   const page = useMemo(() => pageForLocation(), []);
+  const siteRef = useRef<HTMLDivElement | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerFocused, setHeaderFocused] = useState(false);
   const headerVisible = useMarketingHeaderVisibility(mobileNavOpen, headerFocused);
+  useLiquidGlassMotion(siteRef);
 
   useEffect(() => {
     document.documentElement.classList.add("marketing-page");
@@ -187,7 +189,7 @@ export function MarketingSite() {
   }, [page]);
 
   return (
-    <div className="rulix-site rulix-site--liquid-glass">
+    <div className="rulix-site rulix-site--liquid-glass" ref={siteRef}>
       <SiteHeader
         currentPageKind={page.pageKind}
         focused={headerFocused}
@@ -488,8 +490,8 @@ function PageHero({
 function EmailAction() {
   return (
     <a className="rulix-primary-action" href={CONTACT_PAGE_HREF}>
-      Email Rulix
-      <ArrowRight size={18} aria-hidden="true" />
+      <span>Email Rulix</span>
+      <ArrowRight size={20} aria-hidden="true" />
     </a>
   );
 }
@@ -507,12 +509,14 @@ function StaticProductFrame({
 }) {
   return (
     <figure className={["product-frame", className].filter(Boolean).join(" ")}>
-      <div className="product-frame__top">
-        <BrandLogo tone="light" size="compact" />
-        <span>Reviewer workspace</span>
-        <strong>Human decision</strong>
+      <div className="product-frame__screen">
+        <div className="product-frame__top">
+          <BrandLogo tone="light" size="compact" />
+          <span>Reviewer workspace</span>
+          <strong>Human decision</strong>
+        </div>
+        <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
       </div>
-      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
     </figure>
   );
 }
@@ -612,6 +616,87 @@ function useMarketingHeaderVisibility(mobileNavOpen: boolean, hasFocus: boolean)
   }, [hasFocus, mobileNavOpen]);
 
   return visible;
+}
+
+function useLiquidGlassMotion(ref: { current: HTMLDivElement | null }) {
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+
+    const reducedMotion =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : undefined;
+    if (reducedMotion?.matches) return;
+
+    const finePointer =
+      typeof window.matchMedia !== "function" ||
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    let pointerX = 0;
+    let pointerY = 0;
+    let frame: number | undefined;
+
+    const render = () => {
+      frame = undefined;
+      const scrollShift = Math.min(window.scrollY * 0.035, 34);
+
+      root.style.setProperty("--glass-light-x", `${50 + pointerX * 24}%`);
+      root.style.setProperty("--glass-light-y", `${28 + pointerY * 18}%`);
+      root.style.setProperty("--glass-shift-x", `${(pointerX * 10).toFixed(2)}px`);
+      root.style.setProperty("--glass-shift-y", `${(pointerY * 7 + scrollShift).toFixed(2)}px`);
+      root.style.setProperty("--glass-bg-shift-y", `${((pointerY * 7 + scrollShift) * -0.34).toFixed(2)}px`);
+      root.style.setProperty("--glass-frame-shift-y", `${((pointerY * 7 + scrollShift) * -0.16).toFixed(2)}px`);
+      root.style.setProperty("--glass-tilt-x", `${(-pointerY * 1.2).toFixed(2)}deg`);
+      root.style.setProperty("--glass-tilt-y", `${(pointerX * 1.45).toFixed(2)}deg`);
+    };
+
+    const schedule = () => {
+      if (frame !== undefined) return;
+      frame = window.requestAnimationFrame(render);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      pointerX = (event.clientX / Math.max(window.innerWidth, 1) - 0.5) * 2;
+      pointerY = (event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 2;
+      schedule();
+    };
+
+    const onPointerLeave = () => {
+      pointerX = 0;
+      pointerY = 0;
+      schedule();
+    };
+
+    render();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
+    if (finePointer) {
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      document.documentElement.addEventListener("mouseleave", onPointerLeave, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (finePointer) {
+        window.removeEventListener("pointermove", onPointerMove);
+        document.documentElement.removeEventListener("mouseleave", onPointerLeave);
+      }
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      for (const property of [
+        "--glass-light-x",
+        "--glass-light-y",
+        "--glass-shift-x",
+        "--glass-shift-y",
+        "--glass-bg-shift-y",
+        "--glass-frame-shift-y",
+        "--glass-tilt-x",
+        "--glass-tilt-y"
+      ]) {
+        root.style.removeProperty(property);
+      }
+    };
+  }, [ref]);
 }
 
 function useOnceVisible(ref: { current: HTMLElement | null }) {
