@@ -9,7 +9,7 @@ import {
 import { marketingCanonicalPath } from "../marketingPages";
 
 const primaryPages = [
-  ["/", "AI-assisted export classification."],
+  ["/", "Review the reasoning.Keep the decision human."],
   ["/product", "Review classification work without losing the reasoning."],
   ["/use-cases", "Built for teams that have to explain the classification."],
   ["/trust", "A person makes the final decision."],
@@ -34,7 +34,7 @@ describe("marketing pages", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(heading);
     expect(container.querySelectorAll(".rulix-primary-action")).toHaveLength(1);
     expect(container.querySelector("form")).not.toBeInTheDocument();
-    expect(container.querySelector("video")).not.toBeInTheDocument();
+    expect(container.querySelectorAll("video")).toHaveLength(path === "/" ? 2 : 0);
     expect(container.querySelector('[role="tablist"]')).not.toBeInTheDocument();
     expect(container.querySelector(".faq-item, .trust-item, details")).not.toBeInTheDocument();
   });
@@ -49,7 +49,7 @@ describe("marketing pages", () => {
   it("routes the page CTA to Contact before opening email", () => {
     const { container } = renderPath("/");
 
-    expect(screen.getByRole("link", { name: "Email Rulix" })).toHaveAttribute("href", "/contact");
+    expect(screen.getByRole("link", { name: "Request access" })).toHaveAttribute("href", "/contact");
     expect(container.querySelector(".rulix-site")).toHaveClass("rulix-site--liquid-glass");
   });
 

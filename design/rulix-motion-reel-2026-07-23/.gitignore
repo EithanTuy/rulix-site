@@ -1,0 +1,16 @@
+.codex-tmp/
+.hyperframes-venv/
+.thumbnails/
+.waveform-cache/
+audition-*.mp3
+capture/.cursorrules
+capture/AGENTS.md
+capture/CLAUDE.md
+capture/assets/product/demo-*.png
+capture/assets/product/hero-rulix-review-loop.png
+capture/assets/svgs/contact-sheet.jpg
+capture/extracted/
+capture/meta.json
+capture/screenshots/
+renders/
+snapshots/
