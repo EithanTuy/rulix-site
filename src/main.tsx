@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { applyTheme, getInitialTheme } from "./components/ThemeToggle";
-import "./styles.css";
+import "./base.css";
 
 // The public site, app, and operations dashboard share one bundle. Hostname is
 // authoritative in production; paths keep local development and previews easy.

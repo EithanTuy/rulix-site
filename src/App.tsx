@@ -87,6 +87,7 @@ import {
 } from "./lib/appRoutes";
 import "./app-workflow.css";
 import "./memo-builder-workspace.css";
+import "./styles.css";
 
 type AnalysisRunState =
   | { status: "unanalyzed"; message: string }

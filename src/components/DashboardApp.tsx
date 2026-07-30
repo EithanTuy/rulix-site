@@ -47,6 +47,7 @@ import { OutreachWriterPanel } from "./OutreachWriterPanel";
 import { LeadsPanel } from "./LeadsPanel";
 import { LeadReviewQueue } from "./LeadReviewQueue";
 import { OutreachJobsPanel } from "./OutreachJobsPanel";
+import "../styles.css";
 
 const ADMIN_ROLE: UserProfile["role"] = "export-control-officer";
 const RANGE_OPTIONS = [7, 30, 90] as const;

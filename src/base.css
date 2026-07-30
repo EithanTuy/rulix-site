@@ -1,0 +1,186 @@
+/* Document-level rules every surface needs before its own stylesheet loads.
+   Kept out of styles.css so the marketing site does not pull the whole product
+   stylesheet: of its 1535 rules only these few ever matched a marketing page,
+   and it was render-blocking on every visit. */
+
+:root {
+  /* Mirrors styles.css so the brand-logo block below stands alone; the product
+     stylesheet redefines both, including its dark-theme values. */
+  --navy-950: #050b12;
+  --app-bg: #ffffff;
+  --scrollbar-thumb: rgba(83, 103, 126, 0.28);
+  --scrollbar-thumb-hover: rgba(83, 103, 126, 0.48);
+  --scrollbar-track: transparent;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--app-bg);
+}
+
+/* The product surfaces own the viewport; marketing scrolls the document. */
+html.marketing-page,
+html.marketing-page body,
+html.marketing-page #root {
+  min-height: 100%;
+  height: auto;
+  overflow: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Shown by the Suspense fallback in main.tsx, before any surface chunk lands. */
+.surface-loader {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  color: #526176;
+  background: #f4f7fa;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.surface-loader span {
+  width: 30px;
+  height: 30px;
+  margin: auto;
+  border: 3px solid #d4e0e7;
+  border-top-color: #0a9295;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Owned here rather than in styles.css because all three surfaces render
+   the wordmark, including marketing, which loads no product styles. Every
+   contextual override still sits later in styles.css and still wins. */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.brand-logo-mark,
+.brand-logo-wordmark {
+  display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.brand-logo-mark {
+  display: none;
+  width: 36px;
+  height: 36px;
+}
+
+.brand-logo-wordmark {
+  width: 156px;
+  max-width: 100%;
+  height: auto;
+}
+
+.brand-logo-product {
+  min-width: 0;
+  padding-left: 11px;
+  border-left: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.brand-logo--dark {
+  color: var(--navy-950);
+}
+
+.brand-logo--adaptive .brand-logo-asset-light,
+.theme-dark .brand-logo--adaptive .brand-logo-asset-dark,
+.theme-dark .brand-logo--adaptive .brand-logo-mark.brand-logo-asset-light {
+  display: none;
+}
+
+.theme-dark .brand-logo--adaptive .brand-logo-wordmark.brand-logo-asset-light {
+  display: block;
+}
+
+.brand-logo--light {
+  color: rgba(234, 248, 251, 0.78);
+}
+
+.brand-logo--auth .brand-logo-wordmark {
+  width: 190px;
+}
+
+.brand-logo--topbar .brand-logo-wordmark {
+  width: 142px;
+}
+
+.brand-logo--rail {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.brand-logo--rail .brand-logo-wordmark {
+  width: 148px;
+}
+
+.brand-logo--rail .brand-logo-product {
+  padding-left: 0;
+  border-left: 0;
+  color: #8db9c8;
+  font-size: 9px;
+}
