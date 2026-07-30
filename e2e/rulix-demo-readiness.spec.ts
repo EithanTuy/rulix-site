@@ -142,54 +142,69 @@ test("an officer completes the reviewer golden path and downloads a complete rep
   await assertPageHealth(page, runtime);
 });
 
-test("marketing demos pause offscreen and the access form persists a request", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "demo-1280", "The timed marketing interaction runs once.");
+test("marketing pages move between each other without a document reload", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "demo-1280", "The marketing walkthrough runs once.");
   const runtime = collectRuntimeErrors(page);
   await page.goto("/");
 
   await expect(page).toHaveTitle(/Rulix/);
-  await expect(page.getByRole("heading", { name: /Find the weak link/ })).toBeVisible();
-  const activeDemo = page.locator(".demo-tabs button.is-active");
-  await expect(activeDemo).toHaveText("Find unsupported reasoning");
-  await page.waitForTimeout(6_300);
-  await expect(activeDemo).toHaveText("Find unsupported reasoning");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("AI-assisted export classification.");
+  // The site carries no imagery beyond the brand mark and wordmark.
+  await expect(page.locator("img:not(.brand-logo-mark):not(.brand-logo-wordmark)")).toHaveCount(0);
 
-  await page.locator("#product").scrollIntoViewIfNeeded();
-  await page.getByRole("tab", { name: "Resolve with evidence" }).click();
-  await expect(page.getByText("Turn a gap into the next reviewer action.")).toBeVisible();
+  // Marking the document proves the next navigations reuse it rather than reload.
+  await page.evaluate(() => {
+    (window as unknown as { __marketingSession?: number }).__marketingSession = Date.now();
+  });
 
-  await page.getByRole("link", { name: "Request access" }).first().click();
-  await page.getByLabel("Work email").fill(`demo-readiness-${Date.now()}@e2e.rulix.local`);
-  await page.getByLabel("Organization").fill("Rulix synthetic demo QA");
-  await page.getByLabel("Role").fill("Export control officer");
-  await page.getByLabel("What would you like to review?").fill("A fictional public cryogenic controller memo.");
-  const accessResponsePromise = page.waitForResponse((response) =>
-    response.request().method() === "POST" && new URL(response.url()).pathname === "/api/access-requests"
+  for (const [label, heading, path] of [
+    ["Product", "Review classification work without losing the reasoning.", "/product"],
+    ["Use Cases", "Built for teams that have to explain the classification.", "/use-cases"],
+    ["Trust", "A person makes the final decision.", "/trust"],
+    ["Contact", "Talk with us about your classification workflow.", "/contact"]
+  ] as const) {
+    await page.getByRole("link", { name: label, exact: true }).first().click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(heading);
+    expect(new URL(page.url()).pathname).toBe(path);
+    await expect(page).toHaveTitle(/Rulix/);
+  }
+
+  const survived = await page.evaluate(
+    () => (window as unknown as { __marketingSession?: number }).__marketingSession
   );
-  await page.locator("form.access-form").getByRole("button", { name: "Request access" }).click();
-  const accessResponse = await accessResponsePromise;
-  expect(accessResponse.status()).toBe(201);
-  await expect(page.getByText("Request received.")).toBeVisible();
+  expect(survived, "navigating between marketing pages should not reload the document").toBeTruthy();
+
+  await expect(page.getByRole("link", { name: "tuyilin2@msu.edu" })).toHaveAttribute(
+    "href",
+    "mailto:tuyilin2@msu.edu?subject=Rulix%20inquiry"
+  );
+
+  // Back must still unwind the history the client router pushed.
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("A person makes the final decision.");
 
   await assertPageHealth(page, runtime);
 });
 
-test("marketing mobile navigation and reduced-motion media stay usable", async ({ page }, testInfo) => {
+test("marketing mobile navigation and reduced motion stay usable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "demo-1366", "The mobile override runs once.");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   const runtime = collectRuntimeErrors(page);
   await page.goto("/");
 
-  await expect(page.locator(".rulix-hero__media video")).toHaveCount(0);
-  await expect(page.locator(".rulix-hero__media > img")).toBeVisible();
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await page.getByRole("link", { name: "Product", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Review classification work without losing the reasoning."
+  );
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
-  const initialDemo = await page.locator(".demo-tabs button.is-active").textContent();
-  await page.waitForTimeout(6_300);
-  await expect(page.locator(".demo-tabs button.is-active")).toHaveText(initialDemo ?? "Find unsupported reasoning");
+
+  // Reduced motion must not leave scroll-revealed content stuck at zero opacity.
+  await page.locator(".product-step").first().scrollIntoViewIfNeeded();
+  await expect(page.locator(".product-step").first()).toBeVisible();
+
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth

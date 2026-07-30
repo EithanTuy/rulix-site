@@ -164,9 +164,11 @@ export function nextMarketingHeaderVisibility({
 export function MarketingSite() {
   const { path, navigate } = useMarketingRouter();
   const page = useMemo(() => marketingPageForPath(path), [path]);
+  const siteRef = useRef<HTMLDivElement | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerFocused, setHeaderFocused] = useState(false);
   const scroll = useMarketingScrollState(mobileNavOpen, headerFocused);
+  usePointerField(siteRef);
 
   useEffect(() => {
     document.documentElement.classList.add("marketing-page");
@@ -179,7 +181,7 @@ export function MarketingSite() {
   }, [page]);
 
   return (
-    <div className="rulix-site rulix-site--liquid-glass" onClick={navigate}>
+    <div className="rulix-site rulix-site--liquid-glass" onClick={navigate} ref={siteRef}>
       <GlassField />
       <SiteHeader
         currentPageKind={page.pageKind}
@@ -241,13 +243,59 @@ function currentMarketingPath() {
 /* The drifting colour field behind every glass surface. */
 function GlassField() {
   return (
-    <div className="rulix-aurora" aria-hidden="true">
-      <div className="rulix-aurora__blob" />
-      <div className="rulix-aurora__blob" />
-      <div className="rulix-aurora__blob" />
-      <div className="rulix-aurora__grain" />
-    </div>
+    <>
+      <div className="rulix-aurora" aria-hidden="true">
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__grain" />
+      </div>
+      <div className="rulix-spotlight" aria-hidden="true" />
+    </>
   );
+}
+
+/* Lets the field answer the pointer without becoming a cursor toy: the values
+   are written once per frame and the movement is eased over ~1s in CSS, so the
+   light trails well behind the cursor and reads as drift. Fine pointers only,
+   and nothing runs when the reader has asked for reduced motion. */
+function usePointerField(root: { current: HTMLElement | null }) {
+  useEffect(() => {
+    const element = root.current;
+    if (!element || typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame: number | undefined;
+    let pending: { x: number; y: number } | null = null;
+
+    const commit = () => {
+      frame = undefined;
+      if (!pending) return;
+      const { x, y } = pending;
+      element.style.setProperty("--spot-x", `${x}px`);
+      element.style.setProperty("--spot-y", `${y}px`);
+      // a few px of sway, signed from the centre of the viewport
+      element.style.setProperty("--sway-x", `${(x / window.innerWidth - 0.5) * 46}px`);
+      element.style.setProperty("--sway-y", `${(y / window.innerHeight - 0.5) * 34}px`);
+    };
+
+    const onMove = (event: PointerEvent) => {
+      pending = { x: event.clientX, y: event.clientY };
+      element.classList.add("is-pointing");
+      if (frame === undefined) frame = window.requestAnimationFrame(commit);
+    };
+    const onLeave = () => element.classList.remove("is-pointing");
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerleave", onLeave);
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      element.classList.remove("is-pointing");
+    };
+  }, [root]);
 }
 
 function renderMarketingPage(page: MarketingPageMeta) {
