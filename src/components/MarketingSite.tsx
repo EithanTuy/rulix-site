@@ -4,7 +4,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type FocusEvent
+  type FocusEvent,
+  type ReactNode
 } from "react";
 import {
   ArrowRight,
@@ -30,6 +31,10 @@ import {
   type MarketingPageMeta
 } from "../marketingPages";
 import { BrandLogo } from "./BrandLogo";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
 import "../marketing-v2.css";
 
 const CONTACT_EMAIL = "tuyilin2@msu.edu";
@@ -174,7 +179,7 @@ export function MarketingSite() {
   const page = useMemo(() => pageForLocation(), []);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerFocused, setHeaderFocused] = useState(false);
-  const headerVisible = useMarketingHeaderVisibility(mobileNavOpen, headerFocused);
+  const scroll = useMarketingScrollState(mobileNavOpen, headerFocused);
 
   useEffect(() => {
     document.documentElement.classList.add("marketing-page");
@@ -188,17 +193,45 @@ export function MarketingSite() {
 
   return (
     <div className="rulix-site rulix-site--liquid-glass">
+      <GlassField />
       <SiteHeader
         currentPageKind={page.pageKind}
         focused={headerFocused}
         mobileNavOpen={mobileNavOpen}
-        visible={headerVisible}
+        scrolled={scroll.scrolled}
+        visible={scroll.headerVisible}
         onFocusChange={setHeaderFocused}
         onMobileNavChange={setMobileNavOpen}
       />
       <main>{renderMarketingPage(page)}</main>
       <SiteFooter />
     </div>
+  );
+}
+
+/* The drifting colour field every glass surface refracts, plus the displacement
+   map that bends it at each rim. Without something saturated behind them the
+   panes would only read as flat translucency. */
+function GlassField() {
+  return (
+    <>
+      <div className="rulix-aurora" aria-hidden="true">
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__blob" />
+        <div className="rulix-aurora__caustics" />
+        <div className="rulix-aurora__grain" />
+      </div>
+      <svg className="rulix-glass-defs" aria-hidden="true" focusable="false">
+        <filter id="rulix-lens" x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2" seed="7" result="warp" />
+          <feGaussianBlur in="warp" stdDeviation="2.4" result="smooth" />
+          <feDisplacementMap in="SourceGraphic" in2="smooth" scale="18" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+    </>
   );
 }
 
@@ -221,6 +254,7 @@ function SiteHeader({
   currentPageKind,
   focused,
   mobileNavOpen,
+  scrolled,
   visible,
   onFocusChange,
   onMobileNavChange
@@ -228,10 +262,12 @@ function SiteHeader({
   currentPageKind: MarketingPageKind;
   focused: boolean;
   mobileNavOpen: boolean;
+  scrolled: boolean;
   visible: boolean;
   onFocusChange: (focused: boolean) => void;
   onMobileNavChange: (open: boolean) => void;
 }) {
+  const brandTone = useBrandTone();
   const handleBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       onFocusChange(false);
@@ -242,14 +278,19 @@ function SiteHeader({
     <header
       className={[
         "rulix-header",
+        "glass",
+        "glass--chrome",
         visible || focused ? "is-visible" : "is-hidden",
+        scrolled ? "is-scrolled" : "",
         mobileNavOpen ? "is-open" : ""
-      ].join(" ")}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onFocusCapture={() => onFocusChange(true)}
       onBlurCapture={handleBlur}
     >
       <a className="rulix-header__brand" href="/" aria-label="Rulix home">
-        <BrandLogo tone="dark" size="compact" />
+        <BrandLogo tone={brandTone} size="compact" />
       </a>
       <nav className="rulix-header__nav" aria-label="Primary">
         {PRIMARY_MARKETING_NAV.map((item) => (
@@ -283,12 +324,13 @@ function HomePage() {
   return (
     <>
       <PageHero
+        eyebrow="Export-control memo review"
         title="AI-assisted export classification."
         copy="Rulix helps export-control teams review classification memos, find missing support, and keep the final decision with a qualified person."
         media="/marketing/demos/demo-find-missing-reasoning.webp"
         mediaAlt="Rulix showing a classification memo conclusion that needs more support"
       />
-      <section className="rulix-band outcome-band" aria-labelledby="home-outcomes-title">
+      <section className="rulix-band glass glass--pane outcome-band" aria-labelledby="home-outcomes-title">
         <div className="rulix-shell outcome-band__grid">
           <div className="section-intro section-intro--light">
             <h2 id="home-outcomes-title">A clearer path from draft to decision.</h2>
@@ -317,6 +359,7 @@ function ProductPage({ page }: { page: MarketingPageMeta }) {
   return (
     <>
       <PageHero
+        eyebrow="How Rulix works"
         title={hero.title}
         copy={hero.copy}
         media="/marketing/demos/demo-export-review-record.webp"
@@ -333,7 +376,12 @@ function ProductFlow() {
 
   return (
     <section
-      className={visible ? "rulix-band product-flow is-visible" : "rulix-band product-flow"}
+      className={[
+        "rulix-band glass glass--pane product-flow",
+        visible ? "is-visible" : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
       ref={sectionRef}
       aria-labelledby="product-flow-title"
     >
@@ -376,12 +424,13 @@ function UseCasesPage({ page }: { page: MarketingPageMeta }) {
   return (
     <>
       <PageHero
+        eyebrow="Who it is for"
         title={title}
         copy="Rulix gives each team a shared way to find missing information, answer review questions, and document the final decision."
         media="/marketing/demos/demo-resolve-review-gaps.webp"
         mediaAlt="A classification review question being resolved in Rulix"
       />
-      <section className="rulix-band audience-stories" aria-label="Rulix use cases">
+      <section className="rulix-band glass glass--pane audience-stories" aria-label="Rulix use cases">
         <div className="rulix-shell">
           {orderedStories.map((story, index) => {
             const Icon = story.icon;
@@ -410,12 +459,13 @@ function TrustPage() {
   return (
     <>
       <PageHero
+        eyebrow="Human review first"
         title="A person makes the final decision."
         copy="Rulix helps reviewers see the weak point, ask for the right information, and record why they made the final call."
         media="/marketing/demos/demo-export-review-record.webp"
         mediaAlt="A human-reviewed export classification record in Rulix"
       />
-      <section className="rulix-band trust-band" aria-labelledby="trust-title">
+      <section className="rulix-band glass glass--pane trust-band" aria-labelledby="trust-title">
         <div className="rulix-shell trust-band__grid">
           <div className="section-intro section-intro--light">
             <h2 id="trust-title">Clear limits. Clear ownership.</h2>
@@ -448,24 +498,29 @@ function TrustPage() {
 function ContactPage() {
   return (
     <section className="contact-page">
-      <div className="rulix-shell contact-page__inner">
+      <div className="rulix-shell contact-page__inner glass glass--pane">
+        <span className="eyebrow">
+          <span className="eyebrow__dot" aria-hidden="true" />
+          Contact
+        </span>
         <h1>Talk with us about your classification workflow.</h1>
         <p>Tell us where the review slows down. We’ll reply by email and help you decide whether Rulix fits the work.</p>
-        <a className="rulix-primary-action contact-email" href={CONTACT_EMAIL_HREF}>
+        <EmailAction className="contact-email" href={CONTACT_EMAIL_HREF}>
           <span>{CONTACT_EMAIL}</span>
-          <ArrowRight size={20} aria-hidden="true" />
-        </a>
+        </EmailAction>
       </div>
     </section>
   );
 }
 
 function PageHero({
+  eyebrow,
   title,
   copy,
   media,
   mediaAlt
 }: {
+  eyebrow: string;
   title: string;
   copy: string;
   media: string;
@@ -475,6 +530,10 @@ function PageHero({
     <section className="rulix-hero">
       <div className="rulix-shell rulix-hero__grid">
         <div className="rulix-hero__copy">
+          <span className="eyebrow">
+            <span className="eyebrow__dot" aria-hidden="true" />
+            {eyebrow}
+          </span>
           <h1>{title}</h1>
           <p>{copy}</p>
           <EmailAction />
@@ -485,10 +544,16 @@ function PageHero({
   );
 }
 
-function EmailAction() {
+function EmailAction({ className = "", href = CONTACT_PAGE_HREF, children }: {
+  className?: string;
+  href?: string;
+  children?: ReactNode;
+}) {
+  const ref = useGlassSheen<HTMLAnchorElement>();
+
   return (
-    <a className="rulix-primary-action" href={CONTACT_PAGE_HREF}>
-      Email Rulix
+    <a className={["rulix-primary-action", className].filter(Boolean).join(" ")} href={href} ref={ref}>
+      {children ?? "Email Rulix"}
       <ArrowRight size={18} aria-hidden="true" />
     </a>
   );
@@ -505,29 +570,82 @@ function StaticProductFrame({
   priority?: boolean;
   src: string;
 }) {
+  const brandTone = useBrandTone();
+
   return (
     <figure className={["product-frame", className].filter(Boolean).join(" ")}>
       <div className="product-frame__top">
-        <BrandLogo tone="light" size="compact" />
+        <BrandLogo tone={brandTone} size="compact" />
         <span>Reviewer workspace</span>
         <strong>Human decision</strong>
       </div>
       <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
+      <div className="product-frame__sheen" aria-hidden="true" />
     </figure>
   );
 }
 
 function SiteFooter() {
+  const brandTone = useBrandTone();
+
   return (
     <footer className="rulix-footer">
       <div className="rulix-shell rulix-footer__inner">
-        <BrandLogo tone="dark" size="compact" />
+        <BrandLogo tone={brandTone} size="compact" />
         <p>AI-assisted export classification with human review.</p>
         <small>© 2026 Rulix</small>
         <a href="https://app.rulix.cloud">Sign in</a>
       </div>
     </footer>
   );
+}
+
+/* The brand art is two fixed PNG pairs rather than a tintable mark, so the
+   correct pair is chosen from the theme class the app root already sets. */
+function useBrandTone(): "light" | "dark" {
+  const [dark, setDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("theme-dark")
+  );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => setDark(root.classList.contains("theme-dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  return dark ? "light" : "dark";
+}
+
+/* Moves the specular hotspot on a control to follow the pointer. */
+function useGlassSheen<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    // Touch-only pointers have no hover state to track, and jsdom has no matchMedia.
+    if (!element || typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia("(hover: hover)").matches) return;
+
+    const track = (event: PointerEvent) => {
+      const box = element.getBoundingClientRect();
+      element.style.setProperty("--sheen-x", `${((event.clientX - box.left) / box.width) * 100}%`);
+      element.style.setProperty("--sheen-y", `${((event.clientY - box.top) / box.height) * 100}%`);
+      element.style.setProperty("--sheen-opacity", "1");
+    };
+    const release = () => element.style.setProperty("--sheen-opacity", "0");
+
+    element.addEventListener("pointermove", track);
+    element.addEventListener("pointerleave", release);
+    return () => {
+      element.removeEventListener("pointermove", track);
+      element.removeEventListener("pointerleave", release);
+    };
+  }, []);
+
+  return ref;
 }
 
 function productHeroForPage(key: string) {
@@ -565,18 +683,23 @@ function useCaseTitleForAudience(audience?: MarketingAudience) {
   return "Built for teams that have to explain the classification.";
 }
 
-function useMarketingHeaderVisibility(mobileNavOpen: boolean, hasFocus: boolean) {
-  const [visible, setVisible] = useState(true);
-  const visibleRef = useRef(true);
+// Capped so the parallax offset can never drag a blob past the field's bleed.
+const PARALLAX_CEILING = 1600;
+
+function useMarketingScrollState(mobileNavOpen: boolean, hasFocus: boolean) {
+  const [state, setState] = useState({ headerVisible: true, scrolled: false });
+  const stateRef = useRef(state);
   const previousYRef = useRef(0);
   const frameRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    visibleRef.current = visible;
-  }, [visible]);
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
-    if (mobileNavOpen || hasFocus) setVisible(true);
+    if (mobileNavOpen || hasFocus) {
+      setState((current) => (current.headerVisible ? current : { ...current, headerVisible: true }));
+    }
   }, [hasFocus, mobileNavOpen]);
 
   useEffect(() => {
@@ -585,17 +708,24 @@ function useMarketingHeaderVisibility(mobileNavOpen: boolean, hasFocus: boolean)
     const update = () => {
       frameRef.current = undefined;
       const currentY = window.scrollY;
-      const nextVisible = nextMarketingHeaderVisibility({
+      const headerVisible = nextMarketingHeaderVisibility({
         previousY: previousYRef.current,
         currentY,
-        currentlyVisible: visibleRef.current,
+        currentlyVisible: stateRef.current.headerVisible,
         mobileNavOpen,
         hasFocus
       });
+      const scrolled = currentY > 24;
       previousYRef.current = currentY;
-      if (nextVisible !== visibleRef.current) {
-        visibleRef.current = nextVisible;
-        setVisible(nextVisible);
+
+      document.documentElement.style.setProperty(
+        "--scroll",
+        String(Math.min(currentY, PARALLAX_CEILING))
+      );
+
+      if (headerVisible !== stateRef.current.headerVisible || scrolled !== stateRef.current.scrolled) {
+        stateRef.current = { headerVisible, scrolled };
+        setState(stateRef.current);
       }
     };
 
@@ -604,14 +734,16 @@ function useMarketingHeaderVisibility(mobileNavOpen: boolean, hasFocus: boolean)
       frameRef.current = window.requestAnimationFrame(update);
     };
 
+    update();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (frameRef.current !== undefined) window.cancelAnimationFrame(frameRef.current);
+      document.documentElement.style.removeProperty("--scroll");
     };
   }, [hasFocus, mobileNavOpen]);
 
-  return visible;
+  return state;
 }
 
 function useOnceVisible(ref: { current: HTMLElement | null }) {

@@ -1,72 +1,147 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+/* Rulix marketing site — liquid glass material system.
+   Scoped entirely to .rulix-site so the app and dashboard surfaces are untouched. */
+
+@property --sheen-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+
+@property --sheen-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --sheen-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
 
 html.marketing-page,
 html.marketing-page body,
 html.marketing-page #root {
   min-height: 100%;
-  background: #eff7f6;
+  background: #e9eef2;
 }
 
+html.marketing-page.theme-dark,
+html.marketing-page.theme-dark body,
+html.marketing-page.theme-dark #root {
+  background: #04070a;
+}
+
+/* ---------------------------------------------------------------- tokens */
+
 .rulix-site {
-  --rulix-ink: #101719;
-  --rulix-copy: #334448;
-  --rulix-muted: #516166;
-  --rulix-rule: #d9e0e1;
-  --rulix-teal: #057f82;
-  --rulix-teal-hover: #06666a;
-  --rulix-teal-soft: #e8f8f7;
-  --rulix-dark-copy: #eff6f5;
-  --rulix-glass: rgba(255, 255, 255, 0.58);
-  --rulix-glass-strong: rgba(255, 255, 255, 0.76);
-  --rulix-glass-edge: rgba(255, 255, 255, 0.82);
-  --rulix-glass-cyan: rgba(34, 210, 211, 0.62);
-  --rulix-glass-shadow: 0 26px 74px rgba(17, 69, 75, 0.17);
+  /* ink */
+  --ink: #0b1418;
+  --copy: #2e3f45;
+  --muted: #5d6d74;
+  --accent: #04737a;
+  --accent-bright: #12c3c7;
+  --on-accent: #ffffff;
+
+  /* the wallpaper the glass refracts */
+  --field: #dde8ed;
+  --blob-1: rgba(16, 210, 206, 0.66);
+  --blob-2: rgba(56, 132, 240, 0.52);
+  --blob-3: rgba(72, 234, 188, 0.5);
+  --blob-4: rgba(148, 118, 250, 0.42);
+  --blob-5: rgba(255, 156, 116, 0.34);
+  --grain-opacity: 0.05;
+  --grain-blend: multiply;
+
+  /* material fills */
+  --mat-chrome: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(244, 251, 252, 0.32));
+  --mat-pane: linear-gradient(160deg, rgba(255, 255, 255, 0.54), rgba(243, 250, 251, 0.36));
+  --mat-card: linear-gradient(160deg, rgba(255, 255, 255, 0.58), rgba(246, 251, 252, 0.4));
+  --mat-well: rgba(255, 255, 255, 0.5);
+  --mat-inset: rgba(12, 44, 50, 0.05);
+  --hairline: rgba(11, 55, 62, 0.13);
+
+  /* specular rim — the lit edge of the lens.
+     Order matters: hairline, top catch, bottom bounce, thickness, chromatic fringe. */
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.96),
+    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.42), inset 3px 5px 12px -8px rgba(255, 255, 255, 0.9),
+    inset -3px -6px 14px -10px rgba(6, 38, 44, 0.34), inset 1px 1px 0 -0.5px rgba(158, 226, 255, 0.4),
+    inset -1px -1px 0 -0.5px rgba(255, 196, 228, 0.3);
+
+  --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.66), inset 0 2px 0 -0.5px #ffffff,
+    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.5), inset 4px 7px 16px -10px rgba(255, 255, 255, 0.96),
+    inset -4px -8px 18px -12px rgba(6, 38, 44, 0.4), inset 1.5px 1.5px 0 -0.5px rgba(150, 224, 255, 0.5),
+    inset -1.5px -1.5px 0 -0.5px rgba(255, 190, 226, 0.36);
+
+  /* one diffuse shadow, not a stack of glows */
+  --lift-sm: 0 1px 2px rgba(9, 42, 48, 0.05), 0 6px 16px -6px rgba(9, 42, 48, 0.14);
+  --lift-md: 0 2px 4px rgba(9, 42, 48, 0.05), 0 18px 44px -18px rgba(9, 42, 48, 0.24);
+  --lift-lg: 0 4px 8px rgba(9, 42, 48, 0.05), 0 40px 90px -32px rgba(9, 42, 48, 0.32);
+
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-xl: 34px;
+
+  /* Apple's springy standard curve */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
   position: relative;
   isolation: isolate;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow-x: clip;
-  color: var(--rulix-copy);
-  background:
-    radial-gradient(circle at 7% 10%, rgba(71, 216, 208, 0.2), transparent 27%),
-    radial-gradient(circle at 91% 14%, rgba(72, 170, 220, 0.18), transparent 29%),
-    radial-gradient(circle at 58% 82%, rgba(79, 220, 189, 0.14), transparent 34%),
-    linear-gradient(145deg, #f7fcfc 0%, #e6f5f5 48%, #eef8fb 100%);
+  color: var(--copy);
+  background: var(--field);
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 17px;
+  font-feature-settings: "cv11", "ss01";
+  line-height: 1.55;
+  letter-spacing: -0.011em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.rulix-site::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(12, 75, 77, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(12, 75, 77, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  opacity: 0.34;
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 82%);
-}
+html.theme-dark .rulix-site {
+  --ink: #f4f8f9;
+  --copy: #b6c6cc;
+  --muted: #8ba0a7;
+  --accent: #3ee0dd;
+  --accent-bright: #6ff2ee;
+  --on-accent: #03211f;
 
-.rulix-site::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 102% 4%, transparent 0 8%, rgba(255, 255, 255, 0.72) 8.5%, rgba(31, 210, 215, 0.22) 10%, transparent 16%),
-    radial-gradient(ellipse at -10% 76%, transparent 0 11%, rgba(255, 255, 255, 0.78) 11.5%, rgba(36, 194, 200, 0.18) 14%, transparent 21%),
-    radial-gradient(ellipse at 45% 110%, transparent 0 13%, rgba(255, 255, 255, 0.72) 13.5%, rgba(61, 205, 206, 0.16) 16%, transparent 24%);
-  filter: blur(0.3px);
-  opacity: 0.92;
+  --field: #060b10;
+  --blob-1: rgba(18, 214, 214, 0.5);
+  --blob-2: rgba(44, 108, 240, 0.46);
+  --blob-3: rgba(20, 210, 152, 0.34);
+  --blob-4: rgba(130, 88, 244, 0.46);
+  --blob-5: rgba(214, 56, 186, 0.28);
+  --grain-opacity: 0.07;
+  --grain-blend: overlay;
+
+  --mat-chrome: linear-gradient(150deg, rgba(28, 43, 50, 0.52), rgba(9, 18, 23, 0.4));
+  --mat-pane: linear-gradient(160deg, rgba(20, 33, 39, 0.56), rgba(8, 16, 21, 0.46));
+  --mat-card: linear-gradient(160deg, rgba(28, 43, 50, 0.6), rgba(12, 22, 28, 0.5));
+  --mat-well: rgba(255, 255, 255, 0.05);
+  --mat-inset: rgba(255, 255, 255, 0.05);
+  --hairline: rgba(255, 255, 255, 0.11);
+
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.34),
+    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.09), inset 3px 5px 14px -9px rgba(255, 255, 255, 0.42),
+    inset -3px -6px 16px -10px rgba(0, 0, 0, 0.6), inset 1px 1px 0 -0.5px rgba(120, 214, 255, 0.3),
+    inset -1px -1px 0 -0.5px rgba(255, 150, 214, 0.22);
+
+  --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.48),
+    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.14), inset 4px 7px 18px -11px rgba(255, 255, 255, 0.56),
+    inset -4px -8px 20px -12px rgba(0, 0, 0, 0.66), inset 1.5px 1.5px 0 -0.5px rgba(120, 214, 255, 0.4),
+    inset -1.5px -1.5px 0 -0.5px rgba(255, 150, 214, 0.28);
+
+  --lift-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+  --lift-md: 0 2px 6px rgba(0, 0, 0, 0.44), 0 20px 48px -18px rgba(0, 0, 0, 0.7);
+  --lift-lg: 0 4px 10px rgba(0, 0, 0, 0.46), 0 44px 96px -32px rgba(0, 0, 0, 0.8);
 }
 
 .rulix-site *,
@@ -77,6 +152,7 @@ html.marketing-page #root {
 
 .rulix-site main {
   position: relative;
+  z-index: 1;
   flex: 1;
 }
 
@@ -104,50 +180,270 @@ html.marketing-page #root {
 }
 
 .rulix-site :is(a, button):focus-visible {
-  outline: 3px solid rgba(5, 127, 130, 0.32);
-  outline-offset: 4px;
+  outline: 2.5px solid var(--accent-bright);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 .rulix-shell {
-  width: min(1200px, calc(100% - 64px));
+  width: min(1180px, calc(100% - 72px));
   margin-inline: auto;
 }
 
+/* ------------------------------------------------------------- wallpaper */
+
+/* Fixed, slowly drifting colour field. Every glass surface samples this, so it
+   is what makes the material read as glass instead of flat translucency. */
+.rulix-aurora {
+  position: fixed;
+  inset: -20vmax;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+}
+
+.rulix-aurora__blob {
+  position: absolute;
+  border-radius: 50%;
+  /* parallax factor is per-blob so the field gains depth on scroll */
+  translate: 0 calc(var(--scroll, 0) * 1px * var(--depth, 0));
+  will-change: translate;
+}
+
+.rulix-aurora__blob:nth-child(1) {
+  --depth: -0.04;
+  top: 2%;
+  left: -6%;
+  width: 62vmax;
+  height: 54vmax;
+  background: radial-gradient(closest-side, var(--blob-1), transparent 72%);
+  animation: drift-a 46s var(--ease) infinite alternate;
+}
+
+.rulix-aurora__blob:nth-child(2) {
+  --depth: -0.07;
+  top: -12%;
+  right: -12%;
+  width: 70vmax;
+  height: 58vmax;
+  background: radial-gradient(closest-side, var(--blob-2), transparent 72%);
+  animation: drift-b 61s var(--ease) infinite alternate;
+}
+
+.rulix-aurora__blob:nth-child(3) {
+  --depth: -0.1;
+  top: 46%;
+  left: 24%;
+  width: 58vmax;
+  height: 50vmax;
+  background: radial-gradient(closest-side, var(--blob-3), transparent 70%);
+  animation: drift-c 53s var(--ease) infinite alternate;
+}
+
+.rulix-aurora__blob:nth-child(4) {
+  --depth: -0.13;
+  bottom: -14%;
+  right: 4%;
+  width: 66vmax;
+  height: 56vmax;
+  background: radial-gradient(closest-side, var(--blob-4), transparent 72%);
+  animation: drift-d 67s var(--ease) infinite alternate;
+}
+
+.rulix-aurora__blob:nth-child(5) {
+  --depth: -0.16;
+  bottom: 6%;
+  left: -10%;
+  width: 52vmax;
+  height: 46vmax;
+  background: radial-gradient(closest-side, var(--blob-5), transparent 70%);
+  animation: drift-e 74s var(--ease) infinite alternate;
+}
+
+/* Slow light ripples. A perfectly smooth gradient gives the rim displacement
+   nothing to distort, so the panes need this to read as lenses at all. */
+.rulix-aurora__caustics {
+  position: absolute;
+  inset: -8%;
+  opacity: 0.42;
+  mix-blend-mode: soft-light;
+  filter: blur(34px);
+  background-image: repeating-radial-gradient(
+      circle at 22% 26%,
+      transparent 0 150px,
+      rgba(255, 255, 255, 0.3) 150px 240px,
+      transparent 240px 420px
+    ),
+    repeating-radial-gradient(
+      circle at 84% 72%,
+      transparent 0 210px,
+      rgba(255, 255, 255, 0.22) 210px 320px,
+      transparent 320px 560px
+    );
+  animation: caustics-swim 88s var(--ease) infinite alternate;
+}
+
+html.theme-dark .rulix-aurora__caustics {
+  opacity: 0.2;
+  mix-blend-mode: soft-light;
+}
+
+@keyframes caustics-swim {
+  to {
+    transform: translate3d(3vmax, -2vmax, 0) scale(1.08);
+  }
+}
+
+/* Film grain keeps the wide gradients from banding on 8-bit panels. */
+.rulix-aurora__grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes drift-a {
+  to {
+    transform: translate3d(7vmax, 5vmax, 0) scale(1.14);
+  }
+}
+
+@keyframes drift-b {
+  to {
+    transform: translate3d(-9vmax, 7vmax, 0) scale(1.1);
+  }
+}
+
+@keyframes drift-c {
+  to {
+    transform: translate3d(6vmax, -8vmax, 0) scale(1.18);
+  }
+}
+
+@keyframes drift-d {
+  to {
+    transform: translate3d(-7vmax, -6vmax, 0) scale(1.12);
+  }
+}
+
+@keyframes drift-e {
+  to {
+    transform: translate3d(9vmax, -4vmax, 0) scale(1.16);
+  }
+}
+
+.rulix-glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- material */
+
+/* Two stacked backdrop layers per surface:
+   ::before blurs the whole pane, ::after re-blurs only a ring at the rim so
+   the edge distorts more than the centre. That gradient of blur is what the
+   eye reads as lens thickness. */
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--mat-card);
+  box-shadow: var(--rim), var(--lift-md);
+}
+
+.glass::before,
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.glass::before {
+  -webkit-backdrop-filter: blur(22px) saturate(185%) brightness(1.04);
+  backdrop-filter: blur(22px) saturate(185%) brightness(1.04);
+}
+
+.glass::after {
+  padding: 13px;
+  -webkit-backdrop-filter: blur(7px) saturate(150%);
+  backdrop-filter: blur(7px) saturate(150%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* Chromium can run an SVG displacement map inside backdrop-filter, which bends
+   the wallpaper at the rim for real refraction. Unsupported engines drop this
+   declaration and keep the blur-gradient lens above. */
+.glass::after {
+  -webkit-backdrop-filter: blur(7px) saturate(150%) url(#rulix-lens);
+  backdrop-filter: blur(7px) saturate(150%) url(#rulix-lens);
+}
+
+.glass--chrome {
+  background: var(--mat-chrome);
+  box-shadow: var(--rim-strong), var(--lift-md);
+}
+
+.glass--chrome::before {
+  -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
+  backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
+}
+
+.glass--pane {
+  background: var(--mat-pane);
+  box-shadow: var(--rim), var(--lift-lg);
+}
+
+.glass--pane::before {
+  -webkit-backdrop-filter: blur(34px) saturate(170%);
+  backdrop-filter: blur(34px) saturate(170%);
+}
+
+.glass--pane::after {
+  padding: 22px;
+}
+
+/* ----------------------------------------------------------------- header */
+
 .rulix-header {
   position: sticky;
-  top: 14px;
+  top: 12px;
   z-index: 60;
-  width: min(1360px, calc(100% - 40px));
-  min-height: 72px;
+  width: min(1240px, calc(100% - 40px));
+  min-height: 60px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 32px;
   margin-inline: auto;
-  padding: 12px clamp(24px, 4vw, 52px);
-  border: 2px solid transparent;
-  border-radius: 26px;
-  background:
-    radial-gradient(circle at 8% -80%, rgba(255, 255, 255, 0.98), transparent 38%) padding-box,
-    linear-gradient(145deg, rgba(255, 255, 255, 0.74), rgba(225, 247, 249, 0.5)) padding-box,
-    linear-gradient(115deg, #ffffff 0%, rgba(116, 238, 239, 0.72) 34%, #ffffff 58%, rgba(53, 190, 207, 0.44) 100%) border-box;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.46),
-    0 0 30px rgba(38, 205, 211, 0.18),
-    0 22px 58px rgba(18, 90, 98, 0.19),
-    inset 0 2px 0 rgba(255, 255, 255, 0.98),
-    inset 0 -1px 0 rgba(20, 157, 166, 0.2);
-  -webkit-backdrop-filter: blur(34px) saturate(165%);
-  backdrop-filter: blur(34px) saturate(165%);
-  transform: translateY(0);
-  transition: transform 190ms ease, box-shadow 190ms ease;
+  padding: 10px 12px 10px clamp(18px, 2.4vw, 26px);
+  border-radius: 999px;
+  transition: transform 420ms var(--ease), min-height 300ms var(--ease), box-shadow 300ms var(--ease),
+    width 420ms var(--ease);
   will-change: transform;
+}
+
+.rulix-header.is-scrolled {
+  width: min(1080px, calc(100% - 40px));
+  min-height: 54px;
 }
 
 .rulix-header.is-hidden {
   pointer-events: none;
   box-shadow: none;
-  transform: translateY(calc(-100% - 20px));
+  transform: translateY(calc(-100% - 24px));
+}
+
+.rulix-header.is-hidden::before,
+.rulix-header.is-hidden::after {
+  opacity: 0;
 }
 
 .rulix-header.is-hidden:focus-within {
@@ -158,7 +454,12 @@ html.marketing-page #root {
 .rulix-header__brand {
   display: inline-flex;
   align-items: center;
-  min-width: 112px;
+  min-width: 104px;
+  transition: opacity 200ms var(--ease);
+}
+
+.rulix-header__brand:hover {
+  opacity: 0.72;
 }
 
 .rulix-header__brand .brand-logo {
@@ -166,234 +467,313 @@ html.marketing-page #root {
 }
 
 .rulix-header__brand .brand-logo-mark {
-  width: 30px;
-  height: 30px;
+  width: 27px;
+  height: 27px;
 }
 
 .rulix-header__brand .brand-logo-wordmark {
-  width: 76px;
+  width: 70px;
 }
 
 .rulix-header__nav {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 30px;
-  color: #344145;
+  gap: 4px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: -0.008em;
 }
 
 .rulix-header__nav a {
   position: relative;
-  padding: 10px 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--muted);
   white-space: nowrap;
+  transition: color 180ms var(--ease);
 }
 
-.rulix-header__nav a::after {
+/* The active pill is its own small piece of glass sliding over the chrome. */
+.rulix-header__nav a::before {
   content: "";
   position: absolute;
-  right: 0;
-  bottom: 4px;
-  left: 0;
-  height: 2px;
-  background: var(--rulix-teal);
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform 160ms ease;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  opacity: 0;
+  transform: scale(0.86);
+  transition: opacity 220ms var(--ease), transform 220ms var(--ease);
+}
+
+html.theme-dark .rulix-header__nav a::before {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .rulix-header__nav a:hover,
 .rulix-header__nav a[aria-current="page"] {
-  color: var(--rulix-ink);
+  color: var(--ink);
 }
 
-.rulix-header__nav a:hover::after,
-.rulix-header__nav a[aria-current="page"]::after {
-  transform: scaleX(1);
+.rulix-header__nav a:hover::before,
+.rulix-header__nav a[aria-current="page"]::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .rulix-header__signin {
-  color: var(--rulix-muted);
-  font-weight: 500;
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+.rulix-header__nav a.rulix-header__signin {
+  color: var(--ink);
+}
+
+.rulix-header__signin::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .rulix-menu-button {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: none;
   place-items: center;
-  border: 1px solid var(--rulix-glass-edge);
-  border-radius: 14px;
-  color: var(--rulix-ink);
-  background: rgba(255, 255, 255, 0.58);
-  box-shadow: 0 10px 28px rgba(20, 67, 70, 0.1), inset 0 1px 0 #ffffff;
-  -webkit-backdrop-filter: blur(18px) saturate(135%);
-  backdrop-filter: blur(18px) saturate(135%);
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.86);
   cursor: pointer;
+  transition: transform 200ms var(--ease);
 }
+
+html.theme-dark .rulix-menu-button {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.rulix-menu-button:active {
+  transform: scale(0.92);
+}
+
+/* --------------------------------------------------------------- controls */
 
 .rulix-site .rulix-primary-action {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   width: fit-content;
-  min-height: 52px;
+  min-height: 50px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border: 2px solid rgba(143, 244, 242, 0.78);
-  border-radius: 19px;
-  padding: 0 24px;
-  color: #ffffff;
-  background:
-    radial-gradient(circle at 26% 0%, rgba(87, 229, 225, 0.35), transparent 42%),
-    linear-gradient(135deg, rgba(5, 113, 118, 0.96), rgba(2, 69, 76, 0.97));
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.48),
-    0 0 24px rgba(36, 212, 211, 0.3),
-    0 20px 46px rgba(2, 78, 84, 0.3),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -2px 0 rgba(0, 38, 44, 0.34);
-  -webkit-backdrop-filter: blur(24px) saturate(155%);
-  backdrop-filter: blur(24px) saturate(155%);
+  gap: 10px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 26px;
+  color: var(--on-accent);
+  background: linear-gradient(160deg, var(--accent-bright), var(--accent) 62%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.62),
+    inset 0 -2px 6px -2px rgba(0, 40, 44, 0.4), var(--lift-md);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.014em;
   line-height: 1;
-  transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: transform 320ms var(--ease), box-shadow 320ms var(--ease);
 }
 
-.rulix-site .rulix-primary-action::before {
+/* Specular hotspot that tracks the cursor — the "liquid" part of the material. */
+.rulix-site .rulix-primary-action::after {
   content: "";
   position: absolute;
-  inset: 2px 2px auto;
+  inset: 0;
   z-index: -1;
-  height: 52%;
-  border-radius: 16px 16px 60% 60%;
+  border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent);
+  background: radial-gradient(
+    120px circle at var(--sheen-x) var(--sheen-y),
+    rgba(255, 255, 255, 0.55),
+    transparent 68%
+  );
+  opacity: var(--sheen-opacity);
+  transition: opacity 380ms var(--ease);
 }
 
 .rulix-site .rulix-primary-action:hover {
-  color: #ffffff;
-  border-color: rgba(180, 255, 252, 0.96);
-  box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.56),
-    0 0 32px rgba(36, 212, 211, 0.38),
-    0 24px 50px rgba(2, 78, 84, 0.34),
-    inset 0 2px 0 rgba(255, 255, 255, 0.68),
-    inset 0 -2px 0 rgba(0, 38, 44, 0.3);
-  transform: translateY(-2px);
+  transform: translateY(-1.5px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.76),
+    inset 0 -2px 6px -2px rgba(0, 40, 44, 0.34), var(--lift-lg);
 }
 
-.rulix-hero {
-  position: relative;
-  overflow: hidden;
-  display: grid;
+.rulix-site .rulix-primary-action:active {
+  transform: translateY(0) scale(0.975);
+  transition-duration: 90ms;
+}
+
+.rulix-site .rulix-primary-action svg {
+  transition: transform 320ms var(--ease-out);
+}
+
+.rulix-site .rulix-primary-action:hover svg {
+  transform: translateX(3px);
+}
+
+/* Eyebrow label — small glass capsule. */
+.eyebrow {
+  width: fit-content;
+  display: inline-flex;
   align-items: center;
-  min-height: calc(100svh - 86px);
-  margin-top: -72px;
-  padding: 160px 0 88px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
-  background:
-    radial-gradient(circle at 82% 25%, rgba(49, 214, 216, 0.14), transparent 28%),
-    radial-gradient(circle at 12% 78%, rgba(255, 255, 255, 0.8), transparent 30%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(229, 247, 249, 0.16));
-  -webkit-backdrop-filter: blur(14px) saturate(125%);
-  backdrop-filter: blur(14px) saturate(125%);
+  gap: 8px;
+  border-radius: 999px;
+  padding: 6px 14px 6px 12px;
+  color: var(--ink);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    var(--lift-sm);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.004em;
 }
 
-.rulix-hero::before,
-.rulix-hero::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-  border: 26px solid rgba(255, 255, 255, 0.56);
-  box-shadow:
-    inset 0 0 0 2px rgba(61, 212, 216, 0.22),
-    0 0 0 2px rgba(61, 212, 216, 0.16),
-    0 24px 70px rgba(52, 164, 173, 0.14);
-  filter: blur(0.2px);
+html.theme-dark .eyebrow {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    var(--lift-sm);
 }
 
-.rulix-hero::before {
-  width: 420px;
-  height: 250px;
-  top: 86px;
-  right: -190px;
-  border-radius: 48% 52% 58% 42%;
-  transform: rotate(28deg);
+.eyebrow__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-bright) 22%, transparent);
 }
 
-.rulix-hero::after {
-  width: 560px;
-  height: 230px;
-  bottom: -170px;
-  left: -140px;
-  border-radius: 52% 48% 40% 60%;
-  transform: rotate(12deg);
-}
-
-.rulix-hero__grid {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(430px, 0.88fr);
-  align-items: center;
-  gap: clamp(48px, 7vw, 104px);
-}
-
-.rulix-hero__copy {
-  display: grid;
-  align-content: center;
-  gap: 28px;
-}
+/* ------------------------------------------------------------ typography */
 
 .rulix-hero h1,
 .contact-page h1 {
-  max-width: 760px;
-  color: var(--rulix-ink);
-  font-size: clamp(52px, 6vw, 82px);
-  font-weight: 800;
-  letter-spacing: -0.048em;
+  max-width: 19ch;
+  color: var(--ink);
+  font-size: clamp(46px, 5.6vw, 78px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
   line-height: 0.98;
   text-wrap: balance;
 }
 
+.contact-page h1 {
+  max-width: 22ch;
+}
+
 .rulix-hero__copy > p,
 .contact-page__inner > p {
-  max-width: 660px;
-  color: var(--rulix-copy);
-  font-size: clamp(18px, 1.7vw, 21px);
-  line-height: 1.62;
+  max-width: 46ch;
+  color: var(--copy);
+  font-size: clamp(18px, 1.5vw, 20px);
+  letter-spacing: -0.014em;
+  line-height: 1.5;
 }
+
+.section-intro {
+  max-width: 34ch;
+  display: grid;
+  gap: 18px;
+}
+
+.section-intro h2,
+.audience-story h2 {
+  color: var(--ink);
+  font-size: clamp(34px, 3.7vw, 54px);
+  font-weight: 700;
+  letter-spacing: -0.036em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.section-intro p,
+.audience-story p {
+  max-width: 44ch;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.58;
+}
+
+/* ------------------------------------------------------------------- hero */
+
+/* The hero deliberately carries no glass: it is the one place the wallpaper is
+   seen unmediated, which gives every pane below it something to be read against. */
+.rulix-hero {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-height: min(820px, calc(100svh - 40px));
+  padding: clamp(132px, 15vh, 178px) 0 clamp(56px, 7vh, 92px);
+}
+
+.rulix-hero__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(400px, 0.96fr);
+  align-items: center;
+  gap: clamp(44px, 6vw, 92px);
+}
+
+.rulix-hero__copy {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 26px;
+}
+
+.rulix-hero__copy > p {
+  margin-bottom: 6px;
+}
+
+/* ---------------------------------------------------------- product frame */
 
 .product-frame {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
-  border: 4px solid transparent;
-  border-radius: 30px;
-  background:
-    linear-gradient(#0b1113, #0b1113) padding-box,
-    linear-gradient(125deg, #ffffff 0%, rgba(112, 245, 241, 0.88) 28%, rgba(255, 255, 255, 0.98) 53%, rgba(28, 194, 207, 0.72) 78%, #ffffff 100%) border-box;
-  box-shadow:
-    0 0 0 6px rgba(255, 255, 255, 0.58),
-    0 0 44px rgba(32, 208, 211, 0.32),
-    0 34px 82px rgba(16, 71, 78, 0.25),
-    inset 0 2px 0 rgba(255, 255, 255, 0.36);
+  border-radius: var(--radius-xl);
+  padding: 7px;
+  background: var(--mat-card);
+  box-shadow: var(--rim-strong), var(--lift-lg);
+  transition: transform 700ms var(--ease-out), box-shadow 700ms var(--ease-out);
+}
+
+.product-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  backdrop-filter: blur(26px) saturate(190%);
+}
+
+.rulix-hero__media {
+  transform: perspective(1600px) rotateY(-3.5deg) rotateX(1.2deg);
+}
+
+.rulix-hero__media:hover {
+  transform: perspective(1600px) rotateY(0deg) rotateX(0deg) translateY(-4px);
 }
 
 .product-frame__top {
-  min-height: 44px;
+  min-height: 30px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 14px;
-  padding: 0 14px;
-  color: #c6d0d2;
-  background: #0b1113;
-  font-size: 13px;
+  padding: 0 7px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: -0.004em;
 }
 
 .product-frame__top .brand-logo {
@@ -401,12 +781,12 @@ html.marketing-page #root {
 }
 
 .product-frame__top .brand-logo-mark {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .product-frame__top .brand-logo-wordmark {
-  width: 45px;
+  width: 43px;
 }
 
 .product-frame__top span {
@@ -416,9 +796,20 @@ html.marketing-page #root {
 }
 
 .product-frame__top strong {
-  color: #eff6f5;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--ink);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.44);
+  font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+html.theme-dark .product-frame__top strong {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .product-frame > img {
@@ -426,135 +817,175 @@ html.marketing-page #root {
   display: block;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  background: #071014;
+  object-position: top center;
+  border-radius: calc(var(--radius-xl) - 10px);
+  background: #060d11;
+  box-shadow: 0 0 0 1px rgba(6, 32, 38, 0.5), 0 10px 30px -12px rgba(4, 24, 30, 0.6);
 }
+
+/* A single raking highlight across the screen, as if lit from above left. */
+.product-frame > img + .product-frame__sheen,
+.product-frame__sheen {
+  position: absolute;
+  inset: 39px 7px 7px;
+  border-radius: calc(var(--radius-xl) - 10px);
+  pointer-events: none;
+  background: linear-gradient(
+    122deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.04) 22%,
+    transparent 42%
+  );
+  mix-blend-mode: screen;
+}
+
+/* ------------------------------------------------------------------ bands */
 
 .rulix-band {
   position: relative;
-  padding: 112px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.68);
-  background: rgba(255, 255, 255, 0.4);
-  -webkit-backdrop-filter: blur(22px) saturate(120%);
-  backdrop-filter: blur(22px) saturate(120%);
+  padding: clamp(72px, 9vw, 116px) clamp(30px, 4vw, 60px);
+  border-radius: var(--radius-xl);
+  margin-inline: auto;
+  width: min(1300px, calc(100% - 40px));
 }
 
-.section-intro {
-  max-width: 720px;
-  display: grid;
-  gap: 18px;
+.rulix-band + .rulix-band {
+  margin-top: 26px;
 }
 
-.section-intro h2,
-.audience-story h2 {
-  color: var(--rulix-ink);
-  font-size: clamp(36px, 4.2vw, 58px);
-  font-weight: 750;
-  letter-spacing: -0.038em;
-  line-height: 1.04;
-  text-wrap: balance;
+.rulix-band:last-of-type {
+  margin-bottom: clamp(60px, 8vw, 104px);
 }
 
-.section-intro p,
-.audience-story p {
-  max-width: 650px;
-  color: var(--rulix-muted);
-  font-size: 17px;
-  line-height: 1.65;
+.rulix-band > .rulix-shell {
+  width: min(1180px, 100%);
 }
 
-.section-intro--light h2,
-.section-intro--light p {
-  color: var(--rulix-dark-copy);
-}
-
-.section-intro--light p {
-  color: #cbd7d6;
+/* Dark panes are the same material with a darker fill, so the wallpaper still
+   colours them from behind rather than being covered by flat ink. */
+.outcome-band,
+.trust-band {
+  --copy: #c3d3d8;
+  --muted: #9db0b6;
+  --ink: #ffffff;
+  --hairline: rgba(255, 255, 255, 0.14);
+  --mat-pane: radial-gradient(120% 90% at 8% -12%, rgba(62, 224, 221, 0.22), transparent 58%),
+    radial-gradient(100% 80% at 104% 108%, rgba(124, 92, 240, 0.24), transparent 60%),
+    radial-gradient(90% 70% at 78% -4%, rgba(56, 132, 240, 0.16), transparent 62%),
+    linear-gradient(160deg, rgba(8, 18, 22, 0.9), rgba(4, 10, 14, 0.88));
+  --mat-well: rgba(255, 255, 255, 0.07);
+  color: var(--copy);
 }
 
 .outcome-band,
 .trust-band {
-  overflow: hidden;
-  color: var(--rulix-dark-copy);
-  border-bottom-color: rgba(255, 255, 255, 0.13);
-  background:
-    radial-gradient(circle at 88% 8%, rgba(35, 176, 169, 0.2), transparent 32%),
-    linear-gradient(145deg, rgba(8, 23, 25, 0.98), rgba(12, 36, 38, 0.95));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  -webkit-backdrop-filter: blur(24px) saturate(130%);
-  backdrop-filter: blur(24px) saturate(130%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.24),
+    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.07), inset 4px 7px 20px -12px rgba(255, 255, 255, 0.4),
+    inset -4px -8px 22px -14px rgba(0, 0, 0, 0.7), var(--lift-lg);
+}
+
+.section-intro--light h2 {
+  color: #ffffff;
+}
+
+.section-intro--light p {
+  color: #a8bcc2;
 }
 
 .outcome-band__grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.76fr) minmax(0, 1.24fr);
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
   align-items: start;
-  gap: clamp(56px, 8vw, 120px);
+  gap: clamp(48px, 7vw, 104px);
 }
 
 .outcome-list {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  display: grid;
+  gap: 10px;
 }
 
 .outcome-list li {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 22px;
-  padding: 28px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: var(--radius-md);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background 300ms var(--ease), transform 300ms var(--ease);
+}
+
+.outcome-list li:hover {
+  background: rgba(255, 255, 255, 0.11);
+  transform: translateX(3px);
 }
 
 .outcome-list > li > span {
-  color: #79d4d1;
-  font-size: 15px;
-  font-weight: 700;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: rgba(62, 224, 221, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.28);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .outcome-list h3 {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #ffffff;
-  font-size: 23px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.28;
 }
 
 .outcome-list p {
-  max-width: 650px;
-  color: #cbd7d6;
+  max-width: 52ch;
+  color: #a8bcc2;
   font-size: 16px;
-  line-height: 1.65;
+  line-height: 1.6;
 }
 
-.product-flow {
-  overflow: hidden;
-}
+/* -------------------------------------------------------- product / flow */
 
 .product-flow__intro {
-  margin-bottom: 64px;
+  margin-bottom: clamp(40px, 5vw, 64px);
 }
 
 .product-flow__steps {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
-.product-step {
+/* Cards sit inside a glass pane, so they are opaque surfaces rather than a
+   second layer of glass — stacking blur on blur just reads as fog. */
+.product-step,
+.audience-story {
   display: grid;
-  grid-template-columns: minmax(280px, 0.43fr) minmax(0, 0.57fr);
+  grid-template-columns: minmax(260px, 0.44fr) minmax(0, 0.56fr);
   align-items: center;
-  gap: clamp(52px, 8vw, 112px);
-  padding: clamp(34px, 5vw, 58px);
-  border: 1px solid rgba(255, 255, 255, 0.94);
-  border-radius: 30px;
-  background:
-    radial-gradient(circle at 90% 0%, rgba(74, 220, 217, 0.13), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(222, 245, 247, 0.46));
-  box-shadow:
-    0 0 0 2px rgba(49, 195, 200, 0.1),
-    var(--rulix-glass-shadow),
-    inset 0 2px 0 #ffffff,
-    inset 0 -1px 0 rgba(36, 176, 184, 0.16);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
-  backdrop-filter: blur(30px) saturate(150%);
+  gap: clamp(40px, 6vw, 84px);
+  padding: clamp(28px, 3.4vw, 44px);
+  border-radius: var(--radius-lg);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    var(--lift-sm);
+  transition: transform 500ms var(--ease), box-shadow 500ms var(--ease);
+}
+
+html.theme-dark .product-step,
+html.theme-dark .audience-story {
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--lift-sm);
+}
+
+.product-step:hover,
+.audience-story:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--lift-md);
 }
 
 .product-step:nth-child(even) .product-step__copy {
@@ -563,274 +994,64 @@ html.marketing-page #root {
 
 .product-step__copy {
   display: grid;
-  gap: 16px;
+  justify-items: start;
+  gap: 14px;
 }
 
 .product-step__copy > span {
-  color: var(--rulix-teal);
-  font-size: 15px;
-  font-weight: 800;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .product-step h3 {
-  color: var(--rulix-ink);
-  font-size: clamp(30px, 3.2vw, 46px);
-  font-weight: 750;
-  letter-spacing: -0.034em;
+  color: var(--ink);
+  font-size: clamp(26px, 2.6vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.032em;
   line-height: 1.08;
 }
 
 .product-step p {
-  color: var(--rulix-copy);
+  max-width: 42ch;
+  color: var(--copy);
   font-size: 17px;
-  line-height: 1.62;
+  line-height: 1.56;
 }
 
-.product-step strong {
-  padding-left: 16px;
-  border-left: 3px solid var(--rulix-teal);
-  color: var(--rulix-muted);
+.product-step strong,
+.audience-story strong {
+  max-width: 46ch;
+  padding-left: 15px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--muted);
   font-size: 15px;
-  font-weight: 600;
-  line-height: 1.6;
+  font-weight: 500;
+  line-height: 1.55;
 }
 
 .product-flow:not(.is-visible) .product-step {
   opacity: 0;
-  transform: translateY(14px);
+  transform: translateY(18px);
 }
 
 .product-flow.is-visible .product-step {
-  animation: flow-step-reveal 420ms ease both;
-  animation-delay: calc(var(--step-index) * 80ms);
-}
-
-.audience-stories {
-  display: grid;
-  gap: 24px;
-  padding-top: 48px;
-}
-
-.audience-story {
-  display: grid;
-  grid-template-columns: minmax(0, 0.47fr) minmax(0, 0.53fr);
-  align-items: center;
-  gap: clamp(52px, 8vw, 112px);
-  padding: clamp(34px, 5vw, 58px);
-  border: 1px solid rgba(255, 255, 255, 0.94);
-  border-radius: 30px;
-  background:
-    radial-gradient(circle at 10% 100%, rgba(74, 220, 217, 0.12), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(222, 245, 247, 0.46));
-  box-shadow:
-    0 0 0 2px rgba(49, 195, 200, 0.1),
-    var(--rulix-glass-shadow),
-    inset 0 2px 0 #ffffff,
-    inset 0 -1px 0 rgba(36, 176, 184, 0.16);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
-  backdrop-filter: blur(30px) saturate(150%);
-  scroll-margin-top: 92px;
-}
-
-.audience-story:last-child {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.94);
-}
-
-.audience-story:nth-child(even) .audience-story__copy {
-  order: 2;
-}
-
-.audience-story__copy {
-  display: grid;
-  gap: 18px;
-}
-
-.audience-story__label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--rulix-teal);
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.audience-story__label svg {
-  flex: 0 0 auto;
-}
-
-.audience-story strong {
-  max-width: 620px;
-  padding-left: 16px;
-  border-left: 3px solid var(--rulix-teal);
-  color: var(--rulix-copy);
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.6;
-}
-
-.trust-band__grid {
-  display: grid;
-  gap: 62px;
-}
-
-.trust-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.trust-list article {
-  min-height: 210px;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-content: start;
-  gap: 18px;
-  padding: 34px 28px 34px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
-}
-
-.trust-list article:nth-child(odd) {
-  border-right: 1px solid rgba(255, 255, 255, 0.16);
-}
-
-.trust-list article:nth-child(even) {
-  padding-left: 34px;
-}
-
-.trust-list svg {
-  color: #79d4d1;
-}
-
-.trust-list h3 {
-  margin-bottom: 8px;
-  color: #ffffff;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.trust-list p {
-  color: #cbd7d6;
-  font-size: 16px;
-  line-height: 1.65;
-}
-
-.data-boundary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  max-width: 760px;
-  padding: 18px 20px;
-  border: 1px solid rgba(121, 212, 209, 0.36);
-  border-radius: 16px;
-  color: #e7f8f6;
-  background: linear-gradient(135deg, rgba(13, 148, 146, 0.26), rgba(255, 255, 255, 0.08));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 42px rgba(0, 10, 12, 0.15);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
-  backdrop-filter: blur(18px) saturate(130%);
-}
-
-.data-boundary svg {
-  color: #9be3df;
-}
-
-.data-boundary p {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.contact-page {
-  min-height: calc(100svh - 72px);
-  display: grid;
-  align-items: center;
-  padding: 104px 0 120px;
-  background:
-    radial-gradient(circle at 17% 36%, rgba(39, 209, 205, 0.2), transparent 31%),
-    radial-gradient(circle at 88% 78%, rgba(82, 162, 220, 0.14), transparent 32%),
-    transparent;
-}
-
-.contact-page__inner {
-  max-width: 1040px;
-  display: grid;
-  gap: 30px;
-  padding: clamp(34px, 5.5vw, 68px);
-  border: 1px solid rgba(255, 255, 255, 0.96);
-  border-radius: 34px;
-  background:
-    radial-gradient(circle at 96% 0%, rgba(55, 215, 213, 0.14), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(222, 246, 248, 0.48));
-  box-shadow:
-    0 0 0 3px rgba(52, 197, 204, 0.1),
-    0 34px 90px rgba(17, 79, 86, 0.2),
-    inset 0 2px 0 #ffffff,
-    inset 0 -1px 0 rgba(36, 176, 184, 0.18);
-  -webkit-backdrop-filter: blur(34px) saturate(160%);
-  backdrop-filter: blur(34px) saturate(160%);
-}
-
-.contact-page h1 {
-  max-width: 860px;
-}
-
-.contact-email {
-  min-height: 68px;
-  display: inline-flex;
-  gap: 16px;
-  margin-top: 8px;
-  padding: 8px 22px;
-}
-
-.contact-email span {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.rulix-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.72);
-  background: rgba(248, 253, 252, 0.66);
-  box-shadow: inset 0 1px 0 rgba(18, 79, 81, 0.06);
-  -webkit-backdrop-filter: blur(22px) saturate(130%);
-  backdrop-filter: blur(22px) saturate(130%);
-}
-
-.rulix-footer__inner {
-  min-height: 128px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 24px;
-}
-
-.rulix-footer .brand-logo-wordmark {
-  width: 76px;
-}
-
-.rulix-footer p {
-  color: var(--rulix-muted);
-  font-size: 15px;
-}
-
-.rulix-footer small,
-.rulix-footer a {
-  color: var(--rulix-muted);
-  font-size: 14px;
-}
-
-.rulix-footer a {
-  font-weight: 600;
-}
-
-.rulix-footer a:hover {
-  color: var(--rulix-ink);
+  animation: flow-step-reveal 640ms var(--ease-out) both;
+  animation-delay: calc(var(--step-index) * 90ms);
 }
 
 @keyframes flow-step-reveal {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(18px);
   }
 
   to {
@@ -839,106 +1060,246 @@ html.marketing-page #root {
   }
 }
 
-@media (max-width: 980px) {
-  .rulix-shell {
-    width: min(100% - 48px, 820px);
-  }
+/* -------------------------------------------------------------- use cases */
 
-  .rulix-header {
-    grid-template-columns: auto 1fr auto;
-    top: 10px;
-    width: calc(100% - 32px);
-    padding-inline: 24px;
-  }
+.audience-stories {
+  display: grid;
+}
 
-  .rulix-header__nav {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 16px;
-    left: 16px;
-    display: none;
-    gap: 0;
-    padding: 8px 18px;
-    border: 1px solid var(--rulix-glass-edge);
-    border-radius: 20px;
-    background: rgba(248, 253, 252, 0.88);
-    box-shadow: 0 24px 60px rgba(16, 54, 57, 0.18), inset 0 1px 0 #ffffff;
-    -webkit-backdrop-filter: blur(28px) saturate(145%);
-    backdrop-filter: blur(28px) saturate(145%);
-  }
+.audience-stories > .rulix-shell {
+  display: grid;
+  gap: 18px;
+}
 
-  .rulix-header.is-open .rulix-header__nav {
-    display: grid;
-  }
+.audience-story {
+  grid-template-columns: minmax(0, 0.48fr) minmax(0, 0.52fr);
+  scroll-margin-top: 96px;
+}
 
-  .rulix-header__nav a {
-    padding: 14px 4px;
-    border-bottom: 1px solid #edf0f1;
-  }
+.audience-story:nth-child(even) .audience-story__copy {
+  order: 2;
+}
 
-  .rulix-header__nav a:last-child {
-    border-bottom: 0;
-  }
+.audience-story__copy {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
 
-  .rulix-header__nav a::after {
-    display: none;
-  }
+.audience-story__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 999px;
+  padding: 6px 14px 6px 11px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.004em;
+}
 
-  .rulix-menu-button {
-    display: grid;
-    grid-column: 3;
-  }
+.audience-story__label svg {
+  flex: 0 0 auto;
+}
 
-  .rulix-hero {
-    min-height: auto;
-    margin-top: -72px;
-    padding: 148px 0 78px;
-  }
+/* ------------------------------------------------------------------ trust */
 
-  .rulix-hero::before {
-    width: 300px;
-    height: 180px;
-    top: 90px;
-    right: -150px;
-    border-width: 18px;
-    opacity: 0.7;
-  }
+.trust-band__grid {
+  display: grid;
+  gap: clamp(40px, 5vw, 58px);
+}
 
-  .rulix-hero::after {
-    width: 380px;
-    height: 170px;
-    bottom: -120px;
-    left: -180px;
-    border-width: 18px;
-    opacity: 0.65;
-  }
+.trust-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
 
-  .rulix-hero__grid,
-  .outcome-band__grid,
-  .product-step,
-  .audience-story {
-    grid-template-columns: 1fr;
-  }
+.trust-list article {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-content: start;
+  gap: 16px;
+  padding: 28px 26px;
+  border-radius: var(--radius-md);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background 300ms var(--ease);
+}
 
+.trust-list article:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.trust-list svg {
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: 50%;
+  color: #6ff2ee;
+  background: rgba(62, 224, 221, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.26);
+}
+
+.trust-list h3 {
+  margin-bottom: 7px;
+  color: #ffffff;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.32;
+}
+
+.trust-list p {
+  color: #a8bcc2;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.data-boundary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  max-width: 74ch;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  color: #e2f5f3;
+  background: linear-gradient(135deg, rgba(62, 224, 221, 0.14), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.data-boundary svg {
+  color: #6ff2ee;
+}
+
+.data-boundary p {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- contact */
+
+.contact-page {
+  min-height: calc(100svh - 60px);
+  display: grid;
+  align-items: center;
+  padding: clamp(120px, 15vh, 176px) 0 clamp(80px, 10vh, 120px);
+}
+
+.contact-page__inner {
+  max-width: 940px;
+  display: grid;
+  justify-items: start;
+  gap: 26px;
+  padding: clamp(34px, 4.6vw, 62px);
+  border-radius: var(--radius-xl);
+}
+
+.contact-email {
+  min-height: 62px;
+  gap: 14px;
+  margin-top: 6px;
+  padding: 0 26px;
+}
+
+.contact-email span {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.rulix-footer {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 1px;
+  border-top: 1px solid var(--hairline);
+  background: var(--mat-pane);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+html.theme-dark .rulix-footer {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.rulix-footer__inner {
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 0;
+}
+
+.rulix-footer .brand-logo-wordmark {
+  width: 70px;
+}
+
+.rulix-footer p {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.rulix-footer small {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.rulix-footer a {
+  border-radius: 999px;
+  padding: 7px 15px;
+  color: var(--ink);
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 200ms var(--ease);
+}
+
+html.theme-dark .rulix-footer a {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.rulix-footer a:hover {
+  transform: translateY(-1px);
+}
+
+/* ------------------------------------------------------------ responsive */
+
+@media (max-width: 1080px) {
   .rulix-hero__grid {
-    gap: 54px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 52px;
   }
 
   .rulix-hero__copy {
-    max-width: 760px;
+    max-width: 700px;
   }
 
-  .rulix-hero__media {
-    width: 100%;
+  .rulix-hero__media,
+  .rulix-hero__media:hover {
+    transform: none;
+  }
+
+  .outcome-band__grid,
+  .product-step,
+  .audience-story {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .outcome-band__grid {
-    gap: 48px;
+    gap: 44px;
   }
 
   .product-step,
   .audience-story {
-    gap: 42px;
+    gap: 36px;
   }
 
   .product-step:nth-child(even) .product-step__copy,
@@ -946,8 +1307,68 @@ html.marketing-page #root {
     order: initial;
   }
 
+  .section-intro {
+    max-width: 44ch;
+  }
+}
+
+@media (max-width: 900px) {
+  .rulix-shell {
+    width: min(100% - 44px, 760px);
+  }
+
+  .rulix-header {
+    top: 10px;
+    width: calc(100% - 24px);
+    padding-right: 10px;
+  }
+
+  .rulix-header.is-scrolled {
+    width: calc(100% - 24px);
+  }
+
+  .rulix-header__nav {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    left: 0;
+    display: none;
+    gap: 2px;
+    padding: 10px;
+    border-radius: var(--radius-lg);
+    background: var(--mat-chrome);
+    box-shadow: var(--rim-strong), var(--lift-lg);
+    -webkit-backdrop-filter: blur(30px) saturate(190%);
+    backdrop-filter: blur(30px) saturate(190%);
+  }
+
+  .rulix-header.is-open .rulix-header__nav {
+    display: grid;
+    animation: nav-drop 300ms var(--ease-out) both;
+  }
+
+  .rulix-header__nav a {
+    padding: 13px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+  }
+
+  .rulix-header__signin {
+    margin-left: 0;
+  }
+
+  .rulix-menu-button {
+    display: grid;
+    grid-column: 3;
+  }
+
+  .trust-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .rulix-footer__inner {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 16px;
   }
 
   .rulix-footer small {
@@ -955,60 +1376,90 @@ html.marketing-page #root {
   }
 }
 
+@keyframes nav-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (max-width: 640px) {
+  .rulix-site {
+    font-size: 16px;
+  }
+
   .rulix-shell {
-    width: calc(100% - 32px);
+    width: calc(100% - 36px);
   }
 
   .rulix-header {
     top: 8px;
-    width: calc(100% - 20px);
-    min-height: 64px;
-    padding-inline: 16px;
-    border-radius: 20px;
+    width: calc(100% - 16px);
+    min-height: 56px;
+    padding-left: 16px;
   }
 
-  .rulix-header__brand .brand-logo-mark {
-    width: 28px;
-    height: 28px;
-  }
-
-  .rulix-header__brand .brand-logo-wordmark {
-    width: 70px;
+  .rulix-header.is-scrolled {
+    width: calc(100% - 16px);
+    min-height: 52px;
   }
 
   .rulix-hero {
-    margin-top: -64px;
-    padding: 126px 0 62px;
-  }
-
-  .rulix-hero::before {
-    width: 200px;
-    height: 120px;
-    top: 82px;
-    right: -120px;
-    border-width: 12px;
-    opacity: 0.55;
-  }
-
-  .rulix-hero::after {
-    display: none;
+    min-height: 0;
+    padding: 118px 0 66px;
   }
 
   .rulix-hero h1,
   .contact-page h1 {
-    font-size: clamp(42px, 13vw, 58px);
-    letter-spacing: -0.045em;
-    line-height: 1.01;
+    max-width: none;
+    font-size: clamp(38px, 11.5vw, 56px);
+    letter-spacing: -0.04em;
+    line-height: 1.02;
   }
 
   .rulix-hero__copy > p,
   .contact-page__inner > p {
-    font-size: 18px;
+    font-size: 17px;
   }
 
-  .rulix-primary-action {
+  .rulix-site .rulix-primary-action {
     width: 100%;
+  }
+
+  .rulix-band {
+    width: calc(100% - 16px);
+    padding: 60px 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .rulix-band + .rulix-band {
+    margin-top: 16px;
+  }
+
+  .section-intro h2,
+  .audience-story h2 {
+    font-size: clamp(28px, 8.4vw, 36px);
+  }
+
+  .product-frame {
+    padding: 7px;
+    border-radius: var(--radius-lg);
+  }
+
+  /* The demo captures are 16:9; cropping them to a taller box cuts the
+     left-hand caption clean off. */
+  .product-frame > img {
+    border-radius: calc(var(--radius-lg) - 10px);
+  }
+
+  .product-frame__sheen {
+    inset: 40px 7px 7px;
+    border-radius: calc(var(--radius-lg) - 10px);
   }
 
   .product-frame__top span {
@@ -1019,76 +1470,48 @@ html.marketing-page #root {
     grid-template-columns: 1fr auto;
   }
 
-  .product-frame {
-    border-width: 2px;
-    border-radius: 24px;
-    box-shadow:
-      0 0 0 3px rgba(255, 255, 255, 0.52),
-      0 0 28px rgba(32, 208, 211, 0.22),
-      0 26px 60px rgba(16, 71, 78, 0.22),
-      inset 0 2px 0 rgba(255, 255, 255, 0.34);
-  }
-
-  .rulix-band {
-    padding: 78px 0;
-  }
-
-  .section-intro h2,
-  .audience-story h2 {
-    font-size: 36px;
-  }
-
   .outcome-list li {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .product-flow__intro {
-    margin-bottom: 38px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px 18px;
   }
 
   .product-step,
   .audience-story {
-    padding: 30px 24px;
-    border-radius: 22px;
+    padding: 26px 20px;
+    border-radius: var(--radius-md);
   }
 
   .product-step h3 {
-    font-size: 32px;
+    font-size: 27px;
   }
 
-  .trust-list {
-    grid-template-columns: 1fr;
-  }
-
-  .trust-list article,
-  .trust-list article:nth-child(even) {
-    min-height: 0;
-    padding: 28px 0;
-    border-right: 0;
+  .trust-list article {
+    padding: 22px 20px;
   }
 
   .contact-page {
-    min-height: calc(100svh - 64px);
-    padding: 78px 0 92px;
-    background: radial-gradient(circle at 20% 30%, rgba(40, 174, 169, 0.1), transparent 42%);
+    padding: 104px 0 76px;
   }
 
   .contact-page__inner {
-    padding: 30px 22px;
-    border-radius: 24px;
+    padding: 28px 22px;
+    border-radius: var(--radius-lg);
   }
 
   .contact-email {
-    gap: 14px;
-    padding: 14px 18px;
+    padding: 0 20px;
+  }
+
+  .contact-email span {
+    font-size: 15px;
   }
 
   .rulix-footer__inner {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
-    gap: 16px;
-    padding: 30px 0;
+    gap: 14px;
+    padding: 26px 0;
   }
 
   .rulix-footer p,
@@ -1102,6 +1525,52 @@ html.marketing-page #root {
   }
 }
 
+/* ---------------------------------------------------------- preferences */
+
+/* Transparency is decorative here, so honour the OS opt-out with flat fills
+   that keep every contrast ratio intact. */
+@media (prefers-reduced-transparency: reduce) {
+  .rulix-site {
+    --mat-chrome: #f7fafb;
+    --mat-pane: #f2f7f8;
+    --mat-card: #ffffff;
+    --mat-well: rgba(11, 55, 62, 0.05);
+  }
+
+  html.theme-dark .rulix-site {
+    --mat-chrome: #131e23;
+    --mat-pane: #0b1418;
+    --mat-card: #131e23;
+    --mat-well: rgba(255, 255, 255, 0.07);
+  }
+
+  .outcome-band,
+  .trust-band {
+    --mat-pane: #0a1418;
+  }
+
+  .rulix-aurora {
+    display: none;
+  }
+
+  .rulix-aurora__caustics {
+    display: none;
+  }
+
+  .glass::before,
+  .glass::after,
+  .product-frame::before,
+  .rulix-footer,
+  .eyebrow {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .glass::after {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rulix-site *,
   .rulix-site *::before,
@@ -1112,8 +1581,38 @@ html.marketing-page #root {
     transition-duration: 1ms !important;
   }
 
+  .rulix-aurora__blob {
+    animation: none !important;
+    translate: none !important;
+  }
+
   .product-flow:not(.is-visible) .product-step {
     opacity: 1;
     transform: none;
+  }
+
+  .rulix-hero__media,
+  .rulix-hero__media:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .rulix-aurora,
+  .glass::before,
+  .glass::after,
+  .product-frame__sheen {
+    display: none;
+  }
+
+  .rulix-header,
+  .rulix-band,
+  .product-step,
+  .audience-story,
+  .trust-list article,
+  .outcome-list li,
+  .contact-page__inner,
+  .product-frame {
+    border: 1px solid CanvasText;
   }
 }
