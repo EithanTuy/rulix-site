@@ -307,7 +307,6 @@ function HomePage() {
   return (
     <>
       <PageHero
-        eyebrow="Export-control memo review"
         title="AI-assisted export classification."
         copy="Rulix helps export-control teams review classification memos, find missing support, and keep the final decision with a qualified person."
       />
@@ -340,7 +339,6 @@ function ProductPage({ page }: { page: MarketingPageMeta }) {
   return (
     <>
       <PageHero
-        eyebrow="How Rulix works"
         title={hero.title}
         copy={hero.copy}
       />
@@ -402,7 +400,6 @@ function UseCasesPage({ page }: { page: MarketingPageMeta }) {
   return (
     <>
       <PageHero
-        eyebrow="Who it is for"
         title={title}
         copy="Rulix gives each team a shared way to find missing information, answer review questions, and document the final decision."
       />
@@ -434,7 +431,6 @@ function TrustPage() {
   return (
     <>
       <PageHero
-        eyebrow="Human review first"
         title="A person makes the final decision."
         copy="Rulix helps reviewers see the weak point, ask for the right information, and record why they made the final call."
       />
@@ -472,10 +468,6 @@ function ContactPage() {
   return (
     <section className="contact-page">
       <div className="rulix-shell contact-page__inner glass glass--pane">
-        <span className="eyebrow">
-          <span className="eyebrow__dot" aria-hidden="true" />
-          Contact
-        </span>
         <h1>Talk with us about your classification workflow.</h1>
         <p>Tell us where the review slows down. We’ll reply by email and help you decide whether Rulix fits the work.</p>
         <EmailAction className="contact-email" href={CONTACT_EMAIL_HREF}>
@@ -487,21 +479,15 @@ function ContactPage() {
 }
 
 function PageHero({
-  eyebrow,
   title,
   copy
 }: {
-  eyebrow: string;
   title: string;
   copy: string;
 }) {
   return (
     <section className="rulix-hero">
       <div className="rulix-shell rulix-hero__copy">
-        <span className="eyebrow">
-          <span className="eyebrow__dot" aria-hidden="true" />
-          {eyebrow}
-        </span>
         <h1>{title}</h1>
         <p>{copy}</p>
         <EmailAction />
