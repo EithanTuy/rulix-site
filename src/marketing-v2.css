@@ -1,5 +1,10 @@
-/* Rulix marketing site — liquid glass material system.
-   Scoped entirely to .rulix-site so the app and dashboard surfaces are untouched. */
+/* Rulix marketing site — liquid glass theme.
+   Scoped entirely to .rulix-site so the app and dashboard surfaces are untouched.
+
+   The site is one vivid wallpaper with clear glass chrome floating on it. There
+   is deliberately no light/dark split: the material only works over saturated
+   colour, so the page commits to that in both themes rather than degrading to
+   frosted white in one of them. */
 
 @property --sheen-x {
   syntax: "<percentage>";
@@ -23,65 +28,59 @@ html.marketing-page,
 html.marketing-page body,
 html.marketing-page #root {
   min-height: 100%;
-  background: #e9eef2;
-}
-
-html.marketing-page.theme-dark,
-html.marketing-page.theme-dark body,
-html.marketing-page.theme-dark #root {
-  background: #04070a;
+  background: #0a1030;
 }
 
 /* ---------------------------------------------------------------- tokens */
 
 .rulix-site {
-  /* ink */
-  --ink: #0b1418;
-  --copy: #2e3f45;
-  --muted: #5d6d74;
-  --accent: #04737a;
-  --accent-bright: #12c3c7;
-  --on-accent: #ffffff;
+  --ink: #ffffff;
+  --copy: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.82);
+  --accent: #7ff9ee;
+  --accent-deep: #17c6cd;
+  --on-accent: #04262a;
 
-  /* the wallpaper the glass refracts */
-  --field: #dde8ed;
-  --blob-1: rgba(16, 210, 206, 0.66);
-  --blob-2: rgba(56, 132, 240, 0.52);
-  --blob-3: rgba(72, 234, 188, 0.5);
-  --blob-4: rgba(148, 118, 250, 0.42);
-  --blob-5: rgba(255, 156, 116, 0.34);
-  --grain-opacity: 0.05;
-  --grain-blend: multiply;
+  /* the wallpaper every glass surface refracts */
+  --field: linear-gradient(150deg, #0a6f80 0%, #17439e 38%, #4a2596 68%, #8d2a80 100%);
+  --blob-1: rgba(24, 232, 220, 0.4);
+  --blob-2: rgba(70, 128, 255, 0.5);
+  --blob-3: rgba(30, 216, 178, 0.28);
+  --blob-4: rgba(158, 96, 250, 0.5);
+  --blob-5: rgba(232, 78, 194, 0.42);
 
-  /* material fills */
-  --mat-chrome: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(244, 251, 252, 0.32));
-  --mat-pane: linear-gradient(160deg, rgba(255, 255, 255, 0.54), rgba(243, 250, 251, 0.36));
-  --mat-card: linear-gradient(160deg, rgba(255, 255, 255, 0.58), rgba(246, 251, 252, 0.4));
-  --mat-well: rgba(255, 255, 255, 0.5);
-  --mat-inset: rgba(12, 44, 50, 0.05);
-  --hairline: rgba(11, 55, 62, 0.13);
+  /* Holds white type at AA over the brightest part of the wallpaper without
+     flattening the colour underneath it. */
+  --scrim: rgba(6, 10, 30, 0.22);
+
+  /* material fills — smoked glass: dark tint, bright rim */
+  --mat-chrome: linear-gradient(154deg, rgba(16, 30, 66, 0.34), rgba(8, 14, 38, 0.46) 70%);
+  --mat-pane: linear-gradient(158deg, rgba(11, 22, 54, 0.46), rgba(6, 12, 34, 0.6) 72%);
+  --mat-card: linear-gradient(156deg, rgba(14, 26, 60, 0.4), rgba(7, 13, 36, 0.54) 70%);
+  --mat-well: rgba(255, 255, 255, 0.1);
+  --hairline: rgba(255, 255, 255, 0.16);
 
   /* specular rim — the lit edge of the lens.
-     Order matters: hairline, top catch, bottom bounce, thickness, chromatic fringe. */
-  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.96),
-    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.42), inset 3px 5px 12px -8px rgba(255, 255, 255, 0.9),
-    inset -3px -6px 14px -10px rgba(6, 38, 44, 0.34), inset 1px 1px 0 -0.5px rgba(158, 226, 255, 0.4),
-    inset -1px -1px 0 -0.5px rgba(255, 196, 228, 0.3);
+     Order: hairline, top catch, bottom bounce, thickness, chromatic fringe. */
+  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.85),
+    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.28), inset 4px 6px 16px -10px rgba(255, 255, 255, 0.9),
+    inset -4px -7px 18px -12px rgba(0, 8, 22, 0.6), inset 1px 1px 0 -0.5px rgba(170, 232, 255, 0.5),
+    inset -1px -1px 0 -0.5px rgba(255, 186, 234, 0.4);
 
-  --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.66), inset 0 2px 0 -0.5px #ffffff,
-    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.5), inset 4px 7px 16px -10px rgba(255, 255, 255, 0.96),
-    inset -4px -8px 18px -12px rgba(6, 38, 44, 0.4), inset 1.5px 1.5px 0 -0.5px rgba(150, 224, 255, 0.5),
-    inset -1.5px -1.5px 0 -0.5px rgba(255, 190, 226, 0.36);
+  --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.4), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.96),
+    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.36), inset 5px 8px 20px -12px rgba(255, 255, 255, 0.96),
+    inset -5px -9px 22px -14px rgba(0, 8, 22, 0.66), inset 1.5px 1.5px 0 -0.5px rgba(170, 232, 255, 0.6),
+    inset -1.5px -1.5px 0 -0.5px rgba(255, 186, 234, 0.46);
 
-  /* one diffuse shadow, not a stack of glows */
-  --lift-sm: 0 1px 2px rgba(9, 42, 48, 0.05), 0 6px 16px -6px rgba(9, 42, 48, 0.14);
-  --lift-md: 0 2px 4px rgba(9, 42, 48, 0.05), 0 18px 44px -18px rgba(9, 42, 48, 0.24);
-  --lift-lg: 0 4px 8px rgba(9, 42, 48, 0.05), 0 40px 90px -32px rgba(9, 42, 48, 0.32);
+  /* one diffuse shadow per tier, not a stack of glows */
+  --lift-sm: 0 2px 6px rgba(2, 8, 22, 0.3), 0 8px 20px -8px rgba(2, 8, 22, 0.42);
+  --lift-md: 0 3px 10px rgba(2, 8, 22, 0.34), 0 22px 48px -18px rgba(2, 8, 22, 0.52);
+  --lift-lg: 0 5px 14px rgba(2, 8, 22, 0.36), 0 46px 96px -32px rgba(2, 8, 22, 0.6);
 
-  --radius-sm: 12px;
-  --radius-md: 18px;
-  --radius-lg: 26px;
-  --radius-xl: 34px;
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
 
   /* Apple's springy standard curve */
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -94,7 +93,7 @@ html.marketing-page.theme-dark #root {
   flex-direction: column;
   overflow-x: clip;
   color: var(--copy);
-  background: var(--field);
+  background: #0a1030;
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 17px;
   font-feature-settings: "cv11", "ss01";
@@ -103,45 +102,6 @@ html.marketing-page.theme-dark #root {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-html.theme-dark .rulix-site {
-  --ink: #f4f8f9;
-  --copy: #b6c6cc;
-  --muted: #8ba0a7;
-  --accent: #3ee0dd;
-  --accent-bright: #6ff2ee;
-  --on-accent: #03211f;
-
-  --field: #060b10;
-  --blob-1: rgba(18, 214, 214, 0.5);
-  --blob-2: rgba(44, 108, 240, 0.46);
-  --blob-3: rgba(20, 210, 152, 0.34);
-  --blob-4: rgba(130, 88, 244, 0.46);
-  --blob-5: rgba(214, 56, 186, 0.28);
-  --grain-opacity: 0.07;
-  --grain-blend: overlay;
-
-  --mat-chrome: linear-gradient(150deg, rgba(28, 43, 50, 0.52), rgba(9, 18, 23, 0.4));
-  --mat-pane: linear-gradient(160deg, rgba(20, 33, 39, 0.56), rgba(8, 16, 21, 0.46));
-  --mat-card: linear-gradient(160deg, rgba(28, 43, 50, 0.6), rgba(12, 22, 28, 0.5));
-  --mat-well: rgba(255, 255, 255, 0.05);
-  --mat-inset: rgba(255, 255, 255, 0.05);
-  --hairline: rgba(255, 255, 255, 0.11);
-
-  --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.34),
-    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.09), inset 3px 5px 14px -9px rgba(255, 255, 255, 0.42),
-    inset -3px -6px 16px -10px rgba(0, 0, 0, 0.6), inset 1px 1px 0 -0.5px rgba(120, 214, 255, 0.3),
-    inset -1px -1px 0 -0.5px rgba(255, 150, 214, 0.22);
-
-  --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.48),
-    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.14), inset 4px 7px 18px -11px rgba(255, 255, 255, 0.56),
-    inset -4px -8px 20px -12px rgba(0, 0, 0, 0.66), inset 1.5px 1.5px 0 -0.5px rgba(120, 214, 255, 0.4),
-    inset -1.5px -1.5px 0 -0.5px rgba(255, 150, 214, 0.28);
-
-  --lift-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px -6px rgba(0, 0, 0, 0.6);
-  --lift-md: 0 2px 6px rgba(0, 0, 0, 0.44), 0 20px 48px -18px rgba(0, 0, 0, 0.7);
-  --lift-lg: 0 4px 10px rgba(0, 0, 0, 0.46), 0 44px 96px -32px rgba(0, 0, 0, 0.8);
 }
 
 .rulix-site *,
@@ -169,7 +129,6 @@ html.theme-dark .rulix-site {
 .rulix-site h2,
 .rulix-site h3,
 .rulix-site p,
-.rulix-site figure,
 .rulix-site ol {
   margin: 0;
 }
@@ -180,26 +139,25 @@ html.theme-dark .rulix-site {
 }
 
 .rulix-site :is(a, button):focus-visible {
-  outline: 2.5px solid var(--accent-bright);
+  outline: 2.5px solid var(--accent);
   outline-offset: 3px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .rulix-shell {
-  width: min(1180px, calc(100% - 72px));
+  width: min(1120px, calc(100% - 72px));
   margin-inline: auto;
 }
 
 /* ------------------------------------------------------------- wallpaper */
 
-/* Fixed, slowly drifting colour field. Every glass surface samples this, so it
-   is what makes the material read as glass instead of flat translucency. */
 .rulix-aurora {
   position: fixed;
   inset: -20vmax;
   z-index: 0;
   pointer-events: none;
-  contain: strict;
+  background: var(--field);
+  contain: layout paint style;
 }
 
 .rulix-aurora__blob {
@@ -207,55 +165,54 @@ html.theme-dark .rulix-site {
   border-radius: 50%;
   /* parallax factor is per-blob so the field gains depth on scroll */
   translate: 0 calc(var(--scroll, 0) * 1px * var(--depth, 0));
-  will-change: translate;
 }
 
 .rulix-aurora__blob:nth-child(1) {
   --depth: -0.04;
-  top: 2%;
+  top: 4%;
   left: -6%;
-  width: 62vmax;
-  height: 54vmax;
+  width: 58vmax;
+  height: 52vmax;
   background: radial-gradient(closest-side, var(--blob-1), transparent 72%);
   animation: drift-a 46s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(2) {
   --depth: -0.07;
-  top: -12%;
-  right: -12%;
-  width: 70vmax;
-  height: 58vmax;
+  top: -10%;
+  right: -10%;
+  width: 66vmax;
+  height: 56vmax;
   background: radial-gradient(closest-side, var(--blob-2), transparent 72%);
   animation: drift-b 61s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(3) {
   --depth: -0.1;
-  top: 46%;
-  left: 24%;
-  width: 58vmax;
-  height: 50vmax;
+  top: 44%;
+  left: 22%;
+  width: 56vmax;
+  height: 48vmax;
   background: radial-gradient(closest-side, var(--blob-3), transparent 70%);
   animation: drift-c 53s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(4) {
   --depth: -0.13;
-  bottom: -14%;
-  right: 4%;
-  width: 66vmax;
-  height: 56vmax;
+  bottom: -12%;
+  right: 2%;
+  width: 62vmax;
+  height: 54vmax;
   background: radial-gradient(closest-side, var(--blob-4), transparent 72%);
   animation: drift-d 67s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(5) {
   --depth: -0.16;
-  bottom: 6%;
-  left: -10%;
-  width: 52vmax;
-  height: 46vmax;
+  bottom: 8%;
+  left: -8%;
+  width: 50vmax;
+  height: 44vmax;
   background: radial-gradient(closest-side, var(--blob-5), transparent 70%);
   animation: drift-e 74s var(--ease) infinite alternate;
 }
@@ -265,42 +222,31 @@ html.theme-dark .rulix-site {
 .rulix-aurora__caustics {
   position: absolute;
   inset: -8%;
-  opacity: 0.42;
+  opacity: 0.3;
   mix-blend-mode: soft-light;
-  filter: blur(34px);
+  filter: blur(30px);
   background-image: repeating-radial-gradient(
-      circle at 22% 26%,
+      circle at 24% 28%,
       transparent 0 150px,
-      rgba(255, 255, 255, 0.3) 150px 240px,
-      transparent 240px 420px
+      rgba(255, 255, 255, 0.5) 150px 250px,
+      transparent 250px 430px
     ),
     repeating-radial-gradient(
-      circle at 84% 72%,
+      circle at 82% 74%,
       transparent 0 210px,
-      rgba(255, 255, 255, 0.22) 210px 320px,
-      transparent 320px 560px
+      rgba(255, 255, 255, 0.36) 210px 330px,
+      transparent 330px 570px
     );
   animation: caustics-swim 88s var(--ease) infinite alternate;
 }
 
-html.theme-dark .rulix-aurora__caustics {
-  opacity: 0.2;
-  mix-blend-mode: soft-light;
-}
-
-@keyframes caustics-swim {
-  to {
-    transform: translate3d(3vmax, -2vmax, 0) scale(1.08);
-  }
-}
-
-/* Film grain keeps the wide gradients from banding on 8-bit panels. */
+/* Scrim plus grain: the first keeps white type legible over the brightest
+   blobs, the second stops the wide gradients banding on 8-bit panels. */
 .rulix-aurora__grain {
   position: absolute;
   inset: 0;
-  opacity: var(--grain-opacity);
-  mix-blend-mode: var(--grain-blend);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-color: var(--scrim);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
 }
 
 @keyframes drift-a {
@@ -333,19 +279,26 @@ html.theme-dark .rulix-aurora__caustics {
   }
 }
 
+@keyframes caustics-swim {
+  to {
+    transform: translate3d(3vmax, -2vmax, 0) scale(1.08);
+  }
+}
+
 .rulix-glass-defs {
   position: absolute;
   width: 0;
   height: 0;
+  overflow: hidden;
   pointer-events: none;
 }
 
 /* -------------------------------------------------------------- material */
 
-/* Two stacked backdrop layers per surface:
-   ::before blurs the whole pane, ::after re-blurs only a ring at the rim so
-   the edge distorts more than the centre. That gradient of blur is what the
-   eye reads as lens thickness. */
+/* Two stacked backdrop layers per surface: ::before blurs the whole pane,
+   ::after re-blurs only a ring at the rim and runs a displacement map through
+   it, so the edge bends the wallpaper more than the centre. That gradient of
+   blur is what the eye reads as lens thickness. */
 .glass {
   position: relative;
   isolation: isolate;
@@ -364,26 +317,20 @@ html.theme-dark .rulix-aurora__caustics {
 }
 
 .glass::before {
-  -webkit-backdrop-filter: blur(22px) saturate(185%) brightness(1.04);
-  backdrop-filter: blur(22px) saturate(185%) brightness(1.04);
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.05);
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.05);
 }
 
 .glass::after {
-  padding: 13px;
-  -webkit-backdrop-filter: blur(7px) saturate(150%);
-  backdrop-filter: blur(7px) saturate(150%);
+  padding: 14px;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-}
-
-/* Chromium can run an SVG displacement map inside backdrop-filter, which bends
-   the wallpaper at the rim for real refraction. Unsupported engines drop this
-   declaration and keep the blur-gradient lens above. */
-.glass::after {
-  -webkit-backdrop-filter: blur(7px) saturate(150%) url(#rulix-lens);
-  backdrop-filter: blur(7px) saturate(150%) url(#rulix-lens);
+  /* Chromium accepts an SVG filter inside backdrop-filter; engines that do not
+     drop this declaration and keep the blur-gradient lens above. */
+  -webkit-backdrop-filter: blur(5px) saturate(150%) url(#rulix-lens);
+  backdrop-filter: blur(5px) saturate(150%) url(#rulix-lens);
 }
 
 .glass--chrome {
@@ -392,8 +339,8 @@ html.theme-dark .rulix-aurora__caustics {
 }
 
 .glass--chrome::before {
-  -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
-  backdrop-filter: blur(30px) saturate(200%) brightness(1.06);
+  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+  backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
 }
 
 .glass--pane {
@@ -402,22 +349,58 @@ html.theme-dark .rulix-aurora__caustics {
 }
 
 .glass--pane::before {
-  -webkit-backdrop-filter: blur(34px) saturate(170%);
-  backdrop-filter: blur(34px) saturate(170%);
+  -webkit-backdrop-filter: blur(34px) saturate(175%);
+  backdrop-filter: blur(34px) saturate(175%);
 }
 
 .glass--pane::after {
-  padding: 22px;
+  padding: 24px;
+}
+
+/* Surfaces nested inside a pane use plain alpha rather than another blur.
+   Stacking backdrop-filter reads as fog, and nesting it inside a small
+   rounded, clipped, isolated box makes Chromium sample the backdrop from the
+   wrong origin and paint offset rectangles. Alpha over the pane is enough. */
+.tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--mat-well);
+  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.6),
+    inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.14), inset 4px 6px 16px -11px rgba(255, 255, 255, 0.7),
+    inset -4px -7px 18px -13px rgba(0, 8, 22, 0.5), var(--lift-sm);
+  transition: background 320ms var(--ease), transform 380ms var(--ease), box-shadow 380ms var(--ease);
+}
+
+/* Raking highlight down the top-left edge, standing in for the light a real
+   lens rim would bend. */
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    142deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.05) 28%,
+    transparent 54%
+  );
+}
+
+.tile:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 /* ----------------------------------------------------------------- header */
 
 .rulix-header {
   position: sticky;
-  top: 12px;
+  top: 14px;
   z-index: 60;
-  width: min(1240px, calc(100% - 40px));
-  min-height: 60px;
+  width: min(1200px, calc(100% - 40px));
+  min-height: 62px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -425,20 +408,19 @@ html.theme-dark .rulix-aurora__caustics {
   margin-inline: auto;
   padding: 10px 12px 10px clamp(18px, 2.4vw, 26px);
   border-radius: 999px;
-  transition: transform 420ms var(--ease), min-height 300ms var(--ease), box-shadow 300ms var(--ease),
-    width 420ms var(--ease);
+  transition: transform 420ms var(--ease), min-height 300ms var(--ease), width 420ms var(--ease);
   will-change: transform;
 }
 
 .rulix-header.is-scrolled {
-  width: min(1080px, calc(100% - 40px));
+  width: min(1040px, calc(100% - 40px));
   min-height: 54px;
 }
 
 .rulix-header.is-hidden {
   pointer-events: none;
   box-shadow: none;
-  transform: translateY(calc(-100% - 24px));
+  transform: translateY(calc(-100% - 26px));
 }
 
 .rulix-header.is-hidden::before,
@@ -487,7 +469,7 @@ html.theme-dark .rulix-aurora__caustics {
 
 .rulix-header__nav a {
   position: relative;
-  padding: 8px 14px;
+  padding: 9px 15px;
   border-radius: 999px;
   color: var(--muted);
   white-space: nowrap;
@@ -501,15 +483,11 @@ html.theme-dark .rulix-aurora__caustics {
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   opacity: 0;
   transform: scale(0.86);
   transition: opacity 220ms var(--ease), transform 220ms var(--ease);
-}
-
-html.theme-dark .rulix-header__nav a::before {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .rulix-header__nav a:hover,
@@ -523,16 +501,15 @@ html.theme-dark .rulix-header__nav a::before {
   transform: scale(1);
 }
 
-.rulix-header__signin {
+.rulix-header__nav a.rulix-header__signin {
   margin-left: 6px;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
-.rulix-header__nav a.rulix-header__signin {
-  color: var(--ink);
-}
-
 .rulix-header__signin::before {
+  background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.8);
   opacity: 1;
   transform: scale(1);
 }
@@ -545,14 +522,10 @@ html.theme-dark .rulix-header__nav a::before {
   border: 0;
   border-radius: 999px;
   color: var(--ink);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   cursor: pointer;
   transition: transform 200ms var(--ease);
-}
-
-html.theme-dark .rulix-menu-button {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .rulix-menu-button:active {
@@ -561,22 +534,24 @@ html.theme-dark .rulix-menu-button {
 
 /* --------------------------------------------------------------- controls */
 
+/* The accent chip: the one place on the page that is opaque, so the eye lands
+   on it the way it lands on an enabled toggle. */
 .rulix-site .rulix-primary-action {
   position: relative;
   isolation: isolate;
   width: fit-content;
-  min-height: 50px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   border: 0;
   border-radius: 999px;
-  padding: 0 26px;
+  padding: 0 27px;
   color: var(--on-accent);
-  background: linear-gradient(160deg, var(--accent-bright), var(--accent) 62%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.62),
-    inset 0 -2px 6px -2px rgba(0, 40, 44, 0.4), var(--lift-md);
+  background: linear-gradient(158deg, var(--accent), var(--accent-deep) 74%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.9),
+    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.3), 0 12px 32px -10px rgba(20, 220, 214, 0.5), var(--lift-md);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.014em;
@@ -593,8 +568,8 @@ html.theme-dark .rulix-menu-button {
   border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(
-    120px circle at var(--sheen-x) var(--sheen-y),
-    rgba(255, 255, 255, 0.55),
+    130px circle at var(--sheen-x) var(--sheen-y),
+    rgba(255, 255, 255, 0.75),
     transparent 68%
   );
   opacity: var(--sheen-opacity);
@@ -603,8 +578,8 @@ html.theme-dark .rulix-menu-button {
 
 .rulix-site .rulix-primary-action:hover {
   transform: translateY(-1.5px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.76),
-    inset 0 -2px 6px -2px rgba(0, 40, 44, 0.34), var(--lift-lg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 2px 0 -0.5px #ffffff,
+    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.26), 0 16px 40px -10px rgba(20, 220, 214, 0.6), var(--lift-lg);
 }
 
 .rulix-site .rulix-primary-action:active {
@@ -620,45 +595,40 @@ html.theme-dark .rulix-menu-button {
   transform: translateX(3px);
 }
 
-/* Eyebrow label — small glass capsule. */
+/* Eyebrow — small glass capsule. */
 .eyebrow {
   width: fit-content;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   border-radius: 999px;
-  padding: 6px 14px 6px 12px;
+  padding: 7px 15px 7px 12px;
   color: var(--ink);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.86),
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.62),
     var(--lift-sm);
-  -webkit-backdrop-filter: blur(16px) saturate(170%);
-  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.004em;
-}
-
-html.theme-dark .eyebrow {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    var(--lift-sm);
 }
 
 .eyebrow__dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent-bright);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-bright) 22%, transparent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(127, 249, 238, 0.24), 0 0 10px rgba(127, 249, 238, 0.8);
 }
 
 /* ------------------------------------------------------------ typography */
 
 .rulix-hero h1,
 .contact-page h1 {
-  max-width: 19ch;
+  max-width: 20ch;
   color: var(--ink);
-  font-size: clamp(46px, 5.6vw, 78px);
+  font-size: clamp(46px, 6vw, 88px);
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 0.98;
@@ -666,20 +636,20 @@ html.theme-dark .eyebrow {
 }
 
 .contact-page h1 {
-  max-width: 22ch;
+  max-width: 24ch;
 }
 
 .rulix-hero__copy > p,
 .contact-page__inner > p {
-  max-width: 46ch;
+  max-width: 52ch;
   color: var(--copy);
-  font-size: clamp(18px, 1.5vw, 20px);
+  font-size: clamp(18px, 1.6vw, 21px);
   letter-spacing: -0.014em;
-  line-height: 1.5;
+  line-height: 1.52;
 }
 
 .section-intro {
-  max-width: 34ch;
+  max-width: 38ch;
   display: grid;
   gap: 18px;
 }
@@ -687,7 +657,7 @@ html.theme-dark .eyebrow {
 .section-intro h2,
 .audience-story h2 {
   color: var(--ink);
-  font-size: clamp(34px, 3.7vw, 54px);
+  font-size: clamp(34px, 3.9vw, 56px);
   font-weight: 700;
   letter-spacing: -0.036em;
   line-height: 1.04;
@@ -696,7 +666,7 @@ html.theme-dark .eyebrow {
 
 .section-intro p,
 .audience-story p {
-  max-width: 44ch;
+  max-width: 46ch;
   color: var(--muted);
   font-size: 17px;
   line-height: 1.58;
@@ -704,239 +674,90 @@ html.theme-dark .eyebrow {
 
 /* ------------------------------------------------------------------- hero */
 
-/* The hero deliberately carries no glass: it is the one place the wallpaper is
-   seen unmediated, which gives every pane below it something to be read against. */
+/* No glass here: the hero is where the wallpaper is seen unmediated, which
+   gives every pane below it something to be read against. */
 .rulix-hero {
   position: relative;
   display: grid;
   align-items: center;
-  min-height: min(820px, calc(100svh - 40px));
-  padding: clamp(132px, 15vh, 178px) 0 clamp(56px, 7vh, 92px);
-}
-
-.rulix-hero__grid {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(400px, 0.96fr);
-  align-items: center;
-  gap: clamp(44px, 6vw, 92px);
+  min-height: min(720px, calc(100svh - 40px));
+  padding: clamp(148px, 18vh, 214px) 0 clamp(72px, 9vh, 118px);
 }
 
 .rulix-hero__copy {
   display: grid;
   justify-items: start;
   align-content: center;
-  gap: 26px;
+  gap: 28px;
 }
 
 .rulix-hero__copy > p {
   margin-bottom: 6px;
 }
 
-/* ---------------------------------------------------------- product frame */
-
-.product-frame {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  padding: 7px;
-  background: var(--mat-card);
-  box-shadow: var(--rim-strong), var(--lift-lg);
-  transition: transform 700ms var(--ease-out), box-shadow 700ms var(--ease-out);
-}
-
-.product-frame::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  -webkit-backdrop-filter: blur(26px) saturate(190%);
-  backdrop-filter: blur(26px) saturate(190%);
-}
-
-.rulix-hero__media {
-  transform: perspective(1600px) rotateY(-3.5deg) rotateX(1.2deg);
-}
-
-.rulix-hero__media:hover {
-  transform: perspective(1600px) rotateY(0deg) rotateX(0deg) translateY(-4px);
-}
-
-.product-frame__top {
-  min-height: 30px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 14px;
-  padding: 0 7px 7px;
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: -0.004em;
-}
-
-.product-frame__top .brand-logo {
-  gap: 5px;
-}
-
-.product-frame__top .brand-logo-mark {
-  width: 17px;
-  height: 17px;
-}
-
-.product-frame__top .brand-logo-wordmark {
-  width: 43px;
-}
-
-.product-frame__top span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.product-frame__top strong {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 3px 10px;
-  color: var(--ink);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.44);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-html.theme-dark .product-frame__top strong {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-}
-
-.product-frame > img {
-  width: 100%;
-  display: block;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  object-position: top center;
-  border-radius: calc(var(--radius-xl) - 10px);
-  background: #060d11;
-  box-shadow: 0 0 0 1px rgba(6, 32, 38, 0.5), 0 10px 30px -12px rgba(4, 24, 30, 0.6);
-}
-
-/* A single raking highlight across the screen, as if lit from above left. */
-.product-frame > img + .product-frame__sheen,
-.product-frame__sheen {
-  position: absolute;
-  inset: 39px 7px 7px;
-  border-radius: calc(var(--radius-xl) - 10px);
-  pointer-events: none;
-  background: linear-gradient(
-    122deg,
-    rgba(255, 255, 255, 0.16) 0%,
-    rgba(255, 255, 255, 0.04) 22%,
-    transparent 42%
-  );
-  mix-blend-mode: screen;
-}
-
 /* ------------------------------------------------------------------ bands */
 
 .rulix-band {
   position: relative;
-  padding: clamp(72px, 9vw, 116px) clamp(30px, 4vw, 60px);
-  border-radius: var(--radius-xl);
+  width: min(1240px, calc(100% - 40px));
   margin-inline: auto;
-  width: min(1300px, calc(100% - 40px));
+  padding: clamp(64px, 8vw, 108px) clamp(28px, 4vw, 64px);
+  border-radius: var(--radius-xl);
 }
 
 .rulix-band + .rulix-band {
-  margin-top: 26px;
+  margin-top: 28px;
 }
 
 .rulix-band:last-of-type {
-  margin-bottom: clamp(60px, 8vw, 104px);
+  margin-bottom: clamp(64px, 8vw, 112px);
 }
 
 .rulix-band > .rulix-shell {
-  width: min(1180px, 100%);
-}
-
-/* Dark panes are the same material with a darker fill, so the wallpaper still
-   colours them from behind rather than being covered by flat ink. */
-.outcome-band,
-.trust-band {
-  --copy: #c3d3d8;
-  --muted: #9db0b6;
-  --ink: #ffffff;
-  --hairline: rgba(255, 255, 255, 0.14);
-  --mat-pane: radial-gradient(120% 90% at 8% -12%, rgba(62, 224, 221, 0.22), transparent 58%),
-    radial-gradient(100% 80% at 104% 108%, rgba(124, 92, 240, 0.24), transparent 60%),
-    radial-gradient(90% 70% at 78% -4%, rgba(56, 132, 240, 0.16), transparent 62%),
-    linear-gradient(160deg, rgba(8, 18, 22, 0.9), rgba(4, 10, 14, 0.88));
-  --mat-well: rgba(255, 255, 255, 0.07);
-  color: var(--copy);
-}
-
-.outcome-band,
-.trust-band {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.24),
-    inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.07), inset 4px 7px 20px -12px rgba(255, 255, 255, 0.4),
-    inset -4px -8px 22px -14px rgba(0, 0, 0, 0.7), var(--lift-lg);
-}
-
-.section-intro--light h2 {
-  color: #ffffff;
-}
-
-.section-intro--light p {
-  color: #a8bcc2;
+  width: min(1080px, 100%);
 }
 
 .outcome-band__grid {
   display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
   align-items: start;
-  gap: clamp(48px, 7vw, 104px);
+  gap: clamp(44px, 6vw, 96px);
 }
 
 .outcome-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .outcome-list li {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 20px;
-  padding: 22px 24px;
+  padding: 24px 26px;
   border-radius: var(--radius-md);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: background 300ms var(--ease), transform 300ms var(--ease);
 }
 
 .outcome-list li:hover {
-  background: rgba(255, 255, 255, 0.11);
   transform: translateX(3px);
 }
 
 .outcome-list > li > span {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  color: var(--accent);
-  background: rgba(62, 224, 221, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.28);
+  color: var(--on-accent);
+  background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.6);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .outcome-list h3 {
-  margin-bottom: 6px;
-  color: #ffffff;
+  margin-bottom: 7px;
+  color: var(--ink);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -944,8 +765,8 @@ html.theme-dark .product-frame__top strong {
 }
 
 .outcome-list p {
-  max-width: 52ch;
-  color: #a8bcc2;
+  max-width: 54ch;
+  color: var(--muted);
   font-size: 16px;
   line-height: 1.6;
 }
@@ -953,85 +774,68 @@ html.theme-dark .product-frame__top strong {
 /* -------------------------------------------------------- product / flow */
 
 .product-flow__intro {
-  margin-bottom: clamp(40px, 5vw, 64px);
+  margin-bottom: clamp(38px, 5vw, 62px);
 }
 
 .product-flow__steps {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
 
-/* Cards sit inside a glass pane, so they are opaque surfaces rather than a
-   second layer of glass — stacking blur on blur just reads as fog. */
-.product-step,
-.audience-story {
+.product-step {
   display: grid;
-  grid-template-columns: minmax(260px, 0.44fr) minmax(0, 0.56fr);
-  align-items: center;
-  gap: clamp(40px, 6vw, 84px);
-  padding: clamp(28px, 3.4vw, 44px);
+  align-content: start;
+  padding: clamp(28px, 3.2vw, 40px);
   border-radius: var(--radius-lg);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.62),
-    var(--lift-sm);
-  transition: transform 500ms var(--ease), box-shadow 500ms var(--ease);
-}
-
-html.theme-dark .product-step,
-html.theme-dark .audience-story {
-  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--lift-sm);
 }
 
 .product-step:hover,
 .audience-story:hover {
   transform: translateY(-3px);
-  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--lift-md);
-}
-
-.product-step:nth-child(even) .product-step__copy {
-  order: 2;
 }
 
 .product-step__copy {
   display: grid;
   justify-items: start;
-  gap: 14px;
+  gap: 16px;
 }
 
 .product-step__copy > span {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--on-accent);
+  background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.6);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.product-step h3 {
+.product-step__copy > h3 {
   color: var(--ink);
-  font-size: clamp(26px, 2.6vw, 38px);
+  font-size: clamp(27px, 2.7vw, 40px);
   font-weight: 700;
   letter-spacing: -0.032em;
   line-height: 1.08;
 }
 
-.product-step p {
-  max-width: 42ch;
+.product-step__copy > p {
   color: var(--copy);
   font-size: 17px;
   line-height: 1.56;
 }
 
-.product-step strong,
-.audience-story strong {
-  max-width: 46ch;
-  padding-left: 15px;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+/* Child selectors, not descendant, so nested markup never inherits the
+   pull-quote treatment. */
+.product-step__copy > strong,
+.audience-story__copy > strong {
+  max-width: 48ch;
+  padding-left: 16px;
+  border-left: 2px solid rgba(127, 249, 238, 0.6);
   color: var(--muted);
   font-size: 15px;
   font-weight: 500;
@@ -1062,28 +866,45 @@ html.theme-dark .audience-story {
 
 /* -------------------------------------------------------------- use cases */
 
-.audience-stories {
-  display: grid;
-}
-
 .audience-stories > .rulix-shell {
   display: grid;
   gap: 18px;
 }
 
 .audience-story {
-  grid-template-columns: minmax(0, 0.48fr) minmax(0, 0.52fr);
-  scroll-margin-top: 96px;
-}
-
-.audience-story:nth-child(even) .audience-story__copy {
-  order: 2;
+  display: grid;
+  padding: clamp(30px, 3.6vw, 46px);
+  border-radius: var(--radius-lg);
+  scroll-margin-top: 100px;
 }
 
 .audience-story__copy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-content: start;
+  column-gap: clamp(32px, 5vw, 72px);
+  row-gap: 18px;
   justify-items: start;
-  gap: 16px;
+}
+
+.audience-story__copy > .audience-story__label {
+  grid-area: 1 / 1 / 2 / 3;
+}
+
+/* The headline spans both columns; cramming it into one wrapped it four lines
+   deep and left the other column half empty. */
+.audience-story__copy > h2 {
+  grid-area: 2 / 1 / 3 / 3;
+  max-width: 26ch;
+}
+
+.audience-story__copy > p {
+  grid-area: 3 / 1;
+}
+
+.audience-story__copy > strong {
+  grid-area: 3 / 2;
+  align-self: start;
 }
 
 .audience-story__label {
@@ -1091,10 +912,10 @@ html.theme-dark .audience-story {
   align-items: center;
   gap: 9px;
   border-radius: 999px;
-  padding: 6px 14px 6px 11px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+  padding: 7px 15px 7px 12px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.48);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.004em;
@@ -1102,50 +923,44 @@ html.theme-dark .audience-story {
 
 .audience-story__label svg {
   flex: 0 0 auto;
+  color: var(--accent);
 }
 
 /* ------------------------------------------------------------------ trust */
 
 .trust-band__grid {
   display: grid;
-  gap: clamp(40px, 5vw, 58px);
+  gap: clamp(38px, 5vw, 56px);
 }
 
 .trust-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .trust-list article {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr);
   align-content: start;
-  gap: 16px;
-  padding: 28px 26px;
+  gap: 18px;
+  padding: 30px 28px;
   border-radius: var(--radius-md);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px var(--hairline), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: background 300ms var(--ease);
-}
-
-.trust-list article:hover {
-  background: rgba(255, 255, 255, 0.11);
 }
 
 .trust-list svg {
-  width: 34px;
-  height: 34px;
-  padding: 7px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
   border-radius: 50%;
-  color: #6ff2ee;
-  background: rgba(62, 224, 221, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.26);
+  color: var(--on-accent);
+  background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.55);
 }
 
 .trust-list h3 {
-  margin-bottom: 7px;
-  color: #ffffff;
+  margin-bottom: 8px;
+  color: var(--ink);
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -1153,7 +968,7 @@ html.theme-dark .audience-story {
 }
 
 .trust-list p {
-  color: #a8bcc2;
+  color: var(--muted);
   font-size: 16px;
   line-height: 1.6;
 }
@@ -1162,17 +977,17 @@ html.theme-dark .audience-story {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 13px;
-  max-width: 74ch;
-  padding: 16px 20px;
+  gap: 14px;
+  max-width: 76ch;
+  padding: 18px 22px;
   border-radius: var(--radius-md);
-  color: #e2f5f3;
-  background: linear-gradient(135deg, rgba(62, 224, 221, 0.14), rgba(255, 255, 255, 0.05));
-  box-shadow: inset 0 0 0 1px rgba(62, 224, 221, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  background: linear-gradient(135deg, rgba(127, 249, 238, 0.2), rgba(255, 255, 255, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(127, 249, 238, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .data-boundary svg {
-  color: #6ff2ee;
+  color: var(--accent);
 }
 
 .data-boundary p {
@@ -1186,23 +1001,23 @@ html.theme-dark .audience-story {
   min-height: calc(100svh - 60px);
   display: grid;
   align-items: center;
-  padding: clamp(120px, 15vh, 176px) 0 clamp(80px, 10vh, 120px);
+  padding: clamp(128px, 16vh, 190px) 0 clamp(80px, 10vh, 124px);
 }
 
 .contact-page__inner {
-  max-width: 940px;
+  max-width: 900px;
   display: grid;
   justify-items: start;
-  gap: 26px;
-  padding: clamp(34px, 4.6vw, 62px);
+  gap: 28px;
+  padding: clamp(36px, 4.8vw, 66px);
   border-radius: var(--radius-xl);
 }
 
 .contact-email {
-  min-height: 62px;
+  min-height: 64px;
   gap: 14px;
   margin-top: 6px;
-  padding: 0 26px;
+  padding: 0 28px;
 }
 
 .contact-email span {
@@ -1216,16 +1031,11 @@ html.theme-dark .audience-story {
   position: relative;
   z-index: 1;
   margin-top: auto;
-  padding-top: 1px;
   border-top: 1px solid var(--hairline);
   background: var(--mat-pane);
-  -webkit-backdrop-filter: blur(30px) saturate(190%);
-  backdrop-filter: blur(30px) saturate(190%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
-
-html.theme-dark .rulix-footer {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
 }
 
 .rulix-footer__inner {
@@ -1253,62 +1063,46 @@ html.theme-dark .rulix-footer {
 
 .rulix-footer a {
   border-radius: 999px;
-  padding: 7px 15px;
+  padding: 8px 16px;
   color: var(--ink);
-  background: var(--mat-well);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.48);
   font-size: 14px;
   font-weight: 600;
-  transition: transform 200ms var(--ease);
-}
-
-html.theme-dark .rulix-footer a {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 200ms var(--ease), background 200ms var(--ease);
 }
 
 .rulix-footer a:hover {
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 
 /* ------------------------------------------------------------ responsive */
 
-@media (max-width: 1080px) {
-  .rulix-hero__grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 52px;
-  }
-
-  .rulix-hero__copy {
-    max-width: 700px;
-  }
-
-  .rulix-hero__media,
-  .rulix-hero__media:hover {
-    transform: none;
-  }
-
+@media (max-width: 1040px) {
   .outcome-band__grid,
-  .product-step,
-  .audience-story {
+  .product-flow__steps,
+  .audience-story__copy {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audience-story__copy > .audience-story__label,
+  .audience-story__copy > h2,
+  .audience-story__copy > p,
+  .audience-story__copy > strong {
+    grid-area: auto;
   }
 
   .outcome-band__grid {
-    gap: 44px;
+    gap: 42px;
   }
 
-  .product-step,
-  .audience-story {
-    gap: 36px;
-  }
-
-  .product-step:nth-child(even) .product-step__copy,
-  .audience-story:nth-child(even) .audience-story__copy {
-    order: initial;
+  .audience-story__copy {
+    row-gap: 16px;
   }
 
   .section-intro {
-    max-width: 44ch;
+    max-width: 46ch;
   }
 }
 
@@ -1336,7 +1130,7 @@ html.theme-dark .rulix-footer a {
     gap: 2px;
     padding: 10px;
     border-radius: var(--radius-lg);
-    background: var(--mat-chrome);
+    background: linear-gradient(158deg, rgba(14, 26, 56, 0.94), rgba(9, 15, 38, 0.92));
     box-shadow: var(--rim-strong), var(--lift-lg);
     -webkit-backdrop-filter: blur(30px) saturate(190%);
     backdrop-filter: blur(30px) saturate(190%);
@@ -1348,13 +1142,14 @@ html.theme-dark .rulix-footer a {
   }
 
   .rulix-header__nav a {
-    padding: 13px 16px;
+    padding: 14px 16px;
     border-radius: var(--radius-sm);
     font-size: 16px;
   }
 
-  .rulix-header__signin {
+  .rulix-header__nav a.rulix-header__signin {
     margin-left: 0;
+    margin-top: 4px;
   }
 
   .rulix-menu-button {
@@ -1411,13 +1206,13 @@ html.theme-dark .rulix-footer a {
 
   .rulix-hero {
     min-height: 0;
-    padding: 118px 0 66px;
+    padding: 124px 0 64px;
   }
 
   .rulix-hero h1,
   .contact-page h1 {
     max-width: none;
-    font-size: clamp(38px, 11.5vw, 56px);
+    font-size: clamp(38px, 12vw, 58px);
     letter-spacing: -0.04em;
     line-height: 1.02;
   }
@@ -1433,7 +1228,7 @@ html.theme-dark .rulix-footer a {
 
   .rulix-band {
     width: calc(100% - 16px);
-    padding: 60px 20px;
+    padding: 56px 22px;
     border-radius: var(--radius-lg);
   }
 
@@ -1443,64 +1238,40 @@ html.theme-dark .rulix-footer a {
 
   .section-intro h2,
   .audience-story h2 {
-    font-size: clamp(28px, 8.4vw, 36px);
-  }
-
-  .product-frame {
-    padding: 7px;
-    border-radius: var(--radius-lg);
-  }
-
-  /* The demo captures are 16:9; cropping them to a taller box cuts the
-     left-hand caption clean off. */
-  .product-frame > img {
-    border-radius: calc(var(--radius-lg) - 10px);
-  }
-
-  .product-frame__sheen {
-    inset: 40px 7px 7px;
-    border-radius: calc(var(--radius-lg) - 10px);
-  }
-
-  .product-frame__top span {
-    display: none;
-  }
-
-  .product-frame__top {
-    grid-template-columns: 1fr auto;
+    font-size: clamp(28px, 8.6vw, 38px);
   }
 
   .outcome-list li {
-    grid-template-columns: 30px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr);
     gap: 14px;
-    padding: 18px 18px;
+    padding: 20px 20px;
   }
 
   .product-step,
   .audience-story {
-    padding: 26px 20px;
+    padding: 26px 22px;
     border-radius: var(--radius-md);
   }
 
-  .product-step h3 {
-    font-size: 27px;
+  .product-step__copy > h3 {
+    font-size: 28px;
   }
 
   .trust-list article {
-    padding: 22px 20px;
+    padding: 24px 22px;
   }
 
   .contact-page {
-    padding: 104px 0 76px;
+    padding: 108px 0 78px;
   }
 
   .contact-page__inner {
-    padding: 28px 22px;
+    padding: 30px 24px;
     border-radius: var(--radius-lg);
   }
 
   .contact-email {
-    padding: 0 20px;
+    padding: 0 22px;
   }
 
   .contact-email span {
@@ -1531,43 +1302,28 @@ html.theme-dark .rulix-footer a {
    that keep every contrast ratio intact. */
 @media (prefers-reduced-transparency: reduce) {
   .rulix-site {
-    --mat-chrome: #f7fafb;
-    --mat-pane: #f2f7f8;
-    --mat-card: #ffffff;
-    --mat-well: rgba(11, 55, 62, 0.05);
+    --mat-chrome: #131f42;
+    --mat-pane: #101a38;
+    --mat-card: #14204a;
+    --mat-well: #182552;
+    background: #0a1030;
   }
 
-  html.theme-dark .rulix-site {
-    --mat-chrome: #131e23;
-    --mat-pane: #0b1418;
-    --mat-card: #131e23;
-    --mat-well: rgba(255, 255, 255, 0.07);
-  }
-
-  .outcome-band,
-  .trust-band {
-    --mat-pane: #0a1418;
-  }
-
-  .rulix-aurora {
-    display: none;
-  }
-
+  .rulix-aurora__blob,
   .rulix-aurora__caustics {
     display: none;
   }
 
-  .glass::before,
   .glass::after,
-  .product-frame::before,
+  .tile::before {
+    display: none;
+  }
+
+  .glass::before,
   .rulix-footer,
   .eyebrow {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-
-  .glass::after {
-    display: none;
   }
 }
 
@@ -1581,7 +1337,8 @@ html.theme-dark .rulix-footer a {
     transition-duration: 1ms !important;
   }
 
-  .rulix-aurora__blob {
+  .rulix-aurora__blob,
+  .rulix-aurora__caustics {
     animation: none !important;
     translate: none !important;
   }
@@ -1590,18 +1347,13 @@ html.theme-dark .rulix-footer a {
     opacity: 1;
     transform: none;
   }
-
-  .rulix-hero__media,
-  .rulix-hero__media:hover {
-    transform: none;
-  }
 }
 
 @media (forced-colors: active) {
   .rulix-aurora,
   .glass::before,
   .glass::after,
-  .product-frame__sheen {
+  .tile::before {
     display: none;
   }
 
@@ -1611,8 +1363,7 @@ html.theme-dark .rulix-footer a {
   .audience-story,
   .trust-list article,
   .outcome-list li,
-  .contact-page__inner,
-  .product-frame {
+  .contact-page__inner {
     border: 1px solid CanvasText;
   }
 }

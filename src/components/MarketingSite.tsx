@@ -61,29 +61,21 @@ const PRODUCT_STEPS = [
     title: "Add the memo",
     copy: "Upload or paste the draft classification memo and the facts the reviewer already has.",
     detail: "Rulix keeps the memo in view so the review starts with your work—not a blank chat window.",
-    media: "/marketing/demos/hero-rulix-review-loop.webp",
-    alt: "A classification memo open in the Rulix reviewer workspace"
   },
   {
     title: "See what is missing",
     copy: "Rulix points to conclusions that need stronger support and explains what information is missing.",
     detail: "The reviewer can inspect the exact passage instead of searching through a general AI answer.",
-    media: "/marketing/demos/demo-find-missing-reasoning.webp",
-    alt: "Rulix pointing to a classification conclusion that needs more support"
   },
   {
     title: "Answer the reviewer’s questions",
     copy: "Accept a finding, ask for more information, or explain why the team is taking a different view.",
     detail: "Each response stays attached to the question and the part of the memo that raised it.",
-    media: "/marketing/demos/demo-resolve-review-gaps.webp",
-    alt: "A reviewer resolving a classification question in Rulix"
   },
   {
     title: "Save the decision record",
     copy: "Export the findings, responses, notes, and final reviewer decision as one clear record.",
     detail: "The next person can understand what changed and why without reconstructing the review from scratch.",
-    media: "/marketing/demos/demo-export-review-record.webp",
-    alt: "A completed export classification review record in Rulix"
   }
 ];
 
@@ -93,8 +85,6 @@ interface AudienceStory {
   title: string;
   copy: string;
   outcome: string;
-  media: string;
-  alt: string;
   icon: LucideIcon;
 }
 
@@ -105,8 +95,6 @@ const AUDIENCE_STORIES: AudienceStory[] = [
     title: "Review the reasoning without losing the memo.",
     copy: "Find conclusions that need stronger jurisdiction, classification, end-use, or party support while the source text stays in view.",
     outcome: "You leave with clear questions and a record of the reviewer’s final call.",
-    media: "/marketing/demos/demo-find-missing-reasoning.webp",
-    alt: "An export-control officer reviewing a highlighted memo finding in Rulix",
     icon: SearchCheck
   },
   {
@@ -115,8 +103,6 @@ const AUDIENCE_STORIES: AudienceStory[] = [
     title: "Turn product facts into answerable review questions.",
     copy: "Spot missing specifications, intended-use details, and technical support before the memo starts another round of email.",
     outcome: "Your reviewer gets a cleaner packet with fewer basic facts left unresolved.",
-    media: "/marketing/demos/demo-resolve-review-gaps.webp",
-    alt: "A manufacturer resolving a product classification question in Rulix",
     icon: FileCheck2
   },
   {
@@ -125,8 +111,6 @@ const AUDIENCE_STORIES: AudienceStory[] = [
     title: "Separate technical unknowns from review conclusions.",
     copy: "Collect the missing equipment, research, and destination context before qualified reviewers spend time on the final decision.",
     outcome: "The team can hand off a clearer draft with every open question attached to its source.",
-    media: "/marketing/demos/hero-rulix-review-loop.webp",
-    alt: "A university research classification review open in Rulix",
     icon: ShieldCheck
   }
 ];
@@ -267,7 +251,6 @@ function SiteHeader({
   onFocusChange: (focused: boolean) => void;
   onMobileNavChange: (open: boolean) => void;
 }) {
-  const brandTone = useBrandTone();
   const handleBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       onFocusChange(false);
@@ -290,7 +273,7 @@ function SiteHeader({
       onBlurCapture={handleBlur}
     >
       <a className="rulix-header__brand" href="/" aria-label="Rulix home">
-        <BrandLogo tone={brandTone} size="compact" />
+        <BrandLogo tone="light" size="compact" />
       </a>
       <nav className="rulix-header__nav" aria-label="Primary">
         {PRIMARY_MARKETING_NAV.map((item) => (
@@ -327,8 +310,6 @@ function HomePage() {
         eyebrow="Export-control memo review"
         title="AI-assisted export classification."
         copy="Rulix helps export-control teams review classification memos, find missing support, and keep the final decision with a qualified person."
-        media="/marketing/demos/demo-find-missing-reasoning.webp"
-        mediaAlt="Rulix showing a classification memo conclusion that needs more support"
       />
       <section className="rulix-band glass glass--pane outcome-band" aria-labelledby="home-outcomes-title">
         <div className="rulix-shell outcome-band__grid">
@@ -338,7 +319,7 @@ function HomePage() {
           </div>
           <ol className="outcome-list">
             {HOME_OUTCOMES.map((outcome, index) => (
-              <li key={outcome.title}>
+              <li className="tile" key={outcome.title}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <h3>{outcome.title}</h3>
@@ -362,8 +343,6 @@ function ProductPage({ page }: { page: MarketingPageMeta }) {
         eyebrow="How Rulix works"
         title={hero.title}
         copy={hero.copy}
-        media="/marketing/demos/demo-export-review-record.webp"
-        mediaAlt="A complete export classification review record in Rulix"
       />
       <ProductFlow />
     </>
@@ -393,7 +372,7 @@ function ProductFlow() {
         <ol className="product-flow__steps">
           {PRODUCT_STEPS.map((step, index) => (
             <li
-              className="product-step"
+              className="product-step tile"
               key={step.title}
               style={{ "--step-index": index } as CSSProperties}
             >
@@ -403,7 +382,6 @@ function ProductFlow() {
                 <p>{step.copy}</p>
                 <strong>{step.detail}</strong>
               </div>
-              <StaticProductFrame src={step.media} alt={step.alt} />
             </li>
           ))}
         </ol>
@@ -427,15 +405,13 @@ function UseCasesPage({ page }: { page: MarketingPageMeta }) {
         eyebrow="Who it is for"
         title={title}
         copy="Rulix gives each team a shared way to find missing information, answer review questions, and document the final decision."
-        media="/marketing/demos/demo-resolve-review-gaps.webp"
-        mediaAlt="A classification review question being resolved in Rulix"
       />
       <section className="rulix-band glass glass--pane audience-stories" aria-label="Rulix use cases">
         <div className="rulix-shell">
-          {orderedStories.map((story, index) => {
+          {orderedStories.map((story) => {
             const Icon = story.icon;
             return (
-              <article className="audience-story" id={story.key} key={story.key}>
+              <article className="audience-story tile" id={story.key} key={story.key}>
                 <div className="audience-story__copy">
                   <div className="audience-story__label">
                     <Icon size={21} aria-hidden="true" />
@@ -445,7 +421,6 @@ function UseCasesPage({ page }: { page: MarketingPageMeta }) {
                   <p>{story.copy}</p>
                   <strong>{story.outcome}</strong>
                 </div>
-                <StaticProductFrame src={story.media} alt={story.alt} priority={index === 0} />
               </article>
             );
           })}
@@ -462,8 +437,6 @@ function TrustPage() {
         eyebrow="Human review first"
         title="A person makes the final decision."
         copy="Rulix helps reviewers see the weak point, ask for the right information, and record why they made the final call."
-        media="/marketing/demos/demo-export-review-record.webp"
-        mediaAlt="A human-reviewed export classification record in Rulix"
       />
       <section className="rulix-band glass glass--pane trust-band" aria-labelledby="trust-title">
         <div className="rulix-shell trust-band__grid">
@@ -475,7 +448,7 @@ function TrustPage() {
             {TRUST_POINTS.map((point) => {
               const Icon = point.icon;
               return (
-                <article key={point.title}>
+                <article className="tile" key={point.title}>
                   <Icon size={22} aria-hidden="true" />
                   <div>
                     <h3>{point.title}</h3>
@@ -516,29 +489,22 @@ function ContactPage() {
 function PageHero({
   eyebrow,
   title,
-  copy,
-  media,
-  mediaAlt
+  copy
 }: {
   eyebrow: string;
   title: string;
   copy: string;
-  media: string;
-  mediaAlt: string;
 }) {
   return (
     <section className="rulix-hero">
-      <div className="rulix-shell rulix-hero__grid">
-        <div className="rulix-hero__copy">
-          <span className="eyebrow">
-            <span className="eyebrow__dot" aria-hidden="true" />
-            {eyebrow}
-          </span>
-          <h1>{title}</h1>
-          <p>{copy}</p>
-          <EmailAction />
-        </div>
-        <StaticProductFrame className="rulix-hero__media" src={media} alt={mediaAlt} priority />
+      <div className="rulix-shell rulix-hero__copy">
+        <span className="eyebrow">
+          <span className="eyebrow__dot" aria-hidden="true" />
+          {eyebrow}
+        </span>
+        <h1>{title}</h1>
+        <p>{copy}</p>
+        <EmailAction />
       </div>
     </section>
   );
@@ -559,64 +525,18 @@ function EmailAction({ className = "", href = CONTACT_PAGE_HREF, children }: {
   );
 }
 
-function StaticProductFrame({
-  alt,
-  className = "",
-  priority = false,
-  src
-}: {
-  alt: string;
-  className?: string;
-  priority?: boolean;
-  src: string;
-}) {
-  const brandTone = useBrandTone();
-
-  return (
-    <figure className={["product-frame", className].filter(Boolean).join(" ")}>
-      <div className="product-frame__top">
-        <BrandLogo tone={brandTone} size="compact" />
-        <span>Reviewer workspace</span>
-        <strong>Human decision</strong>
-      </div>
-      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} />
-      <div className="product-frame__sheen" aria-hidden="true" />
-    </figure>
-  );
-}
-
 function SiteFooter() {
-  const brandTone = useBrandTone();
 
   return (
     <footer className="rulix-footer">
       <div className="rulix-shell rulix-footer__inner">
-        <BrandLogo tone={brandTone} size="compact" />
+        <BrandLogo tone="light" size="compact" />
         <p>AI-assisted export classification with human review.</p>
         <small>© 2026 Rulix</small>
         <a href="https://app.rulix.cloud">Sign in</a>
       </div>
     </footer>
   );
-}
-
-/* The brand art is two fixed PNG pairs rather than a tintable mark, so the
-   correct pair is chosen from the theme class the app root already sets. */
-function useBrandTone(): "light" | "dark" {
-  const [dark, setDark] = useState(
-    () => typeof document !== "undefined" && document.documentElement.classList.contains("theme-dark")
-  );
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const sync = () => setDark(root.classList.contains("theme-dark"));
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(root, { attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-
-  return dark ? "light" : "dark";
 }
 
 /* Moves the specular hotspot on a control to follow the pointer. */
