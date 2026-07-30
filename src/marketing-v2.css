@@ -28,7 +28,7 @@ html.marketing-page,
 html.marketing-page body,
 html.marketing-page #root {
   min-height: 100%;
-  background: #0a1030;
+  background: #061624;
 }
 
 /* ---------------------------------------------------------------- tokens */
@@ -37,26 +37,25 @@ html.marketing-page #root {
   --ink: #ffffff;
   --copy: rgba(255, 255, 255, 0.92);
   --muted: rgba(255, 255, 255, 0.82);
-  --accent: #7ff9ee;
-  --accent-deep: #17c6cd;
-  --on-accent: #04262a;
+  /* #00ccd8 is the teal in the brand mark; the rest are the product's own
+     navy/teal tokens from styles.css. No other hues belong here. */
+  --accent: #00ccd8;
+  --accent-deep: #0a9295;
+  --on-accent: #04202a;
 
-  /* the wallpaper every glass surface refracts */
-  --field: linear-gradient(150deg, #0a6f80 0%, #17439e 38%, #4a2596 68%, #8d2a80 100%);
-  --blob-1: rgba(24, 232, 220, 0.4);
-  --blob-2: rgba(70, 128, 255, 0.5);
-  --blob-3: rgba(30, 216, 178, 0.28);
-  --blob-4: rgba(158, 96, 250, 0.5);
-  --blob-5: rgba(232, 78, 194, 0.42);
+  --field: linear-gradient(155deg, #06202e 0%, #092034 40%, #0c3145 70%, #061c2a 100%);
+  --blob-1: rgba(0, 204, 216, 0.42);
+  --blob-2: rgba(10, 174, 177, 0.34);
+  --blob-3: rgba(18, 49, 74, 0.62);
 
   /* Holds white type at AA over the brightest part of the wallpaper without
      flattening the colour underneath it. */
-  --scrim: rgba(6, 10, 30, 0.22);
+  --scrim: rgba(2, 11, 20, 0.2);
 
   /* material fills — smoked glass: dark tint, bright rim */
-  --mat-chrome: linear-gradient(154deg, rgba(16, 30, 66, 0.34), rgba(8, 14, 38, 0.46) 70%);
-  --mat-pane: linear-gradient(158deg, rgba(11, 22, 54, 0.46), rgba(6, 12, 34, 0.6) 72%);
-  --mat-card: linear-gradient(156deg, rgba(14, 26, 60, 0.4), rgba(7, 13, 36, 0.54) 70%);
+  --mat-chrome: linear-gradient(154deg, rgba(18, 49, 74, 0.42), rgba(6, 22, 36, 0.56) 70%);
+  --mat-pane: linear-gradient(158deg, rgba(9, 32, 52, 0.56), rgba(5, 18, 30, 0.68) 72%);
+  --mat-card: linear-gradient(156deg, rgba(12, 38, 58, 0.5), rgba(6, 20, 32, 0.62) 70%);
   --mat-well: rgba(255, 255, 255, 0.1);
   --hairline: rgba(255, 255, 255, 0.16);
 
@@ -64,18 +63,18 @@ html.marketing-page #root {
      Order: hairline, top catch, bottom bounce, thickness, chromatic fringe. */
   --rim: inset 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.85),
     inset 0 -1.5px 0 -0.5px rgba(255, 255, 255, 0.28), inset 4px 6px 16px -10px rgba(255, 255, 255, 0.9),
-    inset -4px -7px 18px -12px rgba(0, 8, 22, 0.6), inset 1px 1px 0 -0.5px rgba(170, 232, 255, 0.5),
-    inset -1px -1px 0 -0.5px rgba(255, 186, 234, 0.4);
+    inset -4px -7px 18px -12px rgba(0, 10, 18, 0.6), inset 1px 1px 0 -0.5px rgba(170, 232, 255, 0.5),
+    inset -1px -1px 0 -0.5px rgba(150, 236, 255, 0.26);
 
   --rim-strong: inset 0 0 0 1px rgba(255, 255, 255, 0.4), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.96),
     inset 0 -2px 0 -0.5px rgba(255, 255, 255, 0.36), inset 5px 8px 20px -12px rgba(255, 255, 255, 0.96),
-    inset -5px -9px 22px -14px rgba(0, 8, 22, 0.66), inset 1.5px 1.5px 0 -0.5px rgba(170, 232, 255, 0.6),
-    inset -1.5px -1.5px 0 -0.5px rgba(255, 186, 234, 0.46);
+    inset -5px -9px 22px -14px rgba(0, 10, 18, 0.66), inset 1.5px 1.5px 0 -0.5px rgba(170, 232, 255, 0.6),
+    inset -1.5px -1.5px 0 -0.5px rgba(150, 236, 255, 0.3);
 
   /* one diffuse shadow per tier, not a stack of glows */
-  --lift-sm: 0 2px 6px rgba(2, 8, 22, 0.3), 0 8px 20px -8px rgba(2, 8, 22, 0.42);
-  --lift-md: 0 3px 10px rgba(2, 8, 22, 0.34), 0 22px 48px -18px rgba(2, 8, 22, 0.52);
-  --lift-lg: 0 5px 14px rgba(2, 8, 22, 0.36), 0 46px 96px -32px rgba(2, 8, 22, 0.6);
+  --lift-sm: 0 2px 6px rgba(2, 11, 20, 0.32), 0 8px 20px -8px rgba(2, 11, 20, 0.44);
+  --lift-md: 0 3px 10px rgba(2, 11, 20, 0.36), 0 22px 48px -18px rgba(2, 11, 20, 0.54);
+  --lift-lg: 0 5px 14px rgba(2, 11, 20, 0.38), 0 46px 96px -32px rgba(2, 11, 20, 0.62);
 
   --radius-sm: 14px;
   --radius-md: 20px;
@@ -93,7 +92,7 @@ html.marketing-page #root {
   flex-direction: column;
   overflow-x: clip;
   color: var(--copy);
-  background: #0a1030;
+  background: #061624;
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 17px;
   font-feature-settings: "cv11", "ss01";
@@ -168,76 +167,33 @@ html.marketing-page #root {
 }
 
 .rulix-aurora__blob:nth-child(1) {
-  --depth: -0.04;
-  top: 4%;
-  left: -6%;
-  width: 58vmax;
-  height: 52vmax;
+  --depth: -0.05;
+  top: 2%;
+  left: -8%;
+  width: 62vmax;
+  height: 54vmax;
   background: radial-gradient(closest-side, var(--blob-1), transparent 72%);
-  animation: drift-a 46s var(--ease) infinite alternate;
+  animation: drift-a 56s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(2) {
-  --depth: -0.07;
-  top: -10%;
+  --depth: -0.09;
+  top: -8%;
   right: -10%;
-  width: 66vmax;
-  height: 56vmax;
+  width: 68vmax;
+  height: 58vmax;
   background: radial-gradient(closest-side, var(--blob-2), transparent 72%);
-  animation: drift-b 61s var(--ease) infinite alternate;
+  animation: drift-b 71s var(--ease) infinite alternate;
 }
 
 .rulix-aurora__blob:nth-child(3) {
-  --depth: -0.1;
-  top: 44%;
-  left: 22%;
-  width: 56vmax;
-  height: 48vmax;
-  background: radial-gradient(closest-side, var(--blob-3), transparent 70%);
-  animation: drift-c 53s var(--ease) infinite alternate;
-}
-
-.rulix-aurora__blob:nth-child(4) {
-  --depth: -0.13;
-  bottom: -12%;
-  right: 2%;
-  width: 62vmax;
-  height: 54vmax;
-  background: radial-gradient(closest-side, var(--blob-4), transparent 72%);
-  animation: drift-d 67s var(--ease) infinite alternate;
-}
-
-.rulix-aurora__blob:nth-child(5) {
-  --depth: -0.16;
-  bottom: 8%;
-  left: -8%;
-  width: 50vmax;
-  height: 44vmax;
-  background: radial-gradient(closest-side, var(--blob-5), transparent 70%);
-  animation: drift-e 74s var(--ease) infinite alternate;
-}
-
-/* Slow light ripples. A perfectly smooth gradient gives the rim displacement
-   nothing to distort, so the panes need this to read as lenses at all. */
-.rulix-aurora__caustics {
-  position: absolute;
-  inset: -8%;
-  opacity: 0.3;
-  mix-blend-mode: soft-light;
-  filter: blur(30px);
-  background-image: repeating-radial-gradient(
-      circle at 24% 28%,
-      transparent 0 150px,
-      rgba(255, 255, 255, 0.5) 150px 250px,
-      transparent 250px 430px
-    ),
-    repeating-radial-gradient(
-      circle at 82% 74%,
-      transparent 0 210px,
-      rgba(255, 255, 255, 0.36) 210px 330px,
-      transparent 330px 570px
-    );
-  animation: caustics-swim 88s var(--ease) infinite alternate;
+  --depth: -0.14;
+  bottom: -14%;
+  left: 18%;
+  width: 66vmax;
+  height: 56vmax;
+  background: radial-gradient(closest-side, var(--blob-3), transparent 74%);
+  animation: drift-c 64s var(--ease) infinite alternate;
 }
 
 /* Scrim plus grain: the first keeps white type legible over the brightest
@@ -267,38 +223,12 @@ html.marketing-page #root {
   }
 }
 
-@keyframes drift-d {
-  to {
-    transform: translate3d(-7vmax, -6vmax, 0) scale(1.12);
-  }
-}
-
-@keyframes drift-e {
-  to {
-    transform: translate3d(9vmax, -4vmax, 0) scale(1.16);
-  }
-}
-
-@keyframes caustics-swim {
-  to {
-    transform: translate3d(3vmax, -2vmax, 0) scale(1.08);
-  }
-}
-
-.rulix-glass-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
 /* -------------------------------------------------------------- material */
 
-/* Two stacked backdrop layers per surface: ::before blurs the whole pane,
-   ::after re-blurs only a ring at the rim and runs a displacement map through
-   it, so the edge bends the wallpaper more than the centre. That gradient of
-   blur is what the eye reads as lens thickness. */
+/* One specular rim plus a translucent fill is the whole material. Backdrop
+   blur is reserved for the header and footer, which are small enough to
+   composite cheaply; over a smooth gradient a blurred backdrop is nearly
+   indistinguishable from the gradient, so the large panes do without. */
 .glass {
   position: relative;
   isolation: isolate;
@@ -306,55 +236,16 @@ html.marketing-page #root {
   box-shadow: var(--rim), var(--lift-md);
 }
 
-.glass::before,
-.glass::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.glass::before {
-  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.05);
-  backdrop-filter: blur(20px) saturate(180%) brightness(1.05);
-}
-
-.glass::after {
-  padding: 14px;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  /* Chromium accepts an SVG filter inside backdrop-filter; engines that do not
-     drop this declaration and keep the blur-gradient lens above. */
-  -webkit-backdrop-filter: blur(5px) saturate(150%) url(#rulix-lens);
-  backdrop-filter: blur(5px) saturate(150%) url(#rulix-lens);
-}
-
 .glass--chrome {
   background: var(--mat-chrome);
   box-shadow: var(--rim-strong), var(--lift-md);
-}
-
-.glass--chrome::before {
-  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
-  backdrop-filter: blur(28px) saturate(200%) brightness(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
 }
 
 .glass--pane {
   background: var(--mat-pane);
   box-shadow: var(--rim), var(--lift-lg);
-}
-
-.glass--pane::before {
-  -webkit-backdrop-filter: blur(34px) saturate(175%);
-  backdrop-filter: blur(34px) saturate(175%);
-}
-
-.glass--pane::after {
-  padding: 24px;
 }
 
 /* Surfaces nested inside a pane use plain alpha rather than another blur.
@@ -507,7 +398,7 @@ html.marketing-page #root {
   font-weight: 600;
 }
 
-.rulix-header__signin::before {
+.rulix-header__nav a.rulix-header__signin::before {
   background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1.5px 0 -0.5px rgba(255, 255, 255, 0.8);
   opacity: 1;
@@ -551,7 +442,7 @@ html.marketing-page #root {
   color: var(--on-accent);
   background: linear-gradient(158deg, var(--accent), var(--accent-deep) 74%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 2px 0 -0.5px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.3), 0 12px 32px -10px rgba(20, 220, 214, 0.5), var(--lift-md);
+    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.3), 0 12px 32px -10px rgba(0, 204, 216, 0.42), var(--lift-md);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.014em;
@@ -579,7 +470,7 @@ html.marketing-page #root {
 .rulix-site .rulix-primary-action:hover {
   transform: translateY(-1.5px);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), inset 0 2px 0 -0.5px #ffffff,
-    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.26), 0 16px 40px -10px rgba(20, 220, 214, 0.6), var(--lift-lg);
+    inset 0 -2px 6px -2px rgba(0, 58, 64, 0.26), 0 16px 40px -10px rgba(0, 204, 216, 0.52), var(--lift-lg);
 }
 
 .rulix-site .rulix-primary-action:active {
@@ -722,7 +613,7 @@ html.marketing-page #root {
   border-radius: 50%;
   color: var(--on-accent);
   background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(0, 204, 216, 0.52);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -782,7 +673,7 @@ html.marketing-page #root {
   border-radius: 50%;
   color: var(--on-accent);
   background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(0, 204, 216, 0.52);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -808,7 +699,7 @@ html.marketing-page #root {
 .audience-story__copy > strong {
   max-width: 48ch;
   padding-left: 16px;
-  border-left: 2px solid rgba(127, 249, 238, 0.6);
+  border-left: 2px solid rgba(0, 204, 216, 0.66);
   color: var(--muted);
   font-size: 15px;
   font-weight: 500;
@@ -928,7 +819,7 @@ html.marketing-page #root {
   border-radius: 50%;
   color: var(--on-accent);
   background: linear-gradient(158deg, var(--accent), var(--accent-deep) 72%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(20, 220, 214, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 16px -6px rgba(0, 204, 216, 0.46);
 }
 
 .trust-list h3 {
@@ -955,8 +846,8 @@ html.marketing-page #root {
   padding: 18px 22px;
   border-radius: var(--radius-md);
   color: var(--ink);
-  background: linear-gradient(135deg, rgba(127, 249, 238, 0.2), rgba(255, 255, 255, 0.06));
-  box-shadow: inset 0 0 0 1px rgba(127, 249, 238, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  background: linear-gradient(135deg, rgba(0, 204, 216, 0.18), rgba(255, 255, 255, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(0, 204, 216, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
 .data-boundary svg {
@@ -1103,7 +994,7 @@ html.marketing-page #root {
     gap: 2px;
     padding: 10px;
     border-radius: var(--radius-lg);
-    background: linear-gradient(158deg, rgba(14, 26, 56, 0.94), rgba(9, 15, 38, 0.92));
+    background: linear-gradient(158deg, rgba(12, 40, 62, 0.95), rgba(5, 18, 30, 0.94));
     box-shadow: var(--rim-strong), var(--lift-lg);
     -webkit-backdrop-filter: blur(30px) saturate(190%);
     backdrop-filter: blur(30px) saturate(190%);
@@ -1275,24 +1166,22 @@ html.marketing-page #root {
    that keep every contrast ratio intact. */
 @media (prefers-reduced-transparency: reduce) {
   .rulix-site {
-    --mat-chrome: #131f42;
-    --mat-pane: #101a38;
-    --mat-card: #14204a;
-    --mat-well: #182552;
-    background: #0a1030;
+    --mat-chrome: #0d283f;
+    --mat-pane: #09202f;
+    --mat-card: #0d2a3e;
+    --mat-well: #113349;
+    background: #061624;
   }
 
-  .rulix-aurora__blob,
-  .rulix-aurora__caustics {
+  .rulix-aurora__blob {
     display: none;
   }
 
-  .glass::after,
   .tile::before {
     display: none;
   }
 
-  .glass::before,
+  .glass--chrome,
   .rulix-footer {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1309,8 +1198,7 @@ html.marketing-page #root {
     transition-duration: 1ms !important;
   }
 
-  .rulix-aurora__blob,
-  .rulix-aurora__caustics {
+  .rulix-aurora__blob {
     animation: none !important;
     translate: none !important;
   }
@@ -1323,8 +1211,6 @@ html.marketing-page #root {
 
 @media (forced-colors: active) {
   .rulix-aurora,
-  .glass::before,
-  .glass::after,
   .tile::before {
     display: none;
   }

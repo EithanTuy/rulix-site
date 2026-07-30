@@ -1,8 +1,10 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
   type CSSProperties,
   type FocusEvent,
   type ReactNode
@@ -160,7 +162,8 @@ export function nextMarketingHeaderVisibility({
 }
 
 export function MarketingSite() {
-  const page = useMemo(() => pageForLocation(), []);
+  const { path, navigate } = useMarketingRouter();
+  const page = useMemo(() => marketingPageForPath(path), [path]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerFocused, setHeaderFocused] = useState(false);
   const scroll = useMarketingScrollState(mobileNavOpen, headerFocused);
@@ -176,7 +179,7 @@ export function MarketingSite() {
   }, [page]);
 
   return (
-    <div className="rulix-site rulix-site--liquid-glass">
+    <div className="rulix-site rulix-site--liquid-glass" onClick={navigate}>
       <GlassField />
       <SiteHeader
         currentPageKind={page.pageKind}
@@ -193,29 +196,57 @@ export function MarketingSite() {
   );
 }
 
-/* The drifting colour field every glass surface refracts, plus the displacement
-   map that bends it at each rim. Without something saturated behind them the
-   panes would only read as flat translucency. */
+/* Marketing is five static pages in one already-loaded bundle, so a plain
+   anchor was paying a full document reload — reparse, remount, refetch — to
+   swap a heading and a list. Same markup and same URLs; the click is just
+   intercepted and answered from memory. Anything the browser should still
+   handle itself (new tab, modifier click, mailto, app subdomain) falls
+   through untouched. */
+function useMarketingRouter() {
+  const [path, setPath] = useState(() => currentMarketingPath());
+
+  useEffect(() => {
+    const onPopState = () => setPath(currentMarketingPath());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const navigate = useCallback((event: MouseEvent<HTMLElement>) => {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const anchor = (event.target as HTMLElement | null)?.closest?.("a");
+    if (!anchor) return;
+    if (anchor.target && anchor.target !== "_self") return;
+    if (anchor.hasAttribute("download")) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href || !href.startsWith("/") || href.startsWith("//")) return;
+    if (!isMarketingRoute(href)) return;
+
+    event.preventDefault();
+    if (href === window.location.pathname) return;
+    window.history.pushState({}, "", href);
+    setPath(href);
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+
+  return { path, navigate };
+}
+
+function currentMarketingPath() {
+  return typeof window === "undefined" ? "/" : window.location.pathname;
+}
+
+/* The drifting colour field behind every glass surface. */
 function GlassField() {
   return (
-    <>
-      <div className="rulix-aurora" aria-hidden="true">
-        <div className="rulix-aurora__blob" />
-        <div className="rulix-aurora__blob" />
-        <div className="rulix-aurora__blob" />
-        <div className="rulix-aurora__blob" />
-        <div className="rulix-aurora__blob" />
-        <div className="rulix-aurora__caustics" />
-        <div className="rulix-aurora__grain" />
-      </div>
-      <svg className="rulix-glass-defs" aria-hidden="true" focusable="false">
-        <filter id="rulix-lens" x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2" seed="7" result="warp" />
-          <feGaussianBlur in="warp" stdDeviation="2.4" result="smooth" />
-          <feDisplacementMap in="SourceGraphic" in2="smooth" scale="18" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </svg>
-    </>
+    <div className="rulix-aurora" aria-hidden="true">
+      <div className="rulix-aurora__blob" />
+      <div className="rulix-aurora__blob" />
+      <div className="rulix-aurora__blob" />
+      <div className="rulix-aurora__grain" />
+    </div>
   );
 }
 
@@ -683,11 +714,6 @@ export function isMarketingPath(pathname: string) {
 
 export function marketingMetaForPath(pathname: string) {
   return marketingPageForPath(pathname);
-}
-
-function pageForLocation() {
-  if (typeof window === "undefined") return marketingPageForPath("/");
-  return marketingPageForPath(window.location.pathname);
 }
 
 function applyMarketingMetadata(page: MarketingPageMeta) {
