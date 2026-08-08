@@ -31,8 +31,23 @@ output "account_state_table" {
 }
 
 output "analysis_worker_policy_arn" {
-  description = "Least-privilege analysis capability with read-only account state and no auth or audit-table access."
+  description = "Least-privilege analysis capability for bound workspace stages, evidence, and provider admission."
   value       = aws_iam_policy.analysis_worker.arn
+}
+
+output "analysis_worker_function_name" {
+  description = "Dedicated background analysis worker Lambda."
+  value       = aws_lambda_function.analysis_worker.function_name
+}
+
+output "analysis_queue_url" {
+  description = "Durable analysis SQS queue URL."
+  value       = aws_sqs_queue.analysis.url
+}
+
+output "analysis_dlq_url" {
+  description = "Analysis dead-letter queue URL."
+  value       = aws_sqs_queue.analysis_dlq.url
 }
 
 output "workspace_table" {

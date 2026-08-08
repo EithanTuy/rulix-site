@@ -27,7 +27,7 @@ The production council should be orchestrated by application code rather than fr
 - Contradiction/risk reviewer
 - Report writer
 
-Use the configured Claude Haiku council model where available, with model IDs pinned in configuration and a provider abstraction for swaps. The local prototype simulates this council deterministically so tests can run offline.
+Use the configured Claude Sonnet regulatory-workflow model with model IDs pinned in deployment configuration and a provider abstraction for swaps. Offline tests inject mocked provider responses into the same orchestrator; runtime analysis never substitutes a local classification.
 
 ## Security Baseline
 

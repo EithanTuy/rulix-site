@@ -790,7 +790,7 @@ function SettingsPanel() {
       <div className="setting-card">
         <ShieldCheck size={22} />
         <strong>Model policy</strong>
-        <p>Reviewer-facing analysis requires live AI; local rules remain an internal validation baseline and never replace human signoff.</p>
+        <p>Consequential analysis requires the approved live multi-agent workflow, exact-content approval, a current reviewed corpus, and qualified human signoff.</p>
       </div>
     </section>
   );

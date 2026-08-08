@@ -5,14 +5,14 @@ import type { MemoRecord, UserProfile } from "./types";
 const api = vi.hoisted(() => ({
   acceptInvite: vi.fn(),
   analyzeMemoWithBackend: vi.fn(),
-  approveCouncilAnalysis: vi.fn(),
+  approveAgentWorkflow: vi.fn(),
   applyMemoChatSuggestion: vi.fn(),
   completePasswordReset: vi.fn(),
   createReviewComment: vi.fn(),
   createReview: vi.fn(),
   deleteMemoBuilderSession: vi.fn(),
   getBackendHealth: vi.fn(),
-  getCouncilApproval: vi.fn(),
+  getAgentWorkflowApproval: vi.fn(),
   getCurrentUser: vi.fn(),
   getReviewDetail: vi.fn(),
   listMemoBuilderSessions: vi.fn(),
@@ -24,7 +24,7 @@ const api = vi.hoisted(() => ({
   listTenantMembers: vi.fn(),
   loadWorkspacePreferences: vi.fn(),
   recordReviewDecision: vi.fn(),
-  requestCouncilApproval: vi.fn(),
+  requestAgentWorkflowApproval: vi.fn(),
   requestMemoChatApproval: vi.fn(),
   requestPasswordReset: vi.fn(),
   resolveReviewComment: vi.fn(),
@@ -43,8 +43,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock("./lib/apiClient", () => ({
   ANALYSIS_MODE_CONFIG: {
-    standard: { label: "Full AI Council", depth: "standard", cost: "Haiku", description: "Standard" },
-    deep: { label: "Deep Council Pass", depth: "deep", cost: "Sonnet", description: "Deep" }
+    standard: { label: "Quick multi-agent review", depth: "standard", cost: "Bounded", description: "Standard" },
+    deep: { label: "Heavy multi-agent review", depth: "deep", cost: "Expanded", description: "Deep" }
   },
   ApiError: class ApiError extends Error {
     status: number;
@@ -83,7 +83,7 @@ beforeEach(() => {
     time: "2026-07-14T00:00:00.000Z",
     provider: { configured: false }
   });
-  api.getCouncilApproval.mockResolvedValue(undefined);
+  api.getAgentWorkflowApproval.mockResolvedValue(undefined);
   api.loadWorkspacePreferences.mockResolvedValue({ version: 0, selectedMemoId: primary.id });
   api.listMemoBuilderSessions.mockResolvedValue({ items: [] });
   api.listNotifications.mockResolvedValue({ items: [] });

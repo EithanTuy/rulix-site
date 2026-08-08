@@ -108,15 +108,15 @@ test("an officer completes the reviewer golden path and downloads a complete rep
   await page.getByRole("button", { name: "Continue to Review" }).click();
   await page.getByRole("button", { name: "Approve & run AI review" }).click();
 
-  await expect(page.getByRole("heading", { name: "3A001.a.5" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("heading", { name: "Verify the controlled cryogenic threshold" })).toBeVisible();
-  await expect(page.getByText("Exact-content approval", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "9A001" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Confirm technical thresholds" })).toBeVisible();
+  await expect(page.getByText("Approved for one exact dispatch", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Continue to Decide & Export" }).click();
-  const rationale = "Accepted for the synthetic demo after verifying the cited threshold and evidence trail.";
+  const rationale = "Officer override for the synthetic demo after reviewing the cited threshold, missing-information finding, and complete evidence trail.";
   await page.getByPlaceholder("Explain the evidence, judgment, and any conditions for this decision.").fill(rationale);
-  await page.getByRole("button", { name: "Accept & sign" }).click();
-  await expect(page.getByText("Accept recorded", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Override with rationale" }).click();
+  await expect(page.getByText("Override recorded", { exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export signed result" }).first().click();
@@ -126,18 +126,18 @@ test("an officer completes the reviewer golden path and downloads a complete rep
   const report = await readFile(downloadPath!, "utf8");
   expect(report.length).toBeGreaterThan(1_000);
   expect(report).toContain(demoTitle);
-  expect(report).toContain("## AI Review Scope");
-  expect(report).toContain("Data class: public");
-  expect(report).toContain("Verify the controlled cryogenic threshold");
-  expect(report).toContain("Action: accept");
+  expect(report).toContain("## Reproducibility Bindings");
+  expect(report).toContain("- Data class: public");
+  expect(report).toContain("Confirm technical thresholds");
+  expect(report).toContain("- Action: override");
   expect(report).toContain(rationale);
-  expect(report).toContain(`Signed By: ${session.user.name}`);
+  expect(report).toContain(`- Signed by: ${session.user.name}`);
   expect(report).toContain("## Audit Trail");
   expect(report).toContain("Review created");
 
   await page.getByRole("button", { name: "View audit history" }).click();
   await expect(page.getByRole("complementary", { name: "Review context" })).toBeVisible();
-  await expect(page.getByText("Reviewer decision: accept", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reviewer decision: override", { exact: true })).toBeVisible();
 
   await assertPageHealth(page, runtime);
 });

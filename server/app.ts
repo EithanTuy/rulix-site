@@ -18,6 +18,8 @@ import type {
   AiApprovalRequestStatusKind,
   AiApprovalStatus,
   AiApprovalSubjectBinding,
+  AiWorkflowApprovalBinding,
+  AnalysisRunMode,
   AuditEvent,
   CaseComment,
   DataClass,
@@ -41,18 +43,12 @@ import {
   marketingPageForPath as sharedMarketingPageForPath
 } from "../src/marketingPages";
 import {
-  createLocalPublicMemoTemplate,
-  buildCouncilProviderRequest,
   buildMemoBuilderProviderRequest,
   buildMemoChatProviderRequest,
-  councilApprovalPayload,
-  councilModelForDepth,
   getBedrockRuntime,
-  LiveCouncilUnavailableError,
   memoBuilderApprovalPayload,
   memoChatApprovalPayload,
   resolveMemoBuilderProviderLane,
-  runCouncilAnalysis,
   runMemoBuildChat,
   runMemoChatWithHaiku,
   type AiEgressCallerContext,
@@ -75,7 +71,7 @@ import {
   sameAiApprovalPolicy,
   sameAiApprovalSubject
 } from "./domain/aiApproval";
-import { hashMemoContent, hashReviewResult, sha256Canonical } from "./domain/hashes";
+import { hashMemoContent, sha256Canonical } from "./domain/hashes";
 import { ReviewPolicyError } from "./domain/reviewPolicy";
 import {
   OrganizationAuthorizationError,
@@ -120,6 +116,21 @@ import {
 import { createAiDispatchAdmissionHook } from "./aiAdmission";
 import { createStoreAiDispatchAuthorizationHook } from "./aiAuthorization";
 import {
+  agentWorkflowApprovalExpectation,
+  createAnalysisRun,
+  InProcessAnalysisRunQueue,
+  processAnalysisRun,
+  recordAnalysisRunAuditEvent,
+  SqsAnalysisRunQueue,
+  type AnalysisRunQueue
+} from "./analysisRuns";
+import {
+  InMemoryAnalysisArtifactStore,
+  S3AnalysisArtifactStore,
+  type AnalysisArtifactStore
+} from "./analysisArtifactStore";
+import type { AgentRegulatoryCorpus } from "./agentTools";
+import {
   appendOutreachJobLog,
   createOutreachJob,
   estimateJobCost,
@@ -153,6 +164,9 @@ interface CreateAppOptions {
   store?: AccountStore;
   edgeSharedSecret?: string;
   aiProviderClient?: AiProviderClient;
+  analysisQueue?: AnalysisRunQueue;
+  analysisArtifactStore?: AnalysisArtifactStore;
+  regulatoryCorpus?: AgentRegulatoryCorpus;
 }
 
 export function createApp(options: CreateAppOptions = {}) {
@@ -161,6 +175,22 @@ export function createApp(options: CreateAppOptions = {}) {
   setAiDispatchAuthorizationHook(createStoreAiDispatchAuthorizationHook({ store }));
   const edgeSharedSecret = options.edgeSharedSecret ?? process.env.RULIX_EDGE_SHARED_SECRET;
   const aiProviderClient = options.aiProviderClient;
+  const regulatoryCorpus = options.regulatoryCorpus;
+  const analysisArtifactStore = options.analysisArtifactStore ?? (
+    process.env.RULIX_EVIDENCE_BUCKET?.trim()
+      ? new S3AnalysisArtifactStore(process.env.RULIX_EVIDENCE_BUCKET.trim())
+      : new InMemoryAnalysisArtifactStore()
+  );
+  const analysisQueue = options.analysisQueue ?? (
+    process.env.RULIX_ANALYSIS_QUEUE_URL?.trim()
+      ? new SqsAnalysisRunQueue(process.env.RULIX_ANALYSIS_QUEUE_URL.trim())
+      : new InProcessAnalysisRunQueue((event) => processAnalysisRun(event, {
+          store,
+          artifactStore: analysisArtifactStore,
+          providerClient: aiProviderClient,
+          regulatoryCorpus
+        }).then(() => undefined))
+  );
   const app = express();
   const allowedOrigins = allowedCorsOrigins();
 
@@ -1502,7 +1532,7 @@ export function createApp(options: CreateAppOptions = {}) {
       const requestId = coerceUuid(req.body?.requestId);
       const purpose = req.body?.purpose;
       if (!isRecord(req.body) || !requestId ||
-          (purpose !== "council" && purpose !== "memo-chat" && purpose !== "memo-builder")) {
+          (purpose !== "agent-workflow" && purpose !== "memo-chat" && purpose !== "memo-builder")) {
         res.status(400).json({
           code: "invalid_ai_approval_request",
           error: "AI approval requests require a UUID requestId and one supported purpose."
@@ -1555,7 +1585,7 @@ export function createApp(options: CreateAppOptions = {}) {
           return;
         }
 
-        const allowed = purpose === "council"
+        const allowed = purpose === "agent-workflow"
           ? new Set(["requestId", "purpose", "reviewId", "depth", "expectedVersion", "expectedRevision", "expectedHash"])
           : new Set(["requestId", "purpose", "reviewId", "message", "expectedVersion", "expectedRevision", "expectedHash"]);
         const reviewId = coerceReviewEntityId(req.body.reviewId);
@@ -1590,16 +1620,18 @@ export function createApp(options: CreateAppOptions = {}) {
         const dataClass = storedAiDataClass(res, memo.dataClass);
         if (!dataClass || !enforceDataClass(res, dataClass)) return;
 
-        if (purpose === "council") {
+        if (purpose === "agent-workflow") {
           const depth = coerceReviewDepth(req.body.depth);
-          const expected = councilApprovalExpectation(memo, depth, dataClass);
+          const mode: AnalysisRunMode = depth === "deep" ? "heavy" : "quick";
+          const expected = agentWorkflowApprovalExpectation(memo, mode, dataClass, undefined, regulatoryCorpus);
           const status = await store.createAiApprovalRequest(res.locals.user.id, {
             requestId,
             requestedBy: { id: res.locals.user.id, role: res.locals.user.role },
             purpose,
             ...expected,
             dataClass,
-            context: { kind: "council", depth }
+            workflow: expected.workflow,
+            context: { kind: "agent-workflow", mode }
           });
           res.status(201).json(status);
           return;
@@ -1699,7 +1731,7 @@ export function createApp(options: CreateAppOptions = {}) {
           res.status(404).json({ code: "ai_approval_request_not_found", error: "AI approval request not found." });
           return;
         }
-        res.json(await buildAiApprovalOfficerDetail(store, status));
+        res.json(await buildAiApprovalOfficerDetail(store, status, regulatoryCorpus));
       } catch (error) {
         sendStoreError(res, error);
       }
@@ -1732,7 +1764,7 @@ export function createApp(options: CreateAppOptions = {}) {
           res.status(404).json({ code: "ai_approval_request_not_found", error: "AI approval request not found." });
           return;
         }
-        const inspected = await buildAiApprovalOfficerDetail(store, detail);
+        const inspected = await buildAiApprovalOfficerDetail(store, detail, regulatoryCorpus);
         if (!inspected.inspection.current) {
           res.status(409).json({
             code: "ai_approval_request_stale",
@@ -1812,7 +1844,7 @@ export function createApp(options: CreateAppOptions = {}) {
   );
 
   app.get(
-    "/api/reviews/:id/ai-approvals/council",
+    "/api/reviews/:id/ai-approvals/agent-workflow",
     requireAuth(store),
     requireRoles("export-control-officer", "reviewer", "counsel"),
     async (req, res) => {
@@ -1828,14 +1860,15 @@ export function createApp(options: CreateAppOptions = {}) {
       if (!dataClass || !enforceDataClass(res, dataClass)) return;
       const depth = coerceReviewDepth(req.query.depth);
       try {
-        const expected = councilApprovalExpectation(memo, depth, dataClass);
+        const mode: AnalysisRunMode = depth === "deep" ? "heavy" : "quick";
+        const expected = agentWorkflowApprovalExpectation(memo, mode, dataClass, undefined, regulatoryCorpus);
         const approval = await store.getCurrentAiApproval(res.locals.user.id, {
-          purpose: "council",
+          purpose: "agent-workflow",
           subjectKind: "review",
           subjectId: memo.id
         });
         res.json({
-          purpose: "council",
+          purpose: "agent-workflow",
           depth,
           subject: expected.subject,
           payloadHash: expected.payloadHash,
@@ -1851,7 +1884,7 @@ export function createApp(options: CreateAppOptions = {}) {
   );
 
   app.post(
-    "/api/reviews/:id/ai-approvals/council",
+    "/api/reviews/:id/ai-approvals/agent-workflow",
     requireJsonBytes(4 * 1024),
     requireAuth(store),
     requireCsrf,
@@ -1888,15 +1921,17 @@ export function createApp(options: CreateAppOptions = {}) {
       if (!dataClass || !enforceDataClass(res, dataClass)) return;
       const depth = coerceReviewDepth(req.body.depth);
       try {
-        const expected = councilApprovalExpectation(memo, depth, dataClass);
+        const mode: AnalysisRunMode = depth === "deep" ? "heavy" : "quick";
+        const expected = agentWorkflowApprovalExpectation(memo, mode, dataClass, undefined, regulatoryCorpus);
         const approval = await store.createAiApproval(res.locals.user.id, {
           requestId,
-          purpose: "council",
+          purpose: "agent-workflow",
           subject: expected.subject,
           payloadHash: expected.payloadHash,
           providerRequestHashes: expected.providerRequestHashes,
           dataClass,
           policy: expected.policy,
+          workflow: expected.workflow,
           approvedBy: {
             id: res.locals.user.id,
             role: res.locals.user.role
@@ -1960,109 +1995,150 @@ export function createApp(options: CreateAppOptions = {}) {
     requireCsrf,
     requireRoles("export-control-officer", "reviewer", "counsel"),
     async (req, res) => {
-    const allowed = new Set([
-      "requestId", "depth", "expectedVersion", "expectedRevision", "expectedHash"
-    ]);
-    const memoId = coerceReviewId(req, res);
-    const bindings = coerceReviewBindings(req.body);
-    const dispatchRequestId = coerceUuid(req.body?.requestId);
-    if (!memoId) return;
-    if (!bindings || !dispatchRequestId || !isRecord(req.body) ||
-        Object.keys(req.body).some((key) => !allowed.has(key))) {
-      res.status(400).json({ code: "review_binding_required", error: "Analysis requires a UUID requestId plus the current review version, revision, and hash." });
-      return;
-    }
-    const detail = await store.getReviewDetail(res.locals.user.id, memoId);
-    const memo = detail?.review;
-    if (!memo) {
-      res.status(404).json({ error: "Review not found" });
-      return;
-    }
-    if (!reviewMatchesBindings(memo, bindings)) {
-      res.status(409).json({ code: "stale_revision", error: "The review changed before analysis started. Reload and try again." });
-      return;
-    }
-    const dataClass = storedAiDataClass(res, memo.dataClass);
-    if (!dataClass || !enforceDataClass(res, dataClass)) return;
-
-    const depth = coerceReviewDepth(req.body?.depth);
-    let approval: AiApprovalStatus | undefined;
-    let approvalSubject: AiApprovalSubjectBinding;
-    try {
-      const expected = councilApprovalExpectation(memo, depth, dataClass);
-      approvalSubject = expected.subject;
-      approval = await store.getCurrentAiApproval(res.locals.user.id, {
-        purpose: "council",
-        subjectKind: "review",
-        subjectId: memo.id
-      });
-      if (!isApprovalUsable(approval, expected, dataClass)) {
-        res.status(403).json({
-          code: "ai_officer_approval_required",
-          error: "An export-control officer must approve this exact memo revision, analysis depth, and provider policy before AI analysis."
+      const allowed = new Set(["requestId", "depth", "expectedVersion", "expectedRevision", "expectedHash"]);
+      const memoId = coerceReviewId(req, res);
+      const bindings = coerceReviewBindings(req.body);
+      const dispatchRequestId = coerceUuid(req.body?.requestId);
+      if (!memoId) return;
+      if (!bindings || !dispatchRequestId || !isRecord(req.body) ||
+          Object.keys(req.body).some((key) => !allowed.has(key))) {
+        res.status(400).json({ code: "review_binding_required", error: "Analysis requires a UUID requestId plus the current review version, revision, and hash." });
+        return;
+      }
+      const detail = await store.getReviewDetail(res.locals.user.id, memoId);
+      const memo = detail?.review;
+      if (!memo) {
+        res.status(404).json({ error: "Review not found." });
+        return;
+      }
+      if (!reviewMatchesBindings(memo, bindings)) {
+        res.status(409).json({ code: "stale_revision", error: "The review changed before analysis started. Reload and try again." });
+        return;
+      }
+      const dataClass = storedAiDataClass(res, memo.dataClass);
+      if (!dataClass || !enforceDataClass(res, dataClass)) return;
+      const depth = coerceReviewDepth(req.body?.depth);
+      const mode: AnalysisRunMode = depth === "deep" ? "heavy" : "quick";
+      const existingRun = (await store.listAnalysisRuns(res.locals.user.id, memo.id))
+        .find((run) => run.requestId === dispatchRequestId);
+      if (existingRun) {
+        res.status(202).json({ run: existingRun });
+        return;
+      }
+      try {
+        const expected = agentWorkflowApprovalExpectation(memo, mode, dataClass, undefined, regulatoryCorpus);
+        const approval = await store.getCurrentAiApproval(res.locals.user.id, {
+          purpose: "agent-workflow",
+          subjectKind: "review",
+          subjectId: memo.id
         });
-        return;
-      }
-    } catch (error) {
-      if (sendAiEgressError(res, error)) return;
-      throw error;
-    }
-    let result: ReviewResult;
-    try {
-      result = await runCouncilAnalysis(memo, {
-        depth,
-        maxTokens: depth === "deep" ? 3600 : undefined,
-        onUsage: (sample) => recordUsageSafe(store, res.locals.user, sample),
-        providerClient: aiProviderClient,
-        egress: approvedAiEgressContext(
-          res,
-          dataClass,
-          approval!.approval.id,
-          `council:${dispatchRequestId}`,
-          approvalSubject
-        )
-      });
-    } catch (error) {
-      sendCouncilError(res, error);
-      return;
-    }
-    result = bindReviewResult(result, memo, res.locals.user.id);
-    let transition;
-    try {
-      transition = await store.setAnalysisResult(
-        res.locals.user.id,
-        memo,
-        result,
-        {
-          completion: authoritativeReviewAuditEvent(
-            res.locals.user,
-            memo.id,
-            "Analysis completed",
-            result.provider.message,
-            result.provider.live ? "info" : "review"
-          ),
-          decisionInvalidation: authoritativeReviewAuditEvent(
-            res.locals.user,
-            memo.id,
-            "Reviewer decision invalidated",
-            "A new analysis run requires a fresh reviewer decision.",
-            "review"
-          )
+        if (!isApprovalUsable(approval, expected, dataClass)) {
+          res.status(403).json({
+            code: "ai_officer_approval_required",
+            error: "An export-control officer must approve this exact memo revision, corpus, workflow, model lane, tools, and budget before analysis."
+          });
+          return;
         }
-      );
-    } catch (error) {
-      if (error instanceof StoreError) {
-        sendStoreError(res, error);
+        const run = createAnalysisRun({
+          memo,
+          mode,
+          requestId: dispatchRequestId,
+          approvalId: approval!.approval.id,
+          dataClass,
+          previousResult: detail.result,
+          corpus: regulatoryCorpus
+        });
+        await store.upsertAnalysisRun(res.locals.user.id, run);
+        await recordAnalysisRunAuditEvent(store, res.locals.user.id, authoritativeReviewAuditEvent(
+          res.locals.user,
+          memo.id,
+          "Agent workflow queued",
+          `${mode === "heavy" ? "Heavy" : "Quick"} multi-agent analysis queued against ${run.bindings.corpusSnapshotId}.`,
+          "info"
+        ));
+        try {
+          await analysisQueue.enqueue({
+            source: "rulix.analysis-worker",
+            schemaVersion: 1,
+            accountId: res.locals.user.id,
+            runId: run.id
+          });
+        } catch (error) {
+          const failedAt = new Date(Math.max(Date.now(), Date.parse(run.updatedAt) + 1)).toISOString();
+          run.status = "failed";
+          run.stage = "failed";
+          run.error = "The analysis worker queue was unavailable; no provider call was made.";
+          run.completedAt = failedAt;
+          run.updatedAt = failedAt;
+          await store.upsertAnalysisRun(res.locals.user.id, run, run.createdAt);
+          throw error;
+        }
+        res.status(202).json({ run });
+      } catch (error) {
+        if (sendAiEgressError(res, error)) return;
+        if (error instanceof StoreError) {
+          sendStoreError(res, error);
+          return;
+        }
+        res.status(503).json({
+          code: "analysis_queue_unavailable",
+          error: error instanceof Error ? error.message : "Analysis could not be queued."
+        });
+      }
+    }
+  );
+
+  app.get(
+    "/api/reviews/:id/analysis-runs/:runId",
+    requireAuth(store),
+    requireRoles("export-control-officer", "reviewer", "counsel"),
+    async (req, res) => {
+      const memoId = coerceReviewId(req, res);
+      const runId = coerceAnalysisRunId(req.params.runId);
+      if (!memoId || !runId) {
+        if (memoId) res.status(400).json({ code: "analysis_run_id_invalid", error: "Analysis run ID is invalid." });
         return;
       }
-      throw error;
+      const run = await store.getAnalysisRun(res.locals.user.id, runId);
+      if (!run || run.memoId !== memoId) {
+        res.status(404).json({ error: "Analysis run not found." });
+        return;
+      }
+      res.json({ run });
     }
-    res.json({
-      review: transition.review,
-      result: transition.result,
-      decisionInvalidated: transition.decisionInvalidated,
-      auditEvents: transition.auditEvents
-    });
+  );
+
+  app.post(
+    "/api/reviews/:id/analysis-runs/:runId/cancel",
+    requireJsonBytes(1024),
+    requireAuth(store),
+    requireCsrf,
+    requireRoles("export-control-officer", "reviewer", "counsel"),
+    async (req, res) => {
+      const memoId = coerceReviewId(req, res);
+      const runId = coerceAnalysisRunId(req.params.runId);
+      if (!memoId || !runId || !isRecord(req.body) || Object.keys(req.body).length > 0) {
+        if (memoId) res.status(400).json({ code: "analysis_cancel_invalid", error: "Cancellation accepts no request fields." });
+        return;
+      }
+      const run = await store.getAnalysisRun(res.locals.user.id, runId);
+      if (!run || run.memoId !== memoId) {
+        res.status(404).json({ error: "Analysis run not found." });
+        return;
+      }
+      if (!["completed", "failed", "cancelled", "stale"].includes(run.status)) {
+        const previousUpdatedAt = run.updatedAt;
+        const cancelledAt = new Date(Math.max(Date.now(), Date.parse(previousUpdatedAt) + 1)).toISOString();
+        run.cancelRequestedAt = cancelledAt;
+        run.updatedAt = cancelledAt;
+        if (run.status === "queued") {
+          run.status = "cancelled";
+          run.stage = "cancelled";
+          run.completedAt = cancelledAt;
+        }
+        await store.upsertAnalysisRun(res.locals.user.id, run, previousUpdatedAt);
+      }
+      res.json({ run });
     }
   );
 
@@ -2071,27 +2147,6 @@ export function createApp(options: CreateAppOptions = {}) {
       code: "client_upgrade_required",
       error: "Ad-hoc AI review is retired. Save the memo as a review, obtain explicit AI approval, and analyze the bound review revision."
     });
-  });
-
-  app.post("/api/public-memo-draft", requireJsonBytes(16 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
-    if (!isRecord(req.body) || Object.keys(req.body).some((key) => key !== "item")) {
-      res.status(400).json({
-        code: "invalid_public_draft_request",
-        error: "Public-source templates accept only a bounded item description."
-      });
-      return;
-    }
-    const item = coerceBoundedString(req.body.item, 1, 8_000);
-    if (!item) {
-      res.status(400).json({ error: "Item description is required." });
-      return;
-    }
-    try {
-      const draft = await createLocalPublicMemoTemplate(item);
-      res.json(draft);
-    } catch (error) {
-      throw error;
-    }
   });
 
   app.post("/api/documents/extract", requireJsonBytes(12 * 1024 * 1024), requireAuth(store), requireCsrf, async (req, res) => {
@@ -2818,20 +2873,6 @@ function coerceDecisionBindings(value: unknown): DecisionExpectedBindings | unde
 
 function isSha256(value: unknown): value is string {
   return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-}
-
-function bindReviewResult(result: ReviewResult, memo: MemoRecord, userId: string): ReviewResult {
-  const bound: ReviewResult = {
-    ...result,
-    id: result.id ?? `analysis-${randomUUID()}`,
-    memoRevision: memo.revision ?? 1,
-    inputHash: memo.contentHash ?? hashMemoContent(memo),
-    corpusChecksum: result.corpusChecksum ?? officialCorpus.checksum,
-    promptVersion: result.promptVersion ?? "rulix-council-v2",
-    createdBy: userId
-  };
-  bound.resultHash = hashReviewResult(bound);
-  return bound;
 }
 
 function coerceReviewId(req: Request, res: Response) {
@@ -3600,6 +3641,11 @@ interface AiApprovalExpectation {
   payloadHash: string;
   providerRequestHashes: string[];
   policy: AiApprovalPolicyBinding;
+  workflow?: AiWorkflowApprovalBinding;
+}
+
+function coerceAnalysisRunId(value: unknown) {
+  return coercePathId(value, "analysis-run-", 160);
 }
 
 function approvedAiEgressContext(
@@ -3654,30 +3700,6 @@ function reviewApprovalSubject(memo: MemoRecord): AiApprovalSubjectBinding {
     version: memo.version,
     revision: memo.revision,
     contentHash: memo.contentHash
-  };
-}
-
-function councilApprovalExpectation(
-  memo: MemoRecord,
-  depth: CouncilDepth,
-  dataClass: DataClass
-): AiApprovalExpectation {
-  const model = councilModelForDepth(depth, getBedrockRuntime());
-  const lane = resolveBedrockLane(model);
-  if (!lane) {
-    throw new AiEgressPolicyError(
-      "ai_provider_unavailable",
-      "The approved council provider is not configured.",
-      503
-    );
-  }
-  const semanticPayload = councilApprovalPayload(memo, depth);
-  const providerRequest = buildCouncilProviderRequest(memo, depth, model).body;
-  return {
-    subject: reviewApprovalSubject(memo),
-    payloadHash: hashAiApprovalPayload(semanticPayload),
-    providerRequestHashes: [hashAiApprovalPayload(providerRequest)],
-    policy: currentAiApprovalPolicy(lane, dataClass)
   };
 }
 
@@ -3752,7 +3774,8 @@ function memoBuilderApprovalSubject(stored: StoredMemoBuilderSession): AiApprova
 
 async function buildAiApprovalOfficerDetail(
   store: AccountStore,
-  detail: AiApprovalRequestOfficerDetail
+  detail: AiApprovalRequestOfficerDetail,
+  regulatoryCorpus?: AgentRegulatoryCorpus
 ) {
   const status = detail.approvalRequest;
   const request = status.request;
@@ -3769,34 +3792,29 @@ async function buildAiApprovalOfficerDetail(
         }
       };
     }
-    if (request.purpose === "council") {
-      const depth = request.context.kind === "council" ? request.context.depth : "standard";
+    if (request.purpose === "agent-workflow") {
+      const mode: AnalysisRunMode = request.context.kind === "agent-workflow" ? request.context.mode : "quick";
       try {
         const currentDataClass = effectiveStoredAiDataClass(memo.dataClass);
-        const expected = councilApprovalExpectation(memo, depth, currentDataClass);
-        const providerRequest = buildCouncilProviderRequest(
-          memo,
-          depth,
-          expected.policy.model
-        ).body;
+        const expected = agentWorkflowApprovalExpectation(memo, mode, currentDataClass, undefined, regulatoryCorpus);
         return {
           ...detail,
           inspection: {
-            kind: "council" as const,
+            kind: "agent-workflow" as const,
             current: approvalRequestMatchesExpectation(request, expected, currentDataClass),
-            depth,
+            mode,
             memo,
-            providerRequest,
-            providerRequestHash: hashAiApprovalPayload(providerRequest)
+            workflow: expected.workflow,
+            providerRequestHash: expected.providerRequestHashes[0]
           }
         };
       } catch (error) {
         return {
           ...detail,
           inspection: {
-            kind: "council" as const,
+            kind: "agent-workflow" as const,
             current: false,
-            depth,
+            mode,
             memo,
             unavailableReason: error instanceof Error ? error.message : "The provider policy is unavailable."
           }
@@ -3916,6 +3934,7 @@ function approvalRequestMatchesExpectation(
     && sameAiApprovalSubject(request.subject, expected.subject)
     && request.payloadHash === expected.payloadHash
     && sameAiApprovalPolicy(request.policy, expected.policy)
+    && sameWorkflowBinding(request.workflow, expected.workflow)
     && request.providerRequestHashes.length === expected.providerRequestHashes.length
     && request.providerRequestHashes.every((hash, index) => hash === expected.providerRequestHashes[index]);
 }
@@ -3945,8 +3964,17 @@ function isApprovalUsable(
     && approval.payloadHash === expected.payloadHash
     && sameAiApprovalSubject(approval.subject, expected.subject)
     && sameAiApprovalPolicy(approval.policy, expected.policy)
+    && sameWorkflowBinding(approval.workflow, expected.workflow)
     && approval.providerRequestHashes.length === expected.providerRequestHashes.length
     && approval.providerRequestHashes.every((hash, index) => hash === expected.providerRequestHashes[index]);
+}
+
+function sameWorkflowBinding(
+  left: AiWorkflowApprovalBinding | undefined,
+  right: AiWorkflowApprovalBinding | undefined
+) {
+  return left === undefined && right === undefined
+    || Boolean(left && right && hashAiApprovalPayload(left) === hashAiApprovalPayload(right));
 }
 
 async function findMemoBuilderSession(
@@ -4078,15 +4106,6 @@ function sendStoreError(res: Response, error: unknown) {
   throw error;
 }
 
-function sendCouncilError(res: Response, error: unknown) {
-  if (sendAiEgressError(res, error)) return;
-  if (error instanceof LiveCouncilUnavailableError) {
-    res.status(error.status).json({ error: error.message, code: error.code });
-    return;
-  }
-  throw error;
-}
-
 function sendAiEgressError(res: Response, error: unknown) {
   if (!(error instanceof AiEgressPolicyError)) return false;
   res.status(error.status).json({ code: error.code, error: error.message });
@@ -4166,14 +4185,14 @@ async function buildMemoChatMessages(
     ];
   }
 
-  const localResult = buildLocalMemoChatResult(memo, trimmedMessage);
+  const localChatResult = buildLocalMemoChatResult(memo, trimmedMessage);
   const assistantMessage: MemoChatMessage = {
     id: `chat-${randomUUID()}`,
     memoId: memo.id,
     role: "assistant",
-    text: localResult.text,
+    text: localChatResult.text,
     createdAt: chronology.assistant,
-    proposedMemoText: localResult.proposedMemoText,
+    proposedMemoText: localChatResult.proposedMemoText,
     memoRevision: memo.revision,
     memoVersion: memo.version,
     memoHash: memo.contentHash

@@ -5,7 +5,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import type { UserProfile } from "../src/types";
-import { analyzeMemo } from "../src/lib/eccnReview";
+import { makeReviewResult } from "../src/test/reviewResultFactory";
 import { createApp } from "./app";
 import { createAccountStore, emptyAccountState, type AccountStore } from "./store";
 
@@ -231,8 +231,12 @@ describe("Rulix ECCN API", () => {
   it("serves the official corpus snapshot", async () => {
     const response = await request(testApp()).get("/api/corpus").expect(200);
 
-    expect(response.body.id).toBe("official-corpus-2026-06-seed");
-    expect(response.body.chunks.length).toBeGreaterThan(3);
+    expect(response.body.id).toMatch(/^ecfr-ccl-2026-07-30-/);
+    expect(response.body.label).toContain("through 2026-07-30");
+    expect(response.body.checksum).toMatch(/^[a-f0-9]{64}$/);
+    expect(response.body.approvalStatus).toBe("pending");
+    expect(response.body.documents.length).toBeGreaterThan(10);
+    expect(response.body.chunks).toEqual([]);
   });
 
   it("requires sign in for account review state", async () => {
@@ -595,7 +599,7 @@ describe("Rulix ECCN API", () => {
     expect(response.body.error).toContain("server-owned");
   });
 
-  it("blocks submitters from running council analysis or recording decisions", async () => {
+  it("blocks submitters from running the agent workflow or recording decisions", async () => {
     const submitter = await signedInAgent("submitter-boundary@example.com", "submitter");
     const created = await submitter.agent
       .post("/api/reviews")
@@ -715,12 +719,12 @@ describe("Rulix ECCN API", () => {
       .send(validReviewInput())
       .expect(201);
     const memo = created.body.review;
-    const baseline = analyzeMemo(memo);
+    const baseline = makeReviewResult(memo);
     await reviewer.store.setAnalysisResult(workspaceId(reviewer.user), memo, {
       ...baseline,
       provider: {
         ...baseline.provider,
-        source: "bedrock" as const,
+        source: "agent-workflow" as const,
         label: "Amazon Bedrock",
         model: "test-live-model",
         live: true,
@@ -760,12 +764,12 @@ describe("Rulix ECCN API", () => {
       .expect(201);
     const memo = created.body.review;
     const accountId = workspaceId(reviewer.user);
-    const baseline = analyzeMemo(memo);
+    const baseline = makeReviewResult(memo);
     const result = {
       ...baseline,
       provider: {
         ...baseline.provider,
-        source: "bedrock" as const,
+        source: "agent-workflow" as const,
         label: "Amazon Bedrock",
         model: "test-live-model",
         live: true,

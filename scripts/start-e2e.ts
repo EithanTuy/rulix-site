@@ -1,7 +1,7 @@
 import { rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { deterministicCouncilClient } from "../e2e/fixtures/deterministicCouncil";
+import { agentWorkflowClient, agentWorkflowCorpus } from "../e2e/fixtures/agentWorkflow";
 
 const port = 8789;
 const storePath = path.join(os.tmpdir(), `rulix-playwright-${process.pid}.json`);
@@ -19,7 +19,7 @@ process.env.RULIX_AI_DATA_CLASS = "proprietary";
 rmSync(storePath, { force: true });
 
 const { createApp } = await import("../server/app");
-const server = createApp({ aiProviderClient: deterministicCouncilClient }).listen(port, "127.0.0.1", () => {
+const server = createApp({ aiProviderClient: agentWorkflowClient, regulatoryCorpus: agentWorkflowCorpus }).listen(port, "127.0.0.1", () => {
   console.log(`Rulix Playwright server listening on http://127.0.0.1:${port}`);
 });
 

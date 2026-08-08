@@ -18,7 +18,7 @@ export async function memoFromFile(file: File, dataClass: DataClass): Promise<In
       memo: {
         id: `upload-${crypto.randomUUID()}`,
         title: file.name.replace(/\.[^.]+$/, "") || "Uploaded memo",
-        itemFamily: extractedText ? inferItemFamily(extractedText) : "Uploaded document",
+        itemFamily: "Uploaded item",
         owner: "You",
         updatedAt: now,
         documentCode: `UPLOAD-${now.replaceAll("-", "")}`,
@@ -43,7 +43,7 @@ Add memo text manually or upload a clearer document before AI review.`
     memo: {
       id: `upload-${crypto.randomUUID()}`,
       title: file.name.replace(/\.[^.]+$/, "") || "Uploaded memo",
-      itemFamily: inferItemFamily(text),
+      itemFamily: "Uploaded item",
       owner: "You",
       updatedAt: now,
       documentCode: `UPLOAD-${now.replaceAll("-", "")}`,
@@ -85,14 +85,6 @@ export function formatExtractedAttachment(fileName: string, extraction: Document
 Extraction method: ${methodLabel}
 
 ${extraction.text.trim()}`;
-}
-
-function inferItemFamily(text: string) {
-  if (/cryogenic|cryostat|pulse tube/i.test(text)) return "Cryogenic laboratory equipment";
-  if (/camera|imaging|CMOS/i.test(text)) return "Imaging sensor module";
-  if (/laser|wavelength|pulse/i.test(text)) return "Laser source";
-  if (/quantum|microwave|\bRF\b|qubit/i.test(text)) return "Signal/control electronics";
-  return "Uploaded item";
 }
 
 function extractionWarning(extraction: DocumentExtraction) {

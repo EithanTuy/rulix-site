@@ -18,14 +18,15 @@ export type DataClass = "public" | "proprietary" | "export-controlled" | "itar-r
 /** Every credential-bearing AI workload. Kept shared so approvals, usage, and
  * provider dispatch cannot drift onto subtly different purpose vocabularies. */
 export type AiApprovalPurpose =
-  | "council"
+  | "council" /** Historical audit records only; no runtime council dispatch remains. */
   | "memo-chat"
   | "public-draft"
   | "outreach-writer"
   | "outreach-personalization"
   | "lead-search"
   | "memo-builder"
-  | "document-extraction";
+  | "document-extraction"
+  | "agent-workflow";
 
 export type AiApprovalSubjectKind = "review" | "document" | "memo-builder";
 
@@ -48,6 +49,25 @@ export interface AiApprovalPolicyBinding {
   provider: "amazon-bedrock" | "anthropic-direct";
   clientRegion: string;
   model: string;
+}
+
+export type AgentToolName =
+  | "search_regulatory_corpus"
+  | "read_regulatory_source"
+  | "follow_regulatory_cross_reference"
+  | "search_case_documents"
+  | "read_case_excerpt"
+  | "list_case_evidence"
+  | "read_agent_artifact";
+
+export interface AiWorkflowApprovalBinding {
+  workflowVersion: string;
+  corpusId: string;
+  corpusChecksum: string;
+  models: string[];
+  maximumCalls: number;
+  maximumTokens: number;
+  permittedTools: AgentToolName[];
 }
 
 /** Server-captured, durable binding to the authoritative memo-chat window.
@@ -75,6 +95,8 @@ export interface AiApprovalRecord {
   providerRequestHashes: string[];
   dataClass: DataClass;
   policy: AiApprovalPolicyBinding;
+  /** Required for agent-workflow approvals. */
+  workflow?: AiWorkflowApprovalBinding;
   /** Required exactly for memo-chat approvals; captured by the server. */
   memoChatFence?: AiApprovalMemoChatFence;
   approvedBy: {
@@ -110,7 +132,8 @@ export interface AiApprovalStatus {
 }
 
 export type AiApprovalRequestContext =
-  | { kind: "council"; depth: "standard" | "deep" }
+  | { kind: "council"; depth: "standard" | "deep" } /** Historical request records only. */
+  | { kind: "agent-workflow"; mode: AnalysisRunMode }
   /** Metadata only: request records never retain prospective chat content. */
   | { kind: "memo-chat"; pendingMessageHash: string; historyHash: string }
   | { kind: "memo-builder" };
@@ -133,12 +156,13 @@ export interface AiApprovalRequestRecord {
     id: string;
     role: UserProfile["role"];
   };
-  purpose: "council" | "memo-chat" | "memo-builder";
+  purpose: "council" | "agent-workflow" | "memo-chat" | "memo-builder";
   subject: AiApprovalSubjectBinding;
   payloadHash: string;
   providerRequestHashes: string[];
   dataClass: DataClass;
   policy: AiApprovalPolicyBinding;
+  workflow?: AiWorkflowApprovalBinding;
   context: AiApprovalRequestContext;
   createdAt: string;
   expiresAt: string;
@@ -219,6 +243,15 @@ export type AppView =
   | "memo-builder";
 
 export type AgentRole =
+  | "intake-evidence"
+  | "jurisdiction"
+  | "candidate-research"
+  | "candidate-analysis"
+  | "adversarial-challenge"
+  | "citation-verification"
+  | "synthesis"
+  | "report-writing"
+  /** Historical result roles retained for audit deserialization only. */
   | "memo-parser"
   | "jurisdiction-gate"
   | "eccn-candidate"
@@ -302,7 +335,12 @@ export interface MemoRecord {
 export interface ClassificationCandidate {
   eccn: string;
   label: string;
-  confidence: number;
+  confidence?: number;
+  supportingFacts?: string[];
+  weakeningFacts?: string[];
+  unresolvedFacts?: string[];
+  rankingChangeFacts?: string[];
+  comparison?: string;
   risk: "low" | "medium" | "high";
   summary: string;
   sourceChunkIds: string[];
@@ -320,23 +358,65 @@ export interface EvidenceFinding {
   sourceChunkIds: string[];
   agent: AgentRole;
   severity: "info" | "review" | "escalate";
+  remediationKind?: "editorial" | "missing-fact" | "missing-evidence" | "reviewer-judgment";
+  suggestedResolution?: string;
+  suggestedReplacement?: string;
 }
 
 export interface JurisdictionFinding {
-  outcome: "ear-likely" | "itar-risk" | "insufficient-info";
+  outcome: "ear-likely" | "itar-risk" | "other-agency-risk" | "insufficient-info";
   summary: string;
   rationale: string;
   sourceChunkIds: string[];
+  evidenceIds?: string[];
+  uncertainty?: string;
+}
+
+export interface AgentUsageRecord {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalTokens: number;
+}
+
+export interface AgentInvocationRecord {
+  role: AgentRole;
+  invocationId: string;
+  model: string;
+  promptVersion: string;
+  inputArtifactIds: string[];
+  inputArtifactHashes: string[];
+  outputArtifactId?: string;
+  outputArtifactHash?: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  attempt: number;
+  startedAt?: string;
+  completedAt?: string;
+  latencyMs?: number;
+  usage?: AgentUsageRecord;
+  errorCode?: string;
+  candidateId?: string;
+  providerCallCount?: number;
+  toolCalls?: Array<{ tool: AgentToolName; callId: string; resultHash: string }>;
 }
 
 export interface CouncilAgentRun {
   role: AgentRole;
   label: string;
-  status: "complete" | "blocked";
+  status: "pending" | "running" | "complete" | "blocked" | "failed";
   summary: string;
+  invocationId?: string;
+  model?: string;
+  promptVersion?: string;
+  attempt?: number;
+  latencyMs?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  outputArtifactId?: string;
 }
 
-export type AnalysisSource = "bedrock" | "local-rules" | "fallback";
+export type AnalysisSource = "agent-workflow";
 
 export interface AnalysisProviderStatus {
   source: AnalysisSource;
@@ -356,6 +436,208 @@ export interface FormatCheck {
   note?: string;
 }
 
+export interface CaseEvidenceRecord {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  evidenceKind: "documented-fact" | "user-assertion" | "assumption" | "conflict" | "unreadable-region";
+  subject: string;
+  value: string;
+  units?: string;
+  excerpt: string;
+  location: { kind: "character-range" | "page" | "section"; start?: number; end?: number; label: string };
+  contentHash: string;
+}
+
+export interface CaseEvidence {
+  schemaVersion: "rulix.case-evidence/v1";
+  memoId: string;
+  memoRevision: number;
+  memoHash: string;
+  item: {
+    name: string;
+    model?: string;
+    manufacturer?: string;
+    origin?: string;
+    components: string[];
+    software: string[];
+    firmware: string[];
+    technology: string[];
+    statedUses: string[];
+  };
+  evidence: CaseEvidenceRecord[];
+  conflicts: string[];
+  missingOrUnreadableRegions: string[];
+}
+
+export interface RegulatoryCitation {
+  sourceId: string;
+  locator: string;
+  sourceDate: string;
+  contentHash: string;
+  exactText: string;
+}
+
+export interface CandidateResearchItem {
+  id: string;
+  classification: string;
+  label: string;
+  scope: "commodity" | "software" | "technology" | "jurisdiction" | "ear99";
+  inclusionReason: string;
+  factualQuestions: string[];
+  regulatoryCitations: RegulatoryCitation[];
+}
+
+export interface CandidateResearchResult {
+  schemaVersion: "rulix.candidate-research/v1";
+  searchSummary: string;
+  orderOfReviewApplied: string;
+  candidates: CandidateResearchItem[];
+  ear99SearchComplete: boolean;
+  noCandidateReason?: string;
+}
+
+export interface CandidateCriterionAnalysis {
+  id: string;
+  locator: string;
+  criterion: string;
+  disposition: "supported" | "not-supported" | "unresolved" | "not-applicable";
+  explanation: string;
+  evidenceIds: string[];
+  regulatoryCitations: RegulatoryCitation[];
+  missingInformationQuestions: string[];
+}
+
+export interface CandidateAnalysisResult {
+  schemaVersion: "rulix.candidate-analysis/v1";
+  candidateId: string;
+  classification: string;
+  outcome: "supported" | "not-supported" | "unresolved";
+  summary: string;
+  criteria: CandidateCriterionAnalysis[];
+  exclusionsAndNotes: CandidateCriterionAnalysis[];
+  missingInformationQuestions: string[];
+}
+
+export interface AdversarialChallenge {
+  id: string;
+  severity: "material" | "non-material";
+  summary: string;
+  affectedCandidateIds: string[];
+  evidenceIds: string[];
+  regulatoryCitations: RegulatoryCitation[];
+}
+
+export interface AdversarialChallengeResult {
+  schemaVersion: "rulix.adversarial-challenge/v1";
+  summary: string;
+  concreteDefectFound: boolean;
+  challenges: AdversarialChallenge[];
+  additionalCandidates: CandidateResearchItem[];
+  inconsistentFactUses: string[];
+}
+
+export interface CitationAuditItem {
+  claimId: string;
+  status: "verified" | "unsupported" | "inexact-quotation" | "locator-mismatch" | "too-general";
+  explanation: string;
+  citationIds: string[];
+}
+
+export interface CitationAuditResult {
+  schemaVersion: "rulix.citation-audit/v1";
+  passed: boolean;
+  summary: string;
+  claims: CitationAuditItem[];
+}
+
+export interface EvidenceAssessment {
+  level: "strong" | "partial" | "weak";
+  summary: string;
+  materialGaps: string[];
+  nonMaterialGaps: string[];
+  verifiedDispositiveFacts: string[];
+  supportingSourceIds: string[];
+}
+
+export interface DecisionReadiness {
+  status: "ready-for-reviewer-signoff" | "blocked";
+  summary: string;
+  blockerFindingIds: string[];
+}
+
+export type AnalysisRunMode = "quick" | "heavy";
+export type AnalysisRunStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "stale";
+export type AnalysisRunStage =
+  | "queued"
+  | "intake-evidence"
+  | "jurisdiction"
+  | "candidate-research"
+  | "candidate-analysis"
+  | "adversarial-challenge"
+  | "citation-verification"
+  | "synthesis"
+  | "report-writing"
+  | "publishing"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "stale";
+
+export interface AnalysisRunStageRecord {
+  stage: Exclude<AnalysisRunStage, "queued" | "completed" | "failed" | "cancelled" | "stale">;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled" | "stale";
+  attempt: number;
+  startedAt?: string;
+  completedAt?: string;
+  providerBodyHash?: string;
+  parentMemoHash: string;
+  parentStageHashes: string[];
+  outputHash?: string;
+  artifactRef?: string;
+  error?: string;
+}
+
+export interface AnalysisRun {
+  schemaVersion: "rulix.agent-workflow-run/v1";
+  id: string;
+  requestId: string;
+  memoId: string;
+  mode: AnalysisRunMode;
+  status: AnalysisRunStatus;
+  stage: AnalysisRunStage;
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  cancelRequestedAt?: string;
+  error?: string;
+  resultId?: string;
+  previousResultId?: string;
+  invocations: AgentInvocationRecord[];
+  artifactHashes: Record<string, string>;
+  callBudget: { maximum: number; used: number };
+  tokenBudget: { maximum: number; used: number };
+  challengeRound: number;
+  bindings: {
+    memoRevision: number;
+    memoHash: string;
+    workflowVersion: string;
+    models: string[];
+    corpusSnapshotId: string;
+    corpusChecksum: string;
+    retrievalPolicyHash: string;
+    stageBudget: number;
+    dataClass: DataClass;
+    approvalId: string;
+    permittedTools: AgentToolName[];
+    maximumChallengeRounds: number;
+    candidateConcurrency: number;
+  };
+  stages: AnalysisRunStageRecord[];
+}
+
 export interface ReviewResult {
   memoId: string;
   generatedAt: string;
@@ -369,6 +651,19 @@ export interface ReviewResult {
   infoRequests: string[];
   agents: CouncilAgentRun[];
   formatChecks?: FormatCheck[];
+  confidenceExplanation?: string;
+  outcome?: "classification-recommendation" | "ear99-recommendation" | "jurisdiction-escalation" | "unresolved";
+  caseEvidence?: CaseEvidence;
+  candidateResearch?: CandidateResearchResult;
+  candidateAnalyses?: CandidateAnalysisResult[];
+  adversarialChallenge?: AdversarialChallengeResult;
+  citationAudit?: CitationAuditResult;
+  workflowId?: string;
+  workflowVersion?: string;
+  workflowInvocations?: AgentInvocationRecord[];
+  reportNarrative?: string;
+  evidenceAssessment?: EvidenceAssessment;
+  decisionReadiness?: DecisionReadiness;
   id?: string;
   memoRevision?: number;
   inputHash?: string;

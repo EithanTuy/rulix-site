@@ -62,8 +62,8 @@ not a distributed substitute for DynamoDB's conditional-write guarantees.
 ## AI Egress Authorization
 
 `server/aiEgressGateway.ts` is the sole credential-bearing provider boundary.
-Every council, memo chat, memo builder, document extraction, public draft, lead
-search, outreach-writing, personalization, fallback, and retry attempt passes
+Every regulatory-agent, memo chat, memo builder, document extraction, lead
+search, outreach-writing, personalization, and retry attempt passes
 through it. The gateway checks the exact current provider, client region, and
 (for controlled data) model identity, verifies the server-owned data class,
 acquires account admission, and only then creates a provider client. A missing admission hook returns

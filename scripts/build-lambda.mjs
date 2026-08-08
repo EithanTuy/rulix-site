@@ -8,6 +8,9 @@
 //     dist/          <- built frontend (served by express.static at runtime)
 //   audit-lambda-build/
 //     handler.cjs    <- conditional append-only audit writer (export: handler)
+//   analysis-worker-lambda-build/
+//     handler.cjs    <- durable multi-agent worker
+//     corpus/raw/    <- exact approved source bytes verified at retrieval time
 //
 // Run `npm run build` first so `dist/` exists.
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
@@ -18,7 +21,9 @@ import { build } from "esbuild";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outDir = path.join(root, "lambda-build");
 const auditOutDir = path.join(root, "audit-lambda-build");
+const analysisWorkerOutDir = path.join(root, "analysis-worker-lambda-build");
 const distSrc = path.join(root, "dist");
+const corpusRawSrc = path.join(root, "corpus", "raw");
 
 if (!existsSync(distSrc)) {
   throw new Error("dist/ not found — run `npm run build` before build-lambda.");
@@ -26,8 +31,10 @@ if (!existsSync(distSrc)) {
 
 rmSync(outDir, { recursive: true, force: true });
 rmSync(auditOutDir, { recursive: true, force: true });
+rmSync(analysisWorkerOutDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 mkdirSync(auditOutDir, { recursive: true });
+mkdirSync(analysisWorkerOutDir, { recursive: true });
 
 await build({
   entryPoints: [path.join(root, "server", "lambda.ts")],
@@ -44,6 +51,22 @@ await build({
   logLevel: "info"
 });
 
+if (!existsSync(corpusRawSrc)) {
+  throw new Error("corpus/raw not found — the analysis worker requires exact regulatory source bytes.");
+}
+cpSync(corpusRawSrc, path.join(analysisWorkerOutDir, "corpus", "raw"), { recursive: true });
+
+await build({
+  entryPoints: [path.join(root, "server", "analysisWorkerLambda.ts")],
+  bundle: true,
+  platform: "node",
+  target: "node24",
+  format: "cjs",
+  outfile: path.join(analysisWorkerOutDir, "handler.cjs"),
+  define: { "import.meta.url": JSON.stringify("file:///var/task/handler.cjs") },
+  logLevel: "info"
+});
+
 await build({
   entryPoints: [path.join(root, "server", "auditLambda.ts")],
   bundle: true,
@@ -56,4 +79,4 @@ await build({
 
 cpSync(distSrc, path.join(outDir, "dist"), { recursive: true });
 
-console.log("Lambda bundles ready at lambda-build/ and audit-lambda-build/.");
+console.log("Lambda bundles ready at lambda-build/, audit-lambda-build/, and analysis-worker-lambda-build/.");

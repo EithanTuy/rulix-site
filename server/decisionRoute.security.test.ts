@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { analyzeMemo } from "../src/lib/eccnReview";
+import { makeReviewResult } from "../src/test/reviewResultFactory";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import type {
   AuditEvent,
@@ -237,93 +237,6 @@ describe("authoritative review decision transition", () => {
     expect(finalState.auditEvents.some((event) => event.action === "Memo edited")).toBe(true);
   });
 
-  it("discards a deferred provider result when PATCH changes the memo during analysis", async () => {
-    const provider = deferredCouncilProvider();
-    const harness = await signedInUser(
-      "analysis-edit-race@example.com",
-      "reviewer",
-      new LocalAccountStore({ persist: false }),
-      provider.client
-    );
-    const memo = await createReview(harness);
-    const officer = await signedInUser(
-      `analysis-edit-race-officer-${randomUUID()}@example.com`,
-      "export-control-officer",
-      harness.store
-    );
-    const analysisBody = await approveCouncilDispatch(harness, officer, memo.id);
-
-    const analysisPromise = Promise.resolve(
-      harness.agent
-        .post(`/api/reviews/${memo.id}/analyze`)
-        .set("x-rulix-csrf", harness.csrfToken)
-        .send(analysisBody)
-    );
-    await expectProviderStart(provider.reached, analysisPromise);
-
-    const editedText = `${memo.memoText}\n\nEdit committed while the provider was running.`;
-    await harness.agent
-      .patch(`/api/reviews/${memo.id}`)
-      .set("x-rulix-csrf", harness.csrfToken)
-      .send({ memoText: editedText, ...await memoBindings(harness, memo.id) })
-      .expect(200);
-    provider.release();
-
-    const analysis = await analysisPromise;
-    expect(analysis.status).toBe(409);
-    expect(analysis.body.code).toBe("stale_revision");
-    const finalState = await harness.store.getAccountState(workspaceId(harness.user));
-    expect(finalState.memos.find((item) => item.id === memo.id)).toMatchObject({
-      memoText: editedText,
-      revision: 2,
-      lifecycleStage: "draft"
-    });
-    expect(finalState.analysisResults[memo.id]).toBeUndefined();
-    expect(finalState.decisions[memo.id]).toBeUndefined();
-    expect(finalState.auditEvents.some((event) => event.action === "Analysis completed"))
-      .toBe(false);
-  });
-
-  it("assigns collision-resistant UUIDs to independently persisted analysis runs", async () => {
-    const provider = deferredCouncilProvider();
-    const harness = await signedInUser(
-      "analysis-id-entropy@example.com",
-      "reviewer",
-      new LocalAccountStore({ persist: false }),
-      provider.client
-    );
-    const memo = await createReview(harness);
-    const officer = await signedInUser(
-      `analysis-id-entropy-officer-${randomUUID()}@example.com`,
-      "export-control-officer",
-      harness.store
-    );
-    const firstBody = await approveCouncilDispatch(harness, officer, memo.id);
-
-    const firstPromise = Promise.resolve(
-      harness.agent
-        .post(`/api/reviews/${memo.id}/analyze`)
-        .set("x-rulix-csrf", harness.csrfToken)
-        .send(firstBody)
-    );
-    await expectProviderStart(provider.reached, firstPromise);
-    provider.release();
-    const first = await firstPromise;
-    expect(first.status).toBe(200);
-
-    const secondBody = await approveCouncilDispatch(harness, officer, memo.id);
-    const second = await harness.agent
-      .post(`/api/reviews/${memo.id}/analyze`)
-      .set("x-rulix-csrf", harness.csrfToken)
-      .send(secondBody)
-      .expect(200);
-
-    const analysisId = /^analysis-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-    expect(first.body.result.id).toMatch(analysisId);
-    expect(second.body.result.id).toMatch(analysisId);
-    expect(second.body.result.id).not.toBe(first.body.result.id);
-  });
-
   it("invalidates an accepted decision when a genuinely new analysis is committed", async () => {
     const harness = await signedInReviewer("analysis-rerun-signoff@example.com");
     const memo = await createReview(harness);
@@ -434,45 +347,14 @@ async function memoBindings(
   };
 }
 
-async function approveCouncilDispatch(
-  requester: Awaited<ReturnType<typeof signedInUser>>,
-  officer: Awaited<ReturnType<typeof signedInUser>>,
-  memoId: string
-) {
-  const bindings = await memoBindings(requester, memoId);
-  const queued = await requester.agent
-    .post("/api/ai-approval-requests")
-    .set("x-rulix-csrf", requester.csrfToken)
-    .send({
-      requestId: randomUUID(),
-      purpose: "council",
-      reviewId: memoId,
-      depth: "standard",
-      ...bindings
-    })
-    .expect(201);
-  const approvalRequestId = queued.body.request?.id as string | undefined;
-  expect(approvalRequestId).toMatch(/^air-/);
-  await officer.agent
-    .post(`/api/admin/ai-approval-requests/${approvalRequestId}/approve`)
-    .set("x-rulix-csrf", officer.csrfToken)
-    .send({ requestId: randomUUID() })
-    .expect(200);
-  return {
-    requestId: randomUUID(),
-    depth: "standard" as const,
-    ...bindings
-  };
-}
-
-function liveResult(memo: Parameters<typeof analyzeMemo>[0], findings: EvidenceFinding[]): ReviewResult {
-  const result = analyzeMemo(memo);
+function liveResult(memo: MemoRecord, findings: EvidenceFinding[]): ReviewResult {
+  const result = makeReviewResult(memo);
   return {
     ...result,
     id: `analysis-${memo.id}`,
     provider: {
       ...result.provider,
-      source: "bedrock",
+      source: "agent-workflow",
       label: "Amazon Bedrock",
       model: "test-live-model",
       live: true,
@@ -517,55 +399,6 @@ async function decisionBody(
     expectedAnalysisId: analysis?.id,
     expectedAnalysisHash: analysis?.resultHash
   };
-}
-
-function deferredCouncilProvider() {
-  let reached!: () => void;
-  let release!: () => void;
-  const reachedPromise = new Promise<void>((resolve) => { reached = resolve; });
-  const releasePromise = new Promise<void>((resolve) => { release = resolve; });
-  const create = vi.fn(async () => {
-    reached();
-    await releasePromise;
-    return {
-      content: [{
-        type: "tool_use",
-        name: "record_eccn_review",
-        input: {
-          recommended: {
-            eccn: "3A001.a.5",
-            label: "Cryogenic equipment candidate",
-            confidence: 0.91,
-            risk: "medium",
-            summary: "The memo includes cryogenic performance evidence.",
-            sourceChunkIds: ["chunk-3a001-cryogenic"]
-          },
-          findings: [],
-          infoRequests: []
-        }
-      }],
-      usage: { input_tokens: 100, output_tokens: 40 }
-    };
-  });
-  return {
-    client: { messages: { create } } satisfies AiProviderClient,
-    reached: reachedPromise,
-    release
-  };
-}
-
-async function expectProviderStart(
-  reached: Promise<void>,
-  response: PromiseLike<{ status: number; body: unknown }>
-) {
-  await Promise.race([
-    reached,
-    Promise.resolve(response).then((result) => {
-      throw new Error(
-        `Analysis completed before provider dispatch: ${result.status} ${JSON.stringify(result.body)}`
-      );
-    })
-  ]);
 }
 
 class PausingDecisionStore extends LocalAccountStore {

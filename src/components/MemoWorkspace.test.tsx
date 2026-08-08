@@ -24,11 +24,11 @@ const reviewResult: ReviewResult = {
   corpusId: "official-corpus-2026-06-seed",
   modelPolicy: "test",
   provider: {
-    source: "local-rules",
-    label: "Deterministic",
-    model: "rules",
-    live: false,
-    message: "Rules result",
+    source: "agent-workflow",
+    label: "Agent workflow",
+    model: "test-model",
+    live: true,
+    message: "Agent result",
     checkedAt: "2026-06-26T12:00:00.000Z"
   },
   jurisdiction: {
@@ -80,7 +80,6 @@ describe("MemoWorkspace", () => {
         analysisLocked={false}
         onMemoTextChange={onMemoTextChange}
         onArchiveMemo={vi.fn()}
-        onCreatePublicDraft={vi.fn()}
         onImproveWithAi={vi.fn()}
         onDirtyChange={onDirtyChange}
       />
@@ -112,7 +111,6 @@ describe("MemoWorkspace", () => {
         analysisLocked={false}
         onMemoTextChange={onMemoTextChange}
         onArchiveMemo={vi.fn()}
-        onCreatePublicDraft={vi.fn()}
         onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
@@ -138,7 +136,6 @@ describe("MemoWorkspace", () => {
         analysisLocked={false}
         onMemoTextChange={vi.fn()}
         onArchiveMemo={vi.fn()}
-        onCreatePublicDraft={vi.fn()}
         onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
@@ -157,12 +154,29 @@ describe("MemoWorkspace", () => {
         analysisLocked
         onMemoTextChange={vi.fn()}
         onArchiveMemo={vi.fn()}
-        onCreatePublicDraft={vi.fn()}
         onImproveWithAi={vi.fn()}
         onDirtyChange={vi.fn()}
       />
     );
 
     expect(screen.getByRole("button", { name: /edit/i })).toBeDisabled();
+  });
+
+  it("routes drafting through the approved Memo Builder workflow", () => {
+    const onImproveWithAi = vi.fn();
+    render(
+      <MemoWorkspace
+        memo={baseMemo}
+        analysisLocked={false}
+        onMemoTextChange={vi.fn()}
+        onArchiveMemo={vi.fn()}
+        onImproveWithAi={onImproveWithAi}
+        onDirtyChange={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /draft memo/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /improve with ai/i }));
+    expect(onImproveWithAi).toHaveBeenCalledOnce();
   });
 });

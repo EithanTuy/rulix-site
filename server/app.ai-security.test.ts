@@ -43,23 +43,14 @@ describe("AI route security boundary", () => {
     expect(provider.create).not.toHaveBeenCalled();
   });
 
-  it("keeps public-source drafting local and rejects any classification or provider-control fields", async () => {
+  it("removes the local public-source template route without touching a provider", async () => {
     const provider = providerSpy();
     const session = await signedIn(provider.client);
-    const local = await session.agent
+    await session.agent
       .post("/api/public-memo-draft")
       .set("x-rulix-csrf", session.csrfToken)
       .send({ item: "RLX-200 controller" })
-      .expect(200);
-    expect(local.body.memoText).toEqual(expect.any(String));
-    expect(provider.create).not.toHaveBeenCalled();
-
-    const rejected = await session.agent
-      .post("/api/public-memo-draft")
-      .set("x-rulix-csrf", session.csrfToken)
-      .send({ item: "RLX-200 controller", dataClass: "public" })
-      .expect(400);
-    expect(rejected.body.code).toBe("invalid_public_draft_request");
+      .expect(404);
     expect(provider.create).not.toHaveBeenCalled();
   });
 

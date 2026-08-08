@@ -3285,108 +3285,6 @@ button {
   white-space: nowrap;
 }
 
-.public-draft-panel {
-  display: grid;
-  gap: 14px;
-  padding: 16px 18px 20px;
-}
-
-.public-draft-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.public-draft-header svg {
-  color: var(--teal);
-}
-
-.public-draft-header div,
-.public-draft-input {
-  display: grid;
-  gap: 4px;
-}
-
-.public-draft-header strong,
-.public-draft-input {
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 850;
-}
-
-.public-draft-header span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.public-draft-input textarea {
-  width: 100%;
-  min-height: 92px;
-  padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  outline: none;
-  color: var(--text);
-  background: #ffffff;
-  font-size: 13px;
-  line-height: 1.45;
-  resize: vertical;
-}
-
-.public-draft-input textarea:focus {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(7, 139, 142, 0.1);
-}
-
-.public-draft-result {
-  display: grid;
-  gap: 12px;
-}
-
-.public-draft-preview {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfcfd;
-}
-
-.public-draft-preview strong,
-.public-source-list strong {
-  color: var(--navy-900);
-  font-size: 13px;
-}
-
-.public-draft-preview pre {
-  max-height: 320px;
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  color: #35475d;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.public-source-list {
-  display: grid;
-  gap: 7px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.public-source-list a {
-  color: var(--teal);
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  font-weight: 750;
-  text-decoration: none;
-}
-
 .analysis-panel.collapsed {
   overflow: hidden;
   display: grid;
@@ -4161,11 +4059,6 @@ button {
   border-left: 5px solid var(--green);
 }
 
-.analysis-status-banner.deterministic {
-  background: #f8fbfb;
-  border-left: 5px solid var(--teal);
-}
-
 .analysis-status-banner.failed {
   background: #fff9ed;
   border-left: 5px solid var(--amber);
@@ -4247,14 +4140,6 @@ button {
 
 .provider-box.bedrock svg {
   color: var(--green);
-}
-
-.provider-box.fallback {
-  background: #fff9ed;
-}
-
-.provider-box.fallback svg {
-  color: var(--amber);
 }
 
 .format-compliance {
@@ -9595,7 +9480,6 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .theme-dark .decision-box textarea,
 .theme-dark .editor-frame textarea,
 .theme-dark .memo-chat-input textarea,
-.theme-dark .public-draft-input textarea,
 .theme-dark .memo-builder-input textarea,
 .theme-dark .sort-row select,
 .theme-dark .dash-invite-form input,
@@ -9708,7 +9592,6 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .theme-dark .memo-builder-header,
 .theme-dark .memo-builder-compose,
 .theme-dark .sticky-editor-actions,
-.theme-dark .public-source-list,
 .theme-dark .dash-account,
 .theme-dark .dash-toolbar,
 .theme-dark .outreach-lead-card,
@@ -9758,7 +9641,6 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .theme-dark .chat-message,
 .theme-dark .chat-proposal,
 .theme-dark .suggested-edit,
-.theme-dark .public-draft-preview,
 .theme-dark .console-kpi,
 .theme-dark .corpus-metric,
 .theme-dark .corpus-source,
@@ -9975,8 +9857,6 @@ button.outreach-ledger-row.selected { background: var(--teal-soft); }
 .theme-dark .chat-message strong,
 .theme-dark .chat-proposal strong,
 .theme-dark .suggestion-title strong,
-.theme-dark .public-draft-preview strong,
-.theme-dark .public-source-list strong,
 .theme-dark .memo-builder-sessions-head strong,
 .theme-dark .memo-builder-session strong,
 .theme-dark .memo-builder-header strong,

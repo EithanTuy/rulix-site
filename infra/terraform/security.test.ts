@@ -147,7 +147,7 @@ describe("Terraform security invariants", () => {
     expect(serverApp).toContain('code: "request_body_too_large"');
   });
 
-  it("exports an analysis policy with read-only account state and no auth or audit capability", () => {
+  it("exports a bounded analysis policy with durable run/admission writes and no audit capability", () => {
     const policy = extractBlock(
       main,
       'data "aws_iam_policy_document" "analysis_worker"'
@@ -159,16 +159,14 @@ describe("Terraform security invariants", () => {
     expect(policy).toContain('sid = "WriteAnalysisEvidence"');
     expect(policy).toContain('"s3:PutObject"');
     expect(policy).toContain("aws_s3_bucket.evidence.arn");
-    expect(policy).not.toContain("aws_dynamodb_table.auth.arn");
+    expect(policy).toContain("aws_dynamodb_table.auth.arn");
     expect(policy).not.toContain("aws_dynamodb_table.audit_events.arn");
-    expect(dynamodbActions).toEqual([
-      "dynamodb:GetItem",
-      "dynamodb:GetItem",
-      "dynamodb:Query"
-    ]);
-    expect(policy).not.toContain('"dynamodb:PutItem"');
-    expect(policy).not.toContain('"dynamodb:UpdateItem"');
+    expect(dynamodbActions).toContain("dynamodb:GetItem");
+    expect(dynamodbActions).toContain("dynamodb:PutItem");
+    expect(dynamodbActions).toContain("dynamodb:UpdateItem");
+    expect(dynamodbActions).toContain("dynamodb:TransactWriteItems");
     expect(policy).not.toContain('"dynamodb:DeleteItem"');
+    expect(policy).not.toContain('"dynamodb:Scan"');
     expect(outputs).toContain('output "analysis_worker_policy_arn"');
     expect(outputs).not.toContain('output "worker_policy_arn"');
   });

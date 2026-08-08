@@ -82,7 +82,7 @@ Newly uploaded, pasted, or created memos are intentionally **Unanalyzed**. No re
 - **Live AI analysis**: the configured provider returned a structured review that passed server validation.
 - **AI analysis unavailable**: the provider was unavailable, failed, or timed out; no reviewer-facing result was recorded.
 
-If live AI does not finish within three minutes, Rulix fails closed and asks the reviewer to retry. Deterministic rules are an internal validation baseline for live output, not a reviewer-visible substitute.
+If live AI does not finish, Rulix preserves the durable run as failed or retryable and asks the reviewer to retry. No local classification is produced or stored.
 
 ## Analysis depth
 

@@ -230,6 +230,9 @@ resource "aws_lambda_function" "app" {
         RULIX_WORKSPACE_CURSOR_ACTIVE_KID       = var.workspace_cursor_key_id
         RULIX_WORKSPACE_CURSOR_KEYS_JSON        = jsonencode(local.workspace_cursor_keys)
         RULIX_TENANT_ID                         = var.tenant_slug
+        RULIX_ANALYSIS_QUEUE_URL                = aws_sqs_queue.analysis.url
+        RULIX_EVIDENCE_BUCKET                   = aws_s3_bucket.evidence.bucket
+        RULIX_EVIDENCE_KMS_KEY_ID               = aws_kms_key.tenant.arn
         RULIX_ALLOWED_ORIGINS = join(",", distinct(compact(concat(
           [var.app_base_url, var.dashboard_domain == "" ? "" : "https://${var.dashboard_domain}"],
           var.marketing_origins

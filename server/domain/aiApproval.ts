@@ -9,6 +9,8 @@ import type {
   AiApprovalRequestRecord,
   AiApprovalRevocation,
   AiApprovalSubjectBinding,
+  AiWorkflowApprovalBinding,
+  AgentToolName,
   DataClass,
   MemoChatMessage,
   MemoBuilderSession
@@ -32,7 +34,8 @@ const PURPOSES = new Set<AiApprovalPurpose>([
   "outreach-personalization",
   "lead-search",
   "memo-builder",
-  "document-extraction"
+  "document-extraction",
+  "agent-workflow"
 ]);
 const DATA_CLASSES = new Set<DataClass>([
   "public",
@@ -226,6 +229,12 @@ export function assertAiApprovalRecord(value: unknown): AiApprovalRecord {
   const memoChatFence = value.memoChatFence === undefined
     ? undefined
     : assertAiApprovalMemoChatFence(value.memoChatFence);
+  const workflow = value.workflow === undefined
+    ? undefined
+    : assertAiWorkflowApprovalBinding(value.workflow);
+  if ((purpose === "agent-workflow") !== Boolean(workflow)) {
+    throw new AiApprovalValidationError("Agent workflow approval requires an immutable workflow binding.");
+  }
   if ((purpose === "memo-chat") !== Boolean(memoChatFence)) {
     throw new AiApprovalValidationError(
       "Persisted memo-chat approvals require exactly one server-owned chat fence."
@@ -244,6 +253,7 @@ export function assertAiApprovalRecord(value: unknown): AiApprovalRecord {
     providerRequestHashes,
     dataClass: dataClass as DataClass,
     policy: assertAiApprovalPolicy(value.policy),
+    ...(workflow ? { workflow } : {}),
     ...(memoChatFence ? { memoChatFence } : {}),
     approvedBy: {
       id: boundedIdentifier(value.approvedBy.id, "AI approval officer ID", 1, 512),
@@ -254,6 +264,34 @@ export function assertAiApprovalRecord(value: unknown): AiApprovalRecord {
     validUntilEpoch,
     expiresAtEpoch,
     dispatchLimit
+  };
+}
+
+export function assertAiWorkflowApprovalBinding(value: unknown): AiWorkflowApprovalBinding {
+  if (!isRecord(value)) throw new AiApprovalValidationError("AI workflow approval binding is invalid.");
+  const permitted = new Set<AgentToolName>([
+    "search_regulatory_corpus", "read_regulatory_source", "follow_regulatory_cross_reference",
+    "search_case_documents", "read_case_excerpt", "list_case_evidence", "read_agent_artifact"
+  ]);
+  if (!Array.isArray(value.models) || value.models.length < 1 || value.models.length > 8 ||
+      !Array.isArray(value.permittedTools) || value.permittedTools.some((item) => !permitted.has(item as AgentToolName))) {
+    throw new AiApprovalValidationError("AI workflow models or tools are invalid.");
+  }
+  const models = value.models.map((item) => boundedIdentifier(item, "AI workflow model", 1, 240));
+  const permittedTools = [...new Set(value.permittedTools as AgentToolName[])];
+  const maximumCalls = positiveSafeInteger(value.maximumCalls, "AI workflow call budget");
+  const maximumTokens = positiveSafeInteger(value.maximumTokens, "AI workflow token budget");
+  if (maximumCalls > 64 || maximumTokens > 500_000) {
+    throw new AiApprovalValidationError("AI workflow budget exceeds policy.");
+  }
+  return {
+    workflowVersion: boundedIdentifier(value.workflowVersion, "AI workflow version", 1, 160),
+    corpusId: boundedIdentifier(value.corpusId, "AI workflow corpus ID", 1, 240),
+    corpusChecksum: digest(value.corpusChecksum, "AI workflow corpus checksum"),
+    models,
+    maximumCalls,
+    maximumTokens,
+    permittedTools
   };
 }
 
@@ -277,7 +315,7 @@ export function assertAiApprovalRequestRecord(value: unknown): AiApprovalRequest
   if (!isRecord(value) || value.schemaVersion !== AI_APPROVAL_REQUEST_SCHEMA_VERSION) {
     throw new AiApprovalValidationError("Persisted AI approval request schema is not recognized.");
   }
-  if (value.purpose !== "council" && value.purpose !== "memo-chat" && value.purpose !== "memo-builder") {
+  if (value.purpose !== "council" && value.purpose !== "agent-workflow" && value.purpose !== "memo-chat" && value.purpose !== "memo-builder") {
     throw new AiApprovalValidationError("Persisted AI approval request purpose is not recognized.");
   }
   if (!isRecord(value.requestedBy) || !isUserRole(value.requestedBy.role)) {
@@ -303,6 +341,10 @@ export function assertAiApprovalRequestRecord(value: unknown): AiApprovalRequest
     throw new AiApprovalValidationError("Persisted AI approval request expiry fields are invalid.");
   }
   const policy = assertAiApprovalPolicy(value.policy);
+  const workflow = value.workflow === undefined ? undefined : assertAiWorkflowApprovalBinding(value.workflow);
+  if ((value.purpose === "agent-workflow") !== Boolean(workflow)) {
+    throw new AiApprovalValidationError("Agent workflow approval request binding is missing or unexpected.");
+  }
   if (policy.mode !== "approved") {
     throw new AiApprovalValidationError("Persisted AI approval request policy is not approved.");
   }
@@ -324,6 +366,7 @@ export function assertAiApprovalRequestRecord(value: unknown): AiApprovalRequest
     providerRequestHashes,
     dataClass: value.dataClass as DataClass,
     policy,
+    ...(workflow ? { workflow } : {}),
     context,
     createdAt,
     expiresAt,
@@ -378,6 +421,10 @@ export function assertAiApprovalRequestContext(value: unknown): AiApprovalReques
   if (value.kind === "council" && (value.depth === "standard" || value.depth === "deep") &&
       hasExactKeys(value, ["depth", "kind"])) {
     return { kind: "council", depth: value.depth };
+  }
+  if (value.kind === "agent-workflow" && (value.mode === "quick" || value.mode === "heavy") &&
+      hasExactKeys(value, ["kind", "mode"])) {
+    return { kind: "agent-workflow", mode: value.mode };
   }
   if (value.kind === "memo-chat" && hasExactKeys(value, ["historyHash", "kind", "pendingMessageHash"])) {
     return {
@@ -476,12 +523,14 @@ function validIsoDate(value: unknown, label: string) {
 }
 
 function assertApprovalRequestPurposeBinding(
-  purpose: "council" | "memo-chat" | "memo-builder",
+  purpose: "council" | "agent-workflow" | "memo-chat" | "memo-builder",
   subject: AiApprovalSubjectBinding,
   context: AiApprovalRequestContext
 ) {
   const valid = purpose === "council"
     ? subject.kind === "review" && context.kind === "council"
+    : purpose === "agent-workflow"
+    ? subject.kind === "review" && context.kind === "agent-workflow"
     : purpose === "memo-chat"
       ? subject.kind === "review" && context.kind === "memo-chat"
       : subject.kind === "memo-builder" && context.kind === "memo-builder";

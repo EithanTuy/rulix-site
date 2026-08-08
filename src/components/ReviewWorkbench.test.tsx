@@ -49,7 +49,7 @@ const result: ReviewResult = {
   corpusId: "corpus-1",
   modelPolicy: "human-review-required",
   provider: {
-    source: "bedrock",
+    source: "agent-workflow",
     label: "Claude via Bedrock",
     model: "claude-sonnet",
     live: true,
@@ -152,7 +152,7 @@ function renderWorkbench(overrides: Partial<ComponentProps<typeof ReviewWorkbenc
       onBack={vi.fn()}
       onRunAnalysis={vi.fn()}
       onAnalysisModeChange={vi.fn()}
-      onRevokeCouncilApproval={vi.fn()}
+      onRevokeWorkflowApproval={vi.fn()}
       onExport={vi.fn()}
       onOpenMemoBuilder={vi.fn()}
       onUpdateMetadata={vi.fn()}

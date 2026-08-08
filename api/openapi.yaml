@@ -845,34 +845,6 @@ paths:
       responses:
         "200":
           description: Corpus snapshot
-  /public-memo-draft:
-    post:
-      summary: Create a local cautious memo template for later source verification
-      operationId: draftPublicMemo
-      description: This workflow is deterministic and local-only. It never calls an AI provider, web service, or source-retrieval system because a free-form item description has no server-verifiable public provenance.
-      security:
-        - cookieAuth: []
-          csrfToken: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [item]
-              properties:
-                item:
-                  type: string
-                  minLength: 1
-                  maxLength: 8000
-      responses:
-        "200":
-          description: Local template and explicit zero-provider status
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PublicMemoDraft"
   /documents/extract:
     post:
       summary: Validate and extract text from a bounded document payload
@@ -1307,7 +1279,7 @@ paths:
           application/json:
             schema:
               oneOf:
-                - $ref: "#/components/schemas/CouncilApprovalRequestCommand"
+                - $ref: "#/components/schemas/AgentWorkflowApprovalRequestCommand"
                 - $ref: "#/components/schemas/MemoChatApprovalRequestCommand"
                 - $ref: "#/components/schemas/MemoBuilderApprovalRequestCommand"
               discriminator:
@@ -1481,12 +1453,12 @@ paths:
           description: Export-control officer role required
         "409":
           description: Request is not approved or revocation command conflicts
-  /reviews/{reviewId}/ai-approvals/council:
+  /reviews/{reviewId}/ai-approvals/agent-workflow:
     parameters:
       - $ref: "#/components/parameters/ReviewId"
     get:
       summary: Inspect whether the current review revision and depth have a usable exact AI approval
-      operationId: getCouncilApproval
+      operationId: getAgentWorkflowApproval
       parameters:
         - name: depth
           in: query
@@ -1499,12 +1471,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CouncilApprovalView"
+                $ref: "#/components/schemas/AgentWorkflowApprovalView"
         "404":
           description: Review not found
     post:
-      summary: Approve one exact review revision, depth, policy, semantic payload, and provider body
-      operationId: approveCouncilAnalysis
+      summary: Approve one exact review revision, corpus, workflow, model lane, read-only tool set, and budget
+      operationId: approveAgentWorkflow
       security:
         - cookieAuth: []
           csrfToken: []
@@ -1513,7 +1485,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CouncilApprovalCommand"
+              $ref: "#/components/schemas/AgentWorkflowApprovalCommand"
       responses:
         "201":
           description: Exact single-dispatch approval created by an export-control officer
@@ -1582,8 +1554,8 @@ paths:
           description: Approval not found in the authenticated account
   /reviews/{reviewId}/analyze:
     post:
-      summary: Analyze the exact review revision currently displayed by the caller
-      operationId: analyzeStoredReview
+      summary: Queue a durable multi-agent analysis of the exact approved review revision
+      operationId: queueStoredReviewAnalysis
       security:
         - cookieAuth: []
           csrfToken: []
@@ -1612,24 +1584,17 @@ paths:
                 depth:
                   $ref: "#/components/schemas/AnalysisDepth"
       responses:
-        "200":
-          description: Review result
+        "202":
+          description: Durable run accepted by the analysis queue
           content:
             application/json:
               schema:
                 type: object
-                required: [review, result, auditEvents]
+                additionalProperties: false
+                required: [run]
                 properties:
-                  review:
-                    $ref: "#/components/schemas/MemoRecord"
-                  result:
-                    $ref: "#/components/schemas/ReviewResult"
-                  decisionInvalidated:
-                    type: boolean
-                  auditEvents:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/AuditEvent"
+                  run:
+                    $ref: "#/components/schemas/AnalysisRun"
         "409":
           description: Review bindings became stale before the analysis result committed
         "403":
@@ -1639,7 +1604,59 @@ paths:
         "429":
           description: Per-account AI workload limit reached
         "503":
-          description: AI egress policy or workload admission unavailable
+          description: Analysis queue, AI egress policy, or workload admission unavailable
+  /reviews/{reviewId}/analysis-runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+      - $ref: "#/components/parameters/AnalysisRunId"
+    get:
+      summary: Poll one tenant- and review-bound durable analysis run
+      operationId: getAnalysisRun
+      responses:
+        "200":
+          description: Current stage, progress, budget, and actual agent invocation records
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/AnalysisRun"
+        "404":
+          description: Run not found in this authenticated review scope
+  /reviews/{reviewId}/analysis-runs/{runId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/ReviewId"
+      - $ref: "#/components/parameters/AnalysisRunId"
+    post:
+      summary: Request cancellation before the next agent invocation
+      operationId: cancelAnalysisRun
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "200":
+          description: Updated durable run
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/AnalysisRun"
+        "404":
+          description: Run not found in this authenticated review scope
   /reviews/{reviewId}/chat:
     get:
       summary: List one review's bound chat messages
@@ -1815,6 +1832,14 @@ components:
         type: string
         pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
         maxLength: 128
+    AnalysisRunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^analysis-run-[0-9a-f-]{36}$'
+        maxLength: 80
     AiApprovalRequestId:
       name: approvalRequestId
       in: path
@@ -1893,42 +1918,6 @@ components:
           minLength: 32
           maxLength: 128
           pattern: '^[A-Za-z0-9_-]+$'
-    PublicMemoDraft:
-      type: object
-      required: [title, memoText, sources, provider]
-      properties:
-        title:
-          type: string
-          maxLength: 240
-        memoText:
-          type: string
-          maxLength: 12000
-        sources:
-          type: array
-          maxItems: 20
-          items:
-            type: object
-            required: [title, url]
-            properties:
-              title:
-                type: string
-                maxLength: 240
-              url:
-                type: string
-                format: uri
-                maxLength: 2048
-        provider:
-          type: object
-          required: [configured, model, live, message]
-          properties:
-            configured:
-              type: boolean
-            model:
-              type: string
-            live:
-              type: boolean
-            message:
-              type: string
     AiApprovalSubject:
       type: object
       additionalProperties: false
@@ -1990,6 +1979,37 @@ components:
           type: string
           minLength: 1
           maxLength: 512
+    AiWorkflowBinding:
+      type: object
+      additionalProperties: false
+      required: [workflowVersion, corpusId, corpusChecksum, models, maximumCalls, maximumTokens, permittedTools]
+      properties:
+        workflowVersion:
+          type: string
+          maxLength: 160
+        corpusId:
+          type: string
+          maxLength: 240
+        corpusChecksum:
+          $ref: "#/components/schemas/Sha256"
+        models:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items: { type: string, maxLength: 512 }
+        maximumCalls:
+          type: integer
+          minimum: 1
+          maximum: 200
+        maximumTokens:
+          type: integer
+          minimum: 1
+          maximum: 2000000
+        permittedTools:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items: { type: string, maxLength: 120 }
     AiApprovalRecord:
       type: object
       additionalProperties: false
@@ -2013,7 +2033,7 @@ components:
           maxLength: 512
         purpose:
           type: string
-          enum: [council, memo-chat, memo-builder, document-extraction]
+          enum: [agent-workflow, council, memo-chat, memo-builder, document-extraction]
         subject:
           $ref: "#/components/schemas/AiApprovalSubject"
         payloadHash:
@@ -2030,6 +2050,8 @@ components:
           enum: [public, proprietary, export-controlled, itar-risk, cui]
         policy:
           $ref: "#/components/schemas/AiApprovalPolicy"
+        workflow:
+          $ref: "#/components/schemas/AiWorkflowBinding"
         approvedBy:
           type: object
           additionalProperties: false
@@ -2119,7 +2141,7 @@ components:
           type: string
           minLength: 1
           maxLength: 500
-    CouncilApprovalRequestCommand:
+    AgentWorkflowApprovalRequestCommand:
       type: object
       additionalProperties: false
       required: [requestId, purpose, reviewId, depth, expectedVersion, expectedRevision, expectedHash]
@@ -2128,7 +2150,7 @@ components:
           type: string
           format: uuid
         purpose:
-          const: council
+          const: agent-workflow
         reviewId:
           type: string
           pattern: '^(?:review|paste|upload|ai-draft)-[A-Za-z0-9_][A-Za-z0-9_-]*$'
@@ -2188,12 +2210,13 @@ components:
       oneOf:
         - type: object
           additionalProperties: false
-          required: [kind, depth]
+          required: [kind, mode]
           properties:
             kind:
-              const: council
-            depth:
-              $ref: "#/components/schemas/AnalysisDepth"
+              const: agent-workflow
+            mode:
+              type: string
+              enum: [quick, heavy]
         - type: object
           additionalProperties: false
           required: [kind, pendingMessageHash, historyHash]
@@ -2244,7 +2267,7 @@ components:
               enum: [export-control-officer, reviewer, submitter, counsel]
         purpose:
           type: string
-          enum: [council, memo-chat, memo-builder]
+          enum: [agent-workflow, council, memo-chat, memo-builder]
         subject:
           $ref: "#/components/schemas/AiApprovalSubject"
         payloadHash:
@@ -2355,7 +2378,7 @@ components:
               enum: [export-control-officer, reviewer, submitter, counsel]
         purpose:
           type: string
-          enum: [council, memo-chat, memo-builder]
+          enum: [agent-workflow, council, memo-chat, memo-builder]
         subject:
           $ref: "#/components/schemas/AiApprovalSubjectSummary"
         dataClass:
@@ -2414,19 +2437,19 @@ components:
       oneOf:
         - type: object
           additionalProperties: false
-          required: [kind, current, depth, memo]
+          required: [kind, current, mode, memo, workflow, providerRequestHash]
           properties:
             kind:
-              const: council
+              const: agent-workflow
             current:
               type: boolean
-            depth:
-              $ref: "#/components/schemas/AnalysisDepth"
+            mode:
+              type: string
+              enum: [quick, heavy]
             memo:
               $ref: "#/components/schemas/MemoRecord"
-            providerRequest:
-              type: object
-              description: Exact canonical provider body with no credentials or SDK transport headers.
+            workflow:
+              $ref: "#/components/schemas/AiWorkflowBinding"
             providerRequestHash:
               $ref: "#/components/schemas/Sha256"
             unavailableReason:
@@ -2486,7 +2509,7 @@ components:
               $ref: "#/components/schemas/Sha256"
             unavailableReason:
               type: string
-    CouncilApprovalCommand:
+    AgentWorkflowApprovalCommand:
       type: object
       additionalProperties: false
       required: [requestId, depth, expectedVersion, expectedRevision, expectedHash]
@@ -2504,13 +2527,13 @@ components:
           minimum: 1
         expectedHash:
           $ref: "#/components/schemas/Sha256"
-    CouncilApprovalView:
+    AgentWorkflowApprovalView:
       type: object
       additionalProperties: false
       required: [purpose, depth, subject, payloadHash, policy, usable]
       properties:
         purpose:
-          const: council
+          const: agent-workflow
         depth:
           $ref: "#/components/schemas/AnalysisDepth"
         subject:
@@ -3844,7 +3867,7 @@ components:
           properties:
             source:
               type: string
-              enum: [bedrock, local-rules, fallback]
+              enum: [agent-workflow, bedrock]
             label:
               type: string
             model:
@@ -3879,6 +3902,122 @@ components:
           type: array
           items:
             type: object
+        workflowId:
+          type: string
+        workflowVersion:
+          type: string
+        workflowInvocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentInvocation"
+        caseEvidence:
+          type: object
+        candidateResearch:
+          type: object
+        candidateAnalyses:
+          type: array
+          items: { type: object }
+        adversarialChallenge:
+          type: object
+        citationAudit:
+          type: object
+        reportNarrative:
+          type: string
+    AgentInvocation:
+      type: object
+      additionalProperties: false
+      required: [role, invocationId, model, promptVersion, inputArtifactIds, inputArtifactHashes, status, attempt]
+      properties:
+        role: { type: string }
+        invocationId: { type: string }
+        model: { type: string }
+        promptVersion: { type: string }
+        inputArtifactIds: { type: array, items: { type: string } }
+        inputArtifactHashes: { type: array, items: { $ref: "#/components/schemas/Sha256" } }
+        outputArtifactId: { type: string }
+        outputArtifactHash: { $ref: "#/components/schemas/Sha256" }
+        status: { type: string, enum: [pending, running, completed, failed, cancelled] }
+        attempt: { type: integer, minimum: 1 }
+        candidateId: { type: string }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        latencyMs: { type: number, minimum: 0 }
+        providerCallCount: { type: integer, minimum: 0 }
+        usage:
+          type: object
+          additionalProperties: false
+          properties:
+            inputTokens: { type: integer, minimum: 0 }
+            outputTokens: { type: integer, minimum: 0 }
+            cacheReadTokens: { type: integer, minimum: 0 }
+            cacheWriteTokens: { type: integer, minimum: 0 }
+            totalTokens: { type: integer, minimum: 0 }
+        toolCalls:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [tool, callId, resultHash]
+            properties:
+              tool: { type: string }
+              callId: { type: string }
+              resultHash: { $ref: "#/components/schemas/Sha256" }
+    AnalysisRun:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, id, requestId, memoId, mode, status, stage, progress, createdAt, updatedAt, invocations, artifactHashes, callBudget, tokenBudget, challengeRound, bindings, stages]
+      properties:
+        schemaVersion: { const: rulix.agent-workflow-run/v1 }
+        id: { type: string, pattern: '^analysis-run-[0-9a-f-]{36}$' }
+        requestId: { type: string, format: uuid }
+        memoId: { type: string }
+        mode: { type: string, enum: [quick, heavy] }
+        status: { type: string, enum: [queued, running, completed, failed, cancelled, stale] }
+        stage: { type: string }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        cancelRequestedAt: { type: string, format: date-time }
+        error: { type: string, maxLength: 1000 }
+        resultId: { type: string }
+        previousResultId: { type: string }
+        invocations:
+          type: array
+          items: { $ref: "#/components/schemas/AgentInvocation" }
+        artifactHashes:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Sha256" }
+        callBudget: { $ref: "#/components/schemas/AnalysisBudget" }
+        tokenBudget: { $ref: "#/components/schemas/AnalysisBudget" }
+        challengeRound: { type: integer, minimum: 0 }
+        bindings:
+          type: object
+          description: Exact memo, corpus, workflow, model, policy, approval, tool, and bounded-execution bindings.
+        stages:
+          type: array
+          minItems: 9
+          maxItems: 9
+          items:
+            type: object
+            required: [stage, status, attempt, parentMemoHash, parentStageHashes]
+            properties:
+              stage: { type: string }
+              status: { type: string, enum: [pending, running, completed, failed, cancelled, stale] }
+              attempt: { type: integer, minimum: 0 }
+              parentMemoHash: { $ref: "#/components/schemas/Sha256" }
+              parentStageHashes: { type: array, items: { $ref: "#/components/schemas/Sha256" } }
+              outputHash: { $ref: "#/components/schemas/Sha256" }
+              artifactRef: { type: string }
+              error: { type: string }
+    AnalysisBudget:
+      type: object
+      additionalProperties: false
+      required: [maximum, used]
+      properties:
+        maximum: { type: integer, minimum: 1 }
+        used: { type: integer, minimum: 0 }
     AnalysisDepth:
       type: string
       enum: [standard, deep]

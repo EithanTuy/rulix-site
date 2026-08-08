@@ -1,16 +1,7 @@
-import { officialCorpus } from "../src/data/corpus";
-import { analyzeMemo } from "../src/lib/eccnReview";
-import {
-  COUNCIL_AGENT_ROLES,
-  mergeCouncilPayload,
-  type AiCouncilPayload
-} from "./councilQuality";
 import type {
   DataClass,
-  AnalysisProviderStatus,
   MemoChatMessage,
   MemoRecord,
-  ReviewResult,
   UsageCallType
 } from "../src/types";
 import {
@@ -28,16 +19,6 @@ import {
 export const DEFAULT_BEDROCK_MODEL = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
 export const DEFAULT_DEEP_BEDROCK_MODEL = "global.anthropic.claude-sonnet-4-6";
 export type CouncilDepth = "standard" | "deep";
-
-export class LiveCouncilUnavailableError extends Error {
-  readonly status = 503;
-  readonly code = "live_council_unavailable";
-
-  constructor(message: string) {
-    super(message);
-    this.name = "LiveCouncilUnavailableError";
-  }
-}
 
 // Emitted (best-effort) after each live Bedrock call so callers can record
 // token usage for the admin dashboard. Never fires when live analysis is unavailable.
@@ -60,11 +41,6 @@ export type AiEgressCallerContext = Pick<
   "accountId" | "approvalId" | "dataClass" | "dispatchId" | "subject" | "trustedWorkflowGrant"
 >;
 
-/** Canonical semantic payloads shared by the approval boundary and provider caller. */
-export function councilApprovalPayload(memo: MemoRecord, depth: CouncilDepth) {
-  return { memo, depth };
-}
-
 export function memoChatApprovalPayload(
   memo: MemoRecord,
   reviewerMessage: string,
@@ -75,15 +51,6 @@ export function memoChatApprovalPayload(
 
 export function memoBuilderApprovalPayload(messages: MemoBuildChatMessage[]) {
   return { messages };
-}
-
-interface CouncilOptions {
-  depth?: CouncilDepth;
-  maxTokens?: number;
-  timeoutMs?: number;
-  onUsage?: (sample: UsageSample) => void;
-  providerClient?: CouncilProviderClient;
-  egress?: AiEgressCallerContext;
 }
 
 interface MemoChatOptions {
@@ -101,132 +68,6 @@ export interface MemoChatAiResult {
   proposedMemoText?: string;
   latencyMs: number;
 }
-
-export interface PublicMemoDraftResult {
-  title: string;
-  memoText: string;
-  sources: Array<{ title: string; url: string }>;
-  provider: {
-    configured: boolean;
-    model: string;
-    live: boolean;
-    message: string;
-  };
-}
-
-const SYSTEM_PROMPT = `You are an export-control classification memo review assistant for research facilities.
-You are not a lawyer and must not present a final legal determination.
-Act as a council of seven bounded subagents: memo-parser, jurisdiction-gate, eccn-candidate, evidence-mapper, citation-verifier, risk-reviewer, and report-writer.
-Review the memo against the supplied official-source corpus excerpts and the deterministic baseline.
-Each subagent must be represented in the agents array exactly once with either complete or blocked status.
-Prefer useful, reviewer-actionable blockers over vague caution. Do not block ready memos unless a concrete source-backed gap remains.
-Treat the deterministic baseline as a broad-category guardrail. Do not move to a different ECCN family unless the memo text itself contains source-supported facts for that family. Quantum/RF control pulses are not laser pulses.
-Role rubrics:
-- memo-parser extracts item identity, performance parameters, software/firmware facts, data class, use, end use, and explicit omissions. Also check: does the memo name specific ECCNs or ITAR categories? Does it contain actual reasoning (not just a conclusion)?
-- jurisdiction-gate evaluates EAR/ITAR posture and order-of-review issues without treating end use as classification proof.
-- eccn-candidate proposes the best supported ECCN family and alternatives, and lowers confidence when facts are incomplete.
-- evidence-mapper links memo claims and omissions to exact sourceChunkIds from the supplied official corpus.
-- citation-verifier rejects unsupported sourceChunkIds and identifies claims not grounded in corpus excerpts. Also evaluate whether the explanation for each ECCN/ITAR considered is specific and technically grounded, or whether it is vague, circular, or unsupported.
-- risk-reviewer produces only actionable blockers tied to missing facts, conflicts, or jurisdiction risk. Also flag as blockers: no ECCN/ITAR entries named; analysis that is a bare conclusion with no reasoning; any considered entry whose explanation is vague, circular, or contradicted by the corpus; missing explanation for why the item is or is not subject to a named entry. Be specific about what is weak and why.
-- report-writer summarizes only the structured outputs from the prior agents and must not invent new facts.
-Populate formatChecks using exactly these three keys: "has-eccns-identified" (are specific ECCNs/ITAR named?), "has-analysis" (is there real reasoning, not just a conclusion?), "has-explanation-per-entry" (for each named entry, is there an explanation of why the item is or is not subject?). Set pass=true/false and add a note describing the specific flaw for any that fail.
-Use the record_eccn_review tool to return structured results.`;
-
-const AI_REVIEW_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["jurisdiction", "recommended", "findings", "infoRequests", "agents"],
-  properties: {
-    jurisdiction: {
-      type: "object",
-      additionalProperties: false,
-      required: ["outcome", "summary", "rationale", "sourceChunkIds"],
-      properties: {
-        outcome: { type: "string", enum: ["ear-likely", "itar-risk", "insufficient-info"] },
-        summary: { type: "string" },
-        rationale: { type: "string" },
-        sourceChunkIds: { type: "array", items: { type: "string" } }
-      }
-    },
-    recommended: {
-      type: "object",
-      additionalProperties: false,
-      required: ["eccn", "label", "confidence", "risk", "summary", "sourceChunkIds"],
-      properties: {
-        eccn: { type: "string" },
-        label: { type: "string" },
-        confidence: { type: "number" },
-        risk: { type: "string", enum: ["low", "medium", "high"] },
-        summary: { type: "string" },
-        sourceChunkIds: { type: "array", items: { type: "string" } }
-      }
-    },
-    alternatives: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["eccn", "label", "confidence", "risk", "summary", "sourceChunkIds"],
-        properties: {
-          eccn: { type: "string" },
-          label: { type: "string" },
-          confidence: { type: "number" },
-          risk: { type: "string", enum: ["low", "medium", "high"] },
-          summary: { type: "string" },
-          sourceChunkIds: { type: "array", items: { type: "string" } }
-        }
-      }
-    },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "status", "title", "claim", "rationale", "sourceChunkIds", "agent", "severity"],
-        properties: {
-          id: { type: "string" },
-          status: { type: "string", enum: ["strong", "weak", "missing", "conflict"] },
-          title: { type: "string" },
-          claim: { type: "string" },
-          rationale: { type: "string" },
-          excerpt: { type: "string" },
-          sourceChunkIds: { type: "array", items: { type: "string" } },
-          agent: { type: "string", enum: COUNCIL_AGENT_ROLES },
-          severity: { type: "string", enum: ["info", "review", "escalate"] }
-        }
-      }
-    },
-    infoRequests: { type: "array", items: { type: "string" } },
-    formatChecks: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["key", "label", "pass"],
-        properties: {
-          key: { type: "string" },
-          label: { type: "string" },
-          pass: { type: "boolean" },
-          note: { type: "string" }
-        }
-      }
-    },
-    agents: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["role", "label", "status", "summary"],
-        properties: {
-          role: { type: "string", enum: COUNCIL_AGENT_ROLES },
-          label: { type: "string" },
-          status: { type: "string", enum: ["complete", "blocked"] },
-          summary: { type: "string" }
-        }
-      }
-    }
-  }
-} as const;
 
 const MEMO_CHAT_SYSTEM_PROMPT = `You are Rulix memo chat, an export-control memo assistant.
 You help reviewers understand and improve the selected memo.
@@ -259,61 +100,6 @@ export function getBedrockRuntime() {
   };
 }
 
-export function councilModelForDepth(
-  depth: CouncilDepth,
-  runtime = getBedrockRuntime()
-) {
-  return depth === "deep" ? runtime.deepModel : runtime.model;
-}
-
-export function councilMaxTokensForDepth(depth: CouncilDepth) {
-  return depth === "deep" ? 3600 : 2600;
-}
-
-export function buildCouncilProviderRequest(
-  memo: MemoRecord,
-  depth: CouncilDepth,
-  model: string,
-  maxTokens = councilMaxTokensForDepth(depth)
-) {
-  const computedBaseline = analyzeMemo(memo);
-  // `analyzeMemo` stamps wall-clock time. Provider approval must be
-  // reconstructable across the separate approve and dispatch requests, so
-  // bind prompt-only baseline timestamps to the immutable memo snapshot.
-  const baselineAt = memo.updatedAt || memo.createdAt || "1970-01-01T00:00:00.000Z";
-  const localResult: ReviewResult = {
-    ...computedBaseline,
-    generatedAt: baselineAt,
-    provider: {
-      ...computedBaseline.provider,
-      checkedAt: baselineAt
-    }
-  };
-  return {
-    localResult,
-    body: {
-      model,
-      max_tokens: maxTokens,
-      system: SYSTEM_PROMPT,
-      tools: [
-        {
-          name: "record_eccn_review",
-          description:
-            "Return the ECCN memo review as normalized structured data for the Rulix reviewer UI.",
-          input_schema: AI_REVIEW_SCHEMA
-        }
-      ],
-      tool_choice: { type: "tool", name: "record_eccn_review" },
-      messages: [
-        {
-          role: "user",
-          content: buildCouncilPrompt(memo, localResult, depth)
-        }
-      ]
-    }
-  };
-}
-
 export function buildMemoChatProviderRequest(
   memo: MemoRecord,
   reviewerMessage: string,
@@ -341,74 +127,6 @@ export function buildMemoChatProviderRequest(
       }
     ]
   };
-}
-
-export async function runCouncilAnalysis(
-  memo: MemoRecord,
-  options: CouncilOptions = {}
-): Promise<ReviewResult> {
-  const runtime = getBedrockRuntime();
-  const depth = options.depth ?? "standard";
-  const model = councilModelForDepth(depth, runtime);
-  const lane = resolveBedrockLane(model);
-
-  if (!runtime.configured || !lane) {
-    throw new LiveCouncilUnavailableError(
-      "Live AI analysis is not configured. No deterministic analysis was recorded."
-    );
-  }
-
-  const request = buildCouncilProviderRequest(
-    memo,
-    depth,
-    model,
-    options.maxTokens ?? councilMaxTokensForDepth(depth)
-  );
-  const { localResult } = request;
-  const startedAt = Date.now();
-  try {
-    const response = await dispatchAuthorizedAiRequest(
-      requireEgressContext(options.egress, "council", councilApprovalPayload(memo, depth)),
-      lane,
-      request.body,
-      {
-        signal: AbortSignal.timeout(options.timeoutMs ?? bedrockDeadlineMs())
-      },
-      options.providerClient
-    );
-    emitUsage(options.onUsage, model, "council", response.usage, Date.now() - startedAt);
-
-    const toolBlock = response.content.find(
-      (block) => block.type === "tool_use" && block.name === "record_eccn_review"
-    );
-    const rawText = response.content
-      .filter((block) => block.type === "text")
-      .map((block) => (typeof block.text === "string" ? block.text : ""))
-      .join("\n")
-      .trim();
-    const payload = toolBlock ? (toolBlock.input as AiCouncilPayload) : parseJsonPayload(rawText);
-    const checkedAt = new Date().toISOString();
-
-    return withProvider(mergeCouncilPayload(memo, localResult, payload, {
-      providerLabel: providerLabel(model),
-      depth
-    }), {
-      source: "bedrock",
-      label: providerLabel(model),
-      model,
-      depth,
-      live: true,
-      message:
-        `Live ${providerLabel(model)} analysis completed as a ${depth === "deep" ? "deep" : "standard"} full-council pass; citation IDs and memo highlights were validated by the backend.`,
-      checkedAt,
-      latencyMs: Date.now() - startedAt
-    });
-  } catch (error) {
-    if (error instanceof AiEgressPolicyError) throw error;
-    throw new LiveCouncilUnavailableError(
-      `Live AI analysis failed (${safeError(error)}). No deterministic analysis was recorded.`
-    );
-  }
 }
 
 export async function runMemoChatWithHaiku(
@@ -473,48 +191,6 @@ export async function runMemoChatWithHaiku(
   };
 }
 
-export async function createLocalPublicMemoTemplate(
-  item: string,
-  _options: MemoChatOptions = {}
-): Promise<PublicMemoDraftResult> {
-  // A free-form item description has no server-verifiable public provenance.
-  // Keep this workflow deterministic and local until an authoritative source
-  // ingestion pipeline can bind exact source bytes and approval to the call.
-  return {
-    title: `Public-source memo template - ${item}`,
-    memoText: buildOfflinePublicDraft(item),
-    sources: [],
-    provider: {
-      configured: false,
-      model: "local-template",
-      live: false,
-      message:
-        "Created locally from a structured template. No AI provider or external source was contacted; attach and verify official public sources before analysis."
-    }
-  };
-}
-
-function buildOfflinePublicDraft(item: string) {
-  return `# ECCN Public-Source Draft - ${item}
-
-**Item:** ${item}
-**Owner:** [Add owner]
-**Proposed Classification:** Review required
-
-## Drafting Note
-
-This template was created locally without an AI provider or web request. Add public manufacturer documentation, datasheets, manuals, and official classification guidance before relying on this memo.
-
-## Information Needed
-
-- Manufacturer and exact model number
-- Datasheet and user manual
-- Performance parameters relevant to the Commerce Control List
-- Software, firmware, source code, technical data, and encryption details
-- Intended end use, end user, destination, and restricted-party screening
-`;
-}
-
 function buildMemoChatPrompt(
   memo: MemoRecord,
   reviewerMessage: string,
@@ -559,85 +235,7 @@ function normalizeProposedMemoText(currentMemoText: string, value: unknown) {
   return `${proposed}\n`;
 }
 
-function buildCouncilPrompt(memo: MemoRecord, localResult: ReviewResult, depth: CouncilDepth) {
-  const corpus = officialCorpus.chunks.map((chunk) => ({
-    id: chunk.id,
-    locator: chunk.locator,
-    title: chunk.title,
-    text: chunk.text,
-    tags: chunk.tags
-  }));
-
-  const schema = {
-    jurisdiction: {
-      outcome: "ear-likely | itar-risk | insufficient-info",
-      summary: "short summary",
-      rationale: "grounded rationale",
-      sourceChunkIds: ["chunk-id"]
-    },
-    recommended: {
-      eccn: "candidate ECCN or review path",
-      label: "short label",
-      confidence: 0.62,
-      risk: "low | medium | high",
-      summary: "why this recommendation agrees or disagrees with memo",
-      sourceChunkIds: ["chunk-id"]
-    },
-    alternatives: [
-      {
-        eccn: "alternate candidate",
-        label: "short label",
-        confidence: 0.35,
-        risk: "low | medium | high",
-        summary: "why it remains plausible",
-        sourceChunkIds: ["chunk-id"]
-      }
-    ],
-    findings: [
-      {
-        id: "stable-id",
-        status: "strong | weak | missing | conflict",
-        title: "finding title",
-        claim: "claim or missing-info request",
-        rationale: "why this is good, bad, or needs more information",
-        excerpt: "exact memo text to highlight when available",
-        sourceChunkIds: ["chunk-id"],
-        agent: "evidence-mapper",
-        severity: "info | review | escalate"
-      }
-    ],
-    infoRequests: ["specific technical evidence to request"],
-    agents: [
-      {
-        role: "memo-parser",
-        label: "Memo Parser",
-        status: "complete | blocked",
-        summary: "subagent outcome"
-      }
-    ]
-  };
-
-  return JSON.stringify(
-    {
-      task:
-        depth === "deep"
-          ? "Run a deep full-council review of whether the memo's ECCN classification is supported. In addition to evidence, bad reasoning, conflicts, and missing information, identify anything that would make a reviewer unhappy: ambiguous blocker wording, missing next action, unsupported confidence, overblocking a ready memo, or underblocking a risky memo. Prefer precise source chunk IDs from the corpus."
-          : "Run a full-council review of whether the memo's ECCN classification is supported. Highlight good evidence, bad reasoning, conflicts, and missing information. Prefer precise source chunk IDs from the corpus.",
-      analysisDepth: depth,
-      fullCouncilRoles: COUNCIL_AGENT_ROLES,
-      blockerPolicy:
-        "Mark an agent blocked only when the memo cannot support reviewer signoff without a specific missing fact, conflict, or jurisdiction issue. Make each info request actionable.",
-      memo,
-      officialCorpus: corpus,
-      deterministicBaseline: localResult,
-      requiredJsonSchema: schema
-    },
-    null,
-    2
-  );
-}
-
-function parseJsonPayload(rawText: string): AiCouncilPayload {
+function parseJsonPayload(rawText: string): Record<string, unknown> {
   const withoutFence = rawText
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
@@ -649,30 +247,15 @@ function parseJsonPayload(rawText: string): AiCouncilPayload {
     throw new Error("Claude response did not contain a JSON object");
   }
 
-  return JSON.parse(withoutFence.slice(start, end + 1)) as AiCouncilPayload;
+  return JSON.parse(withoutFence.slice(start, end + 1)) as Record<string, unknown>;
 }
 
 function providerLabel(model: string) {
   const normalized = model.toLowerCase();
-  if (normalized.includes("haiku")) return "Claude Haiku council via Bedrock";
-  if (normalized.includes("sonnet")) return "Claude Sonnet council via Bedrock";
-  if (normalized.includes("opus")) return "Claude Opus council via Bedrock";
-  return "Claude council via Bedrock";
-}
-
-function bedrockDeadlineMs() {
-  const configured = Number(process.env.RULIX_BEDROCK_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured >= 5_000
-    ? Math.min(configured, 52_000)
-    : 50_000;
-}
-
-function withProvider(result: ReviewResult, provider: AnalysisProviderStatus): ReviewResult {
-  return {
-    ...result,
-    generatedAt: provider.checkedAt,
-    provider
-  };
+  if (normalized.includes("haiku")) return "Claude Haiku via Bedrock";
+  if (normalized.includes("sonnet")) return "Claude Sonnet via Bedrock";
+  if (normalized.includes("opus")) return "Claude Opus via Bedrock";
+  return "Claude via Bedrock";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -722,11 +305,11 @@ function usageNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-// ── Memo Builder ──────────────────────────────────────────────────────────────
+// â”€â”€ Memo Builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MEMO_BUILDER_SYSTEM_PROMPT = `You are Rulix Memo Builder, an expert that helps create ECCN export-control classification memos through guided conversation.
 
-Your goal is to gather facts and produce a complete self-classification memo. Ask focused, concise follow-up questions — one or two at a time. Collect:
+Your goal is to gather facts and produce a complete self-classification memo. Ask focused, concise follow-up questions â€” one or two at a time. Collect:
 1. Item name, model/part number
 2. Manufacturer and country of origin
 3. Key technical specifications that drive ECCN classification (frequencies, power levels, materials, encryption, etc.)
@@ -734,11 +317,11 @@ Your goal is to gather facts and produce a complete self-classification memo. As
 5. Whether information is publicly available or proprietary
 6. Any attached datasheets or reference documents
 
-Do NOT rush to finish_draft — gather the minimum facts for a meaningful memo first. Ask for missing critical details before finishing.
+Do NOT rush to finish_draft â€” gather the minimum facts for a meaningful memo first. Ask for missing critical details before finishing.
 
 If the user provides sections labeled "Attached source documents", treat them as primary source material. Preserve model numbers, manufacturer names, technical limits, units, and source document names. Do not invent specifications. If attachments provide enough facts, call finish_draft directly.
 
-REQUIRED MEMO FORMAT — the memoText MUST follow this exact structure:
+REQUIRED MEMO FORMAT â€” the memoText MUST follow this exact structure:
 
 # Export control analysis for "[item name]"
 **Date issued:** [YYYY-MM-DD]
@@ -751,7 +334,7 @@ REQUIRED MEMO FORMAT — the memoText MUST follow this exact structure:
 For each entry considered, include the EXACT verbatim quoted text from the regulation and the version date:
 
 > "[Exact quoted description text from the ECCN or ITAR entry]"
-— *[Regulation citation, e.g. EAR 15 CFR Part 774, Supplement No. 1], as of [date]*
+â€” *[Regulation citation, e.g. EAR 15 CFR Part 774, Supplement No. 1], as of [date]*
 
 ## Analysis
 
@@ -761,7 +344,7 @@ For each ECCN/ITAR entry, include a subsection with this structure:
 **Is the scope subject to [entry]?**
 
 [If NOT subject, for each relevant subcategory:]
-Not subject — [Subcategory letter/number]: [Specific explanation of why the item does not meet this criterion based on its specifications]
+Not subject â€” [Subcategory letter/number]: [Specific explanation of why the item does not meet this criterion based on its specifications]
 
 [If SUBJECT:]
 **Scope is subject to ECCN/ITAR: "[entry]"**
@@ -774,7 +357,7 @@ Not subject — [Subcategory letter/number]: [Specific explanation of why the it
 
 ## Reference Documents
 [List all datasheets, manufacturer documents, and source materials used]
-- [Document name] — [manufacturer/source]
+- [Document name] â€” [manufacturer/source]
 
 Never claim a final legal determination. Always present as a draft requiring reviewer signoff and independent verification.`;
 

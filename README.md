@@ -1,6 +1,6 @@
 # Rulix ECCN
 
-Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned official-source corpus. It ingests memo text, runs a backend AI council through Amazon Bedrock when `BEDROCK_ENABLED=true`, fails closed without recording a result when live AI is unavailable, highlights memo evidence, maps findings to citations, and requires human export-control signoff before any result is treated as final. Deterministic rules remain an internal validation baseline for live results, not a reviewer-visible substitute for the provider.
+Rulix ECCN is a Phase 2 MVP for reviewing ECCN classification memos against a versioned exact-text official-source corpus. It runs a durable server-owned multi-agent workflow through Amazon Bedrock when `BEDROCK_ENABLED=true`, fails closed without recording a result when live AI or a required agent is unavailable, preserves cited evidence and candidate analyses, and requires human export-control signoff before any recommendation is treated as final. Runtime code does not provide a local semantic analysis or classification fallback.
 
 ## Run
 
@@ -35,9 +35,9 @@ Optional model override:
 BEDROCK_MODEL=global.anthropic.claude-haiku-4-5-20251001-v1:0
 ```
 
-Deep council reviews use Claude Sonnet 4.6 by default. Override that server-side
-with `BEDROCK_DEEP_MODEL`; standard reviews, memo chat, and drafting remain on
-`BEDROCK_MODEL`.
+Regulatory agent workflows use Claude Sonnet by default. Override that
+server-side with `BEDROCK_DEEP_MODEL`; memo chat and Memo Builder continue to
+use `BEDROCK_MODEL`.
 
 AI egress is bound to a deployment-owned classification, provider, and region;
 request bodies cannot lower that policy. The default lane is Amazon Bedrock in
@@ -119,17 +119,17 @@ Bounded outreach operations: `docs/outreach-operations.md`.
 ## What Is Implemented
 
 - React/Vite dashboard based on the generated concept in `design/eccn-dashboard-concept.png`.
-- Express backend with `/api/health`, `/api/corpus`, review commands, exact AI approval-request queues, council analysis, memo chat, Memo Builder, document extraction, and reviewer decision endpoints. The former `/api/ai/review` surface is retired with `410`; local public templates never call a provider.
+- Express backend with `/api/health`, `/api/corpus`, review commands, exact AI approval-request queues, durable analysis runs, memo chat, Memo Builder, document extraction, and reviewer decision endpoints. The former ad-hoc `/api/ai/review` surface remains retired with `410`; the obsolete local public-template route has been removed.
 - Invite-only authenticated account workspace with credential-generation-bound sessions, conditional DynamoDB auth transitions, and storage for users, invites, reset tokens, memos, decisions, analysis results, memo chat history, encrypted pending AI-approval previews, and audit events.
 - Atomic per-account AI admission with expiring concurrency leases, rolling request limits, daily token/spend budgets, and actual-usage settlement before provider dispatch.
 - Exact 7/30/90-day admin usage metrics from bounded daily DynamoDB aggregates, with an atomic account counter and explicit availability instead of partial totals.
 - Reviewer/counsel AI work queues one immutable, exact-content request for officer inspection. Approval binds the current content/classification, server-loaded context, policy, and canonical provider-body hash to one dispatch; stale or revoked approvals fail before provider use.
 - A first-run workflow, persistent in-app Help guide, exact role-specific AI guidance, keyboard focus management, and responsive desktop/mobile navigation keep the security model understandable at the point of use.
-- Review queue, upload/paste intake, highlighted memo viewer, editable memo text, memo chat-assisted edits, AI council panel, source citations, decision notes, and report export.
+- Review queue, upload/paste intake, highlighted memo viewer, editable memo text, memo chat-assisted edits, real agent-run progress, candidate analyses, evidence, challenges, citation status, decision notes, and report export.
 - Outreach administration uses account-bound keyset cursors, bounded first pages, deliberate capped server-side bulk enumeration, stable load-more controls, and capped job logs instead of whole-tenant reads.
-- Backend Bedrock Claude Haiku council adapter with deterministic citation/range validation and fail-closed provider handling.
-- Local review engine that recommends candidate ECCNs/EAR99 review paths, labels evidence as strong/weak/missing/conflict, verifies citations against the official corpus, and preserves human signoff as a hard gate.
-- Seed official corpus metadata for EAR/ITAR/BIS/ITA sources, with a downloader for full raw snapshots.
+- Durable Bedrock workflow with separate intake, jurisdiction, candidate-research, per-candidate, challenge, citation-verification, synthesis, and report-writing invocations; bounded AI repair; and fail-closed provider handling.
+- Non-semantic validation for schemas, stable source IDs, exact excerpt locations, hashes, approval bindings, budgets, and job transitions. Substantive conclusions are neither merged with nor replaced by local rules.
+- Versioned exact-text EAR/ITAR corpus records with source URLs, locators, effective dates, hashes, approval status, supersession metadata, raw snapshots, and a qualified-review promotion gate.
 - AWS/GovCloud architecture notes in `docs/aws-govcloud-architecture.md`.
 - API contract in `api/openapi.yaml`.
 - Terraform starter in `infra/terraform/` for single-tenant AWS or GovCloud-ready storage, auth/account tables, audit, KMS, SES-capable Lambda permissions, and worker permissions.

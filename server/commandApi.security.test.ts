@@ -65,7 +65,7 @@ describe("scoped review command API", () => {
       .set("x-rulix-csrf", session.csrfToken)
       .send({
         requestId: randomUUID(),
-        purpose: "council",
+        purpose: "agent-workflow",
         reviewId,
         depth: "standard",
         ...bindings(detail.body.review)

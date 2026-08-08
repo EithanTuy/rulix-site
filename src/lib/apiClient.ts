@@ -7,6 +7,7 @@ import type {
   AiApprovalRequestStatusKind,
   AiApprovalStatus,
   AiApprovalSubjectBinding,
+  AnalysisRun,
   AuditEvent,
   CaseComment,
   CorpusSnapshot,
@@ -35,16 +36,16 @@ export type AnalysisMode = "standard" | "deep";
 
 export const ANALYSIS_MODE_CONFIG = {
   standard: {
-    label: "Full AI Council",
+    label: "Quick multi-agent review",
     depth: "standard",
-    cost: "Haiku live review",
-    description: "Use for routine seven-agent triage, citation checks, and missing-information mapping."
+    cost: "Bounded live workflow",
+    description: "Use for routine evidence extraction, candidate analysis, challenge, citation verification, and synthesis."
   },
   deep: {
-    label: "Deep Council Pass",
+    label: "Heavy multi-agent review",
     depth: "deep",
-    cost: "Sonnet deep review",
-    description: "Use when blockers, user friction, or signoff risk need a stricter second look."
+    cost: "Expanded live workflow",
+    description: "Use when a stricter challenge round and deeper candidate review are warranted."
   }
 } as const satisfies Record<AnalysisMode, {
   label: string;
@@ -277,14 +278,12 @@ export async function getBackendCorpus(signal?: AbortSignal) {
 export async function analyzeMemoWithBackend(
   memo: MemoRecord,
   mode: AnalysisMode,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (run: AnalysisRun) => void
 ) {
-  const logicalKey = `council-dispatch:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
+  const logicalKey = `agent-workflow-dispatch:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
   const response = await fetchJson<{
-    review: MemoRecord;
-    result: ReviewResult;
-    decisionInvalidated?: boolean;
-    auditEvents?: AuditEvent[];
+    run: AnalysisRun;
   }>(
     `/api/reviews/${encodeURIComponent(memo.id)}/analyze`,
     {
@@ -303,11 +302,66 @@ export async function analyzeMemoWithBackend(
     }
   );
   await completeAiLogicalRequest(logicalKey);
-  return response;
+  let run = response.run;
+  onProgress?.(run);
+  try {
+    while (!isTerminalAnalysisRun(run)) {
+      await abortableDelay(750, signal);
+      run = await getAnalysisRun(memo.id, run.id, signal);
+      onProgress?.(run);
+    }
+  } catch (error) {
+    if (signal?.aborted && !isTerminalAnalysisRun(run)) {
+      await cancelAnalysisRun(memo.id, run.id).catch(() => undefined);
+    }
+    throw error;
+  }
+  if (run.status !== "completed") {
+    throw new Error(run.error || `Analysis ended with status ${run.status}.`);
+  }
+  const detail = await getReviewDetail(memo.id, signal);
+  if (!detail.result || detail.result.id !== run.resultId) {
+    throw new Error("The completed workflow result is not available from the authoritative review record.");
+  }
+  return { review: detail.review, result: detail.result, decision: detail.decision, run };
 }
 
-export interface CouncilApprovalView {
-  purpose: "council";
+export async function getAnalysisRun(memoId: string, runId: string, signal?: AbortSignal) {
+  const response = await fetchJson<{ run: AnalysisRun }>(
+    `/api/reviews/${encodeURIComponent(memoId)}/analysis-runs/${encodeURIComponent(runId)}`,
+    { signal }
+  );
+  return response.run;
+}
+
+export async function cancelAnalysisRun(memoId: string, runId: string, signal?: AbortSignal) {
+  const response = await fetchJson<{ run: AnalysisRun }>(
+    `/api/reviews/${encodeURIComponent(memoId)}/analysis-runs/${encodeURIComponent(runId)}/cancel`,
+    { method: "POST", signal, headers: { "Content-Type": "application/json" }, body: "{}" }
+  );
+  return response.run;
+}
+
+function isTerminalAnalysisRun(run: AnalysisRun) {
+  return ["completed", "failed", "cancelled", "stale"].includes(run.status);
+}
+
+function abortableDelay(milliseconds: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+      return;
+    }
+    const timeout = setTimeout(resolve, milliseconds);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timeout);
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    }, { once: true });
+  });
+}
+
+export interface AgentWorkflowApprovalView {
+  purpose: "agent-workflow";
   depth: "standard" | "deep";
   subject: AiApprovalSubjectBinding;
   payloadHash: string;
@@ -316,25 +370,25 @@ export interface CouncilApprovalView {
   usable: boolean;
 }
 
-export async function getCouncilApproval(
+export async function getAgentWorkflowApproval(
   memoId: string,
   mode: AnalysisMode,
   signal?: AbortSignal
 ) {
-  return fetchJson<CouncilApprovalView>(
-    `/api/reviews/${encodeURIComponent(memoId)}/ai-approvals/council?depth=${encodeURIComponent(ANALYSIS_MODE_CONFIG[mode].depth)}`,
+  return fetchJson<AgentWorkflowApprovalView>(
+    `/api/reviews/${encodeURIComponent(memoId)}/ai-approvals/agent-workflow?depth=${encodeURIComponent(ANALYSIS_MODE_CONFIG[mode].depth)}`,
     { signal }
   );
 }
 
-export async function approveCouncilAnalysis(
+export async function approveAgentWorkflow(
   memo: Pick<MemoRecord, "id" | "version" | "revision" | "contentHash">,
   mode: AnalysisMode,
   signal?: AbortSignal
 ) {
-  const logicalKey = `council-approval:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
+  const logicalKey = `agent-workflow-approval:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
   const response = await fetchJson<{ approval: AiApprovalStatus; usable: boolean }>(
-    `/api/reviews/${encodeURIComponent(memo.id)}/ai-approvals/council`,
+    `/api/reviews/${encodeURIComponent(memo.id)}/ai-approvals/agent-workflow`,
     {
       method: "POST",
       signal,
@@ -374,15 +428,15 @@ export async function revokeAiApproval(
   return response;
 }
 
-export async function requestCouncilApproval(
+export async function requestAgentWorkflowApproval(
   memo: Pick<MemoRecord, "id" | "version" | "revision" | "contentHash">,
   mode: AnalysisMode,
   signal?: AbortSignal
 ) {
-  const logicalKey = `council-request:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
+  const logicalKey = `agent-workflow-request:${memo.id}:${memo.version}:${memo.revision}:${memo.contentHash}:${mode}`;
   return createPendingAiApprovalRequest(logicalKey, (requestId) => ({
     requestId,
-    purpose: "council",
+    purpose: "agent-workflow",
     reviewId: memo.id,
     depth: ANALYSIS_MODE_CONFIG[mode].depth,
     expectedVersion: memo.version,
@@ -1188,22 +1242,6 @@ export async function sendMemoBuildChat(
   });
   await completeAiLogicalRequest(logicalKey);
   return response;
-}
-
-export async function draftPublicMemo(item: string, signal?: AbortSignal) {
-  return fetchJson<{
-    title: string;
-    memoText: string;
-    sources: Array<{ title: string; url: string }>;
-    provider: { configured: boolean; model: string; live: boolean; message: string };
-  }>("/api/public-memo-draft", {
-    method: "POST",
-    signal,
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ item })
-  });
 }
 
 export interface DocumentExtraction {

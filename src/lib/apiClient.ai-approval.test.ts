@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { reviewFixtures } from "../test/reviewFixtures";
 import {
   getCurrentUser,
-  requestCouncilApproval,
+  requestAgentWorkflowApproval,
   requestMemoChatApproval,
   requestMemoBuilderApproval,
   resetAiRequestIdsForTests,
@@ -35,13 +35,13 @@ describe("durable AI approval request identity", () => {
     }));
 
     await Promise.all([
-      requestCouncilApproval(reviewFixtures[0], "standard"),
-      requestCouncilApproval(reviewFixtures[0], "standard")
+      requestAgentWorkflowApproval(reviewFixtures[0], "standard"),
+      requestAgentWorkflowApproval(reviewFixtures[0], "standard")
     ]);
     expect(bodies[0].requestId).toBe(bodies[1].requestId);
 
     resetAiRequestMemoryForTests();
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(bodies[2].requestId).toBe(bodies[0].requestId);
   });
 
@@ -58,16 +58,16 @@ describe("durable AI approval request identity", () => {
       return json({ status: "approved" });
     }));
 
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     const original = bodies[0].requestId;
     phase = "rejected";
-    const terminal = await requestCouncilApproval(reviewFixtures[0], "standard");
+    const terminal = await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(terminal.status).toBe("approved");
     expect(bodies[1].requestId).toBe(original);
     expect(bodies[2].requestId).not.toBe(original);
 
     resetAiRequestMemoryForTests();
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(bodies[3].requestId).toBe(bodies[2].requestId);
   });
 
@@ -94,25 +94,25 @@ describe("durable AI approval request identity", () => {
     }));
 
     await getCurrentUser();
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     const first = last(queueBodies)?.requestId;
     const pendingKey = storageKeys().find((key) => key.startsWith("rulix.ai-request.v1."));
     expect(pendingKey).toBeDefined();
     localStorage.setItem(pendingKey!, "{malformed");
     resetAiRequestMemoryForTests();
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(last(queueBodies)?.requestId).not.toBe(first);
 
     const beforeSwitch = last(queueBodies)?.requestId;
     user = "user-b";
     await getCurrentUser();
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(last(queueBodies)?.requestId).not.toBe(beforeSwitch);
 
     const beforeLogout = last(queueBodies)?.requestId;
     await signOut();
     setCsrfToken("csrf-test");
-    await requestCouncilApproval(reviewFixtures[0], "standard");
+    await requestAgentWorkflowApproval(reviewFixtures[0], "standard");
     expect(last(queueBodies)?.requestId).not.toBe(beforeLogout);
   });
 

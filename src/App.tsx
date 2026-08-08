@@ -7,14 +7,14 @@ import {
   type BackendHealth,
   type MemoBuildDraft,
   applyMemoChatSuggestion,
-  approveCouncilAnalysis,
+  approveAgentWorkflow,
   acceptInvite,
   analyzeMemoWithBackend,
   completePasswordReset,
   createReview,
   deleteMemoBuilderSession,
   getBackendHealth,
-  getCouncilApproval,
+  getAgentWorkflowApproval,
   getCurrentUser,
   getReviewDetail,
   listMemoBuilderSessions,
@@ -25,7 +25,7 @@ import {
   listTenantMembers,
   loadWorkspacePreferences,
   recordReviewDecision,
-  requestCouncilApproval,
+  requestAgentWorkflowApproval,
   requestMemoChatApproval,
   requestPasswordReset,
   revokeAiApproval,
@@ -41,7 +41,7 @@ import {
   validateInvite,
   validatePasswordReset,
   type InvitePublicInfo,
-  type CouncilApprovalView,
+  type AgentWorkflowApprovalView,
   type PasswordResetPublicInfo
 } from "./lib/apiClient";
 import type { ReviewSummary } from "./lib/apiClient";
@@ -52,6 +52,7 @@ import { isReviewId } from "./shared/reviewIds";
 import type {
   AppView,
   AuditEvent,
+  AnalysisRun,
   DataClass,
   MemoBuilderSession,
   MemoChatMessage,
@@ -89,11 +90,11 @@ import "./app-workflow.css";
 import "./memo-builder-workspace.css";
 import "./styles.css";
 
-type AnalysisRunState =
-  | { status: "unanalyzed"; message: string }
-  | { status: "running"; message: string }
-  | { status: "live"; message: string }
-  | { status: "failed"; message: string };
+type AnalysisRunState = {
+  status: "unanalyzed" | "running" | "live" | "failed";
+  message: string;
+  run?: AnalysisRun;
+};
 
 type AuthState =
   | { status: "checking" }
@@ -185,7 +186,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
   const [backendHealth, setBackendHealth] = useState<BackendHealth | undefined>();
   const [backendNotice, setBackendNotice] = useState("Checking analysis service...");
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("standard");
-  const [councilApproval, setCouncilApproval] = useState<CouncilApprovalView | undefined>();
+  const [workflowApproval, setWorkflowApproval] = useState<AgentWorkflowApprovalView | undefined>();
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | undefined>();
   const [memoDraftDirty, setMemoDraftDirty] = useState(false);
@@ -479,15 +480,15 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       || auth.user.role === "submitter"
       || !backendHealth?.provider.configured
     ) {
-      setCouncilApproval(undefined);
+      setWorkflowApproval(undefined);
       return;
     }
     const controller = new AbortController();
-    setCouncilApproval(undefined);
-    getCouncilApproval(selectedMemo.id, analysisMode, controller.signal)
-      .then(setCouncilApproval)
+    setWorkflowApproval(undefined);
+    getAgentWorkflowApproval(selectedMemo.id, analysisMode, controller.signal)
+      .then(setWorkflowApproval)
       .catch(() => {
-        if (!controller.signal.aborted) setCouncilApproval(undefined);
+        if (!controller.signal.aborted) setWorkflowApproval(undefined);
       });
     return () => controller.abort();
   }, [
@@ -868,28 +869,6 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     navigateApp({ view: "work", memoId: memo.id, stage: "prepare" });
   };
 
-  const handleCreatePublicDraftMemo = async (title: string, memoText: string) => {
-    if (blockDirtyDraft("creating a public draft")) return;
-    const memo = await persistNewReview({
-      title: title.trim() || "Public-source ECCN memo draft",
-      itemFamily: "Public-source draft",
-      manufacturer: "",
-      intendedUse: "",
-      dataClass: "public",
-      sourcePath: "self-classification",
-      attachments: [],
-      memoText
-    }, "Creating public-source review...");
-    setAnalysisStates((current) => ({
-      ...current,
-      [memo.id]: {
-        status: "unanalyzed",
-        message: "Public-source draft is waiting for reviewer-initiated AI analysis."
-      }
-    }));
-    navigateApp({ view: "work", memoId: memo.id, stage: "prepare" });
-  };
-
   const prepareBuilderSessionForAi = async (session: MemoBuilderSession) => {
     const sanitized = sanitizeMemoBuilderSessionForStorage(session);
     let expectedVersion = builderVersionsRef.current.get(session.id) ?? 0;
@@ -1102,7 +1081,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         ...current,
         [memo.id]: {
           status: "failed",
-          message: "Live AI analysis is unavailable. No deterministic analysis was recorded."
+          message: "Live AI analysis is unavailable. No result was recorded."
         }
       }));
       return;
@@ -1110,15 +1089,15 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     setApprovalBusy(true);
     try {
       if (currentUser?.role === "export-control-officer") {
-        const approved = await approveCouncilAnalysis(memo, analysisMode);
-        setCouncilApproval((current) => current
+        const approved = await approveAgentWorkflow(memo, analysisMode);
+        setWorkflowApproval((current) => current
           ? { ...current, approval: approved.approval, usable: approved.usable }
           : current);
       } else {
-        const status = await getCouncilApproval(memo.id, analysisMode);
-        setCouncilApproval(status);
+        const status = await getAgentWorkflowApproval(memo.id, analysisMode);
+        setWorkflowApproval(status);
         if (!status.usable) {
-          await requestCouncilApproval(memo, analysisMode);
+          await requestAgentWorkflowApproval(memo, analysisMode);
           setAnalysisStates((current) => ({
             ...current,
             [memo.id]: {
@@ -1142,15 +1121,12 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     }
     const controller = new AbortController();
     analysisControllersRef.current.set(memo.id, controller);
-    // End the browser wait before the 120-second CloudFront/Lambda deadline so
-    // users get a deterministic retry state instead of an edge-generated 504.
-    const timeoutId = window.setTimeout(() => controller.abort(), 115000);
     setAnalysisStates((current) => ({
       ...current,
       [memo.id]: {
         status: "running",
         message: backendHealth?.provider.configured
-          ? `${ANALYSIS_MODE_CONFIG[analysisMode].label} is analyzing this memo. No deterministic fallback will be recorded.`
+          ? `${ANALYSIS_MODE_CONFIG[analysisMode].label} is analyzing this memo. Partial work will not be published.`
           : "Live AI availability is unknown. Rulix will fail closed if the provider is unavailable."
       }
     }));
@@ -1159,10 +1135,18 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       const {
         review,
         result,
-        decisionInvalidated,
-        auditEvents: serverAuditEvents
-      } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal);
-      window.clearTimeout(timeoutId);
+        decision: authoritativeDecision,
+        run
+      } = await analyzeMemoWithBackend(memo, analysisMode, controller.signal, (progressRun) => {
+        setAnalysisStates((current) => ({
+          ...current,
+          [memo.id]: {
+            status: "running",
+            message: workflowProgressMessage(progressRun),
+            run: progressRun
+          }
+        }));
+      });
       const currentMemo = memosRef.current.find((item) => item.id === memo.id);
       if (currentMemo && (
         currentMemo.version !== memo.version
@@ -1178,26 +1162,30 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         return;
       }
       setAnalysisResults((current) => ({ ...current, [memo.id]: result }));
-      if (serverAuditEvents?.length) mergeAuditEvents(serverAuditEvents);
-      if (decisionInvalidated) {
-        setDecisions((current) => {
-          const next = { ...current };
-          delete next[memo.id];
-          return next;
-        });
-      }
+      setDecisions((current) => {
+        const next = { ...current };
+        if (authoritativeDecision) next[memo.id] = authoritativeDecision;
+        else delete next[memo.id];
+        return next;
+      });
       setAnalysisStates((current) => ({
         ...current,
         [memo.id]: {
           status: "live",
-          message: "Live AI analysis completed. Reviewer signoff is still required."
+          message: "Live multi-agent analysis completed. Reviewer signoff is still required.",
+          run
         }
       }));
       setMemos((current) => current.map((item) => (item.id === memo.id ? review : item)));
       setSyncNotice("AI analysis saved");
-      void getCouncilApproval(memo.id, analysisMode).then(setCouncilApproval).catch(() => undefined);
+      void getAgentWorkflowApproval(memo.id, analysisMode).then(setWorkflowApproval).catch(() => undefined);
+      void listReviewAuditEvents(memo.id, { limit: 25 })
+        .then((page) => {
+          setAuditEvents((current) => mergePagedAuditEvents(current, page.items, memo.id, true));
+          setAuditCursors((current) => ({ ...current, [memo.id]: page.nextCursor }));
+        })
+        .catch(() => undefined);
     } catch (error) {
-      window.clearTimeout(timeoutId);
       if (controller.signal.aborted) {
         setAnalysisStates((current) => ({
           ...current,
@@ -1210,14 +1198,14 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         return;
       }
       const message = readableApiError(error instanceof Error ? error.message : "AI analysis request failed.");
+      await refreshReviewState("Analysis failed; authoritative review state reloaded", memo.id).catch(() => undefined);
       setAnalysisStates((current) => ({
         ...current,
         [memo.id]: {
           status: "failed",
-          message: `${message} No deterministic analysis was recorded; retry when live AI is available.`
+          message: `${message} No partial result was published; retry when live AI is available.`
         }
       }));
-      await refreshReviewState("Analysis failed; authoritative review state reloaded", memo.id).catch(() => undefined);
     } finally {
       analysisControllersRef.current.delete(memo.id);
     }
@@ -1293,8 +1281,8 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
     analysisControllersRef.current.get(selectedMemo.id)?.abort();
   };
 
-  const handleRevokeCouncilApproval = async () => {
-    const approvalId = councilApproval?.approval?.approval.id;
+  const handleRevokeWorkflowApproval = async () => {
+    const approvalId = workflowApproval?.approval?.approval.id;
     if (!approvalId || approvalBusy) return;
     setApprovalBusy(true);
     try {
@@ -1302,7 +1290,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
         approvalId,
         "Revoked from the review workspace before provider dispatch."
       );
-      setCouncilApproval((current) => current
+      setWorkflowApproval((current) => current
         ? { ...current, approval: revoked.approval, usable: false }
         : current);
       setSyncNotice("AI approval revoked");
@@ -1512,7 +1500,6 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
       analysisLocked={analysisState.status === "running"}
       onMemoTextChange={updateMemoText}
       onArchiveMemo={archiveMemo}
-      onCreatePublicDraft={handleCreatePublicDraftMemo}
       onImproveWithAi={openMemoBuilderForSelectedReview}
       onDirtyChange={setMemoDraftDirty}
     />
@@ -1584,7 +1571,8 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
               analysisMode={analysisMode}
               backendNotice={backendNotice}
               liveAnalysisAvailable={backendHealth?.provider.configured !== false}
-              councilApproval={councilApproval}
+              analysisRun={analysisState.run}
+              workflowApproval={workflowApproval}
               approvalBusy={approvalBusy}
               memoEditor={memoEditor}
               memoDraftDirty={memoDraftDirty}
@@ -1598,7 +1586,7 @@ export function App({ authLink = consumeAuthLinkFragment() }: { authLink?: AuthL
               onRunAnalysis={() => void runAnalysis()}
               onCancelAnalysis={cancelAnalysis}
               onAnalysisModeChange={setAnalysisMode}
-              onRevokeCouncilApproval={handleRevokeCouncilApproval}
+              onRevokeWorkflowApproval={handleRevokeWorkflowApproval}
               onExport={exportReport}
               onOpenMemoBuilder={openMemoBuilderForSelectedReview}
               onUpdateMetadata={handleUpdateSelectedMetadata}
@@ -2062,8 +2050,21 @@ function deriveAnalysisStates(results: Record<string, ReviewResult>) {
 
 function liveOnlyAnalysisResults(results: Record<string, ReviewResult>) {
   return Object.fromEntries(
-    Object.entries(results).filter(([, result]) => result.provider.live && result.provider.source === "bedrock")
+    Object.entries(results).filter(([, result]) => result.provider.live && result.provider.source === "agent-workflow")
   ) as Record<string, ReviewResult>;
+}
+
+function workflowProgressMessage(run: AnalysisRun) {
+  const stage = run.stage
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  const completedAgents = run.invocations.filter((invocation) => invocation.status === "completed").length;
+  const runningAgents = run.invocations.filter((invocation) => invocation.status === "running").length;
+  const agentDetail = runningAgents
+    ? `${runningAgents} agent${runningAgents === 1 ? "" : "s"} running`
+    : `${completedAgents} agent invocation${completedAgents === 1 ? "" : "s"} complete`;
+  return `${stage} · ${run.progress}% · ${agentDetail} · ${run.callBudget.used}/${run.callBudget.maximum} model calls`;
 }
 
 function readableApiError(message: string) {

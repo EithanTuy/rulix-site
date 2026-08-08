@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rulix.cloud/schemas/classification-gold-set-v1.json",
+  "title": "Rulix adjudicated classification gold set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "datasetId", "createdAt", "cases"],
+  "properties": {
+    "schemaVersion": { "const": "rulix.classification-gold-set/v1" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "productFamily", "split", "analysisDate", "adjudicationStatus", "jurisdiction", "scopeItems", "elements"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "productFamily": { "type": "string", "minLength": 1 },
+          "split": { "enum": ["train", "validation", "test"] },
+          "analysisDate": { "type": "string", "format": "date" },
+          "adjudicationStatus": { "const": "gold" },
+          "jurisdiction": { "enum": ["EAR", "ITAR", "OTHER", "OUTSIDE_SCOPE"] },
+          "scopeItems": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["id", "expectedClassification", "requiredMissingFactIds"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "expectedClassification": { "type": "string", "minLength": 1 },
+                "requiredMissingFactIds": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["id", "expected"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "expected": { "enum": ["met", "not_met", "unknown", "not_applicable"] },
+                "numericBoundaryCase": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

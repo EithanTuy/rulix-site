@@ -151,9 +151,20 @@ variable "workspace_migration_principal_arns" {
 # ---- App hosting (Lambda + Function URL + CloudFront) ----
 
 variable "bedrock_enabled" {
-  description = "Enables live Bedrock AI calls when true. False keeps the app in deterministic local-rules mode."
+  description = "Enables approved live Bedrock AI calls. When false, consequential analysis is unavailable and fails closed."
   type        = bool
   default     = true
+}
+
+variable "analysis_worker_reserved_concurrency" {
+  description = "Bounded concurrency for the dedicated analysis worker."
+  type        = number
+  default     = 2
+
+  validation {
+    condition     = var.analysis_worker_reserved_concurrency >= 1 && var.analysis_worker_reserved_concurrency <= 20
+    error_message = "analysis_worker_reserved_concurrency must be between 1 and 20."
+  }
 }
 
 variable "ai_data_class" {

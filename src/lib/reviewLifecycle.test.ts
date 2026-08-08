@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { reviewFixtures } from "../test/reviewFixtures";
-import { analyzeMemo } from "./eccnReview";
+import { makeReviewResult } from "../test/reviewResultFactory";
 import { createAuditEvent, deriveReviewStatus, summarizeReadiness } from "./reviewLifecycle";
 
 describe("review lifecycle", () => {
   it("blocks memo signoff when missing or conflicting evidence exists", () => {
-    const result = analyzeMemo(reviewFixtures[0]);
+    const result = makeReviewResult(reviewFixtures[0], { findings: [{
+      id: "fixture-conflict", status: "conflict", title: "Conflict", claim: "Fixture",
+      rationale: "Fixture", sourceChunkIds: [], agent: "synthesis", severity: "review"
+    }] });
 
     expect(deriveReviewStatus(result)).toBe("conflict");
     expect(summarizeReadiness(result).blockers).toBeGreaterThan(0);
   });
 
   it("lets a human decision control the stored review status", () => {
-    const result = analyzeMemo(reviewFixtures[0]);
+    const result = makeReviewResult(reviewFixtures[0]);
 
     expect(
       deriveReviewStatus(result, {

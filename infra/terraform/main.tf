@@ -21,15 +21,18 @@ data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix                 = "rulix-${var.tenant_slug}"
-  log_group_name              = "/aws/rulix/${var.tenant_slug}/application"
-  lambda_log_group_name       = "/aws/lambda/${local.name_prefix}-app"
-  audit_lambda_name           = "${local.name_prefix}-audit-writer"
-  audit_lambda_log_group_name = "/aws/lambda/${local.audit_lambda_name}"
-  log_group_arn               = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
-  lambda_log_group_arn        = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.lambda_log_group_name}"
-  audit_lambda_log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.audit_lambda_log_group_name}"
-  approved_ai_region          = coalesce(var.approved_region, var.aws_region)
+  name_prefix                    = "rulix-${var.tenant_slug}"
+  log_group_name                 = "/aws/rulix/${var.tenant_slug}/application"
+  lambda_log_group_name          = "/aws/lambda/${local.name_prefix}-app"
+  audit_lambda_name              = "${local.name_prefix}-audit-writer"
+  audit_lambda_log_group_name    = "/aws/lambda/${local.audit_lambda_name}"
+  analysis_worker_name           = "${local.name_prefix}-analysis-worker"
+  analysis_worker_log_group_name = "/aws/lambda/${local.analysis_worker_name}"
+  log_group_arn                  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.log_group_name}"
+  lambda_log_group_arn           = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.lambda_log_group_name}"
+  audit_lambda_log_group_arn     = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.audit_lambda_log_group_name}"
+  analysis_worker_log_group_arn  = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:${local.analysis_worker_log_group_name}"
+  approved_ai_region             = coalesce(var.approved_region, var.aws_region)
   common_tags = {
     Application = "Rulix ECCN"
     Tenant      = var.tenant_slug
@@ -73,7 +76,9 @@ data "aws_iam_policy_document" "tenant_kms" {
         local.lambda_log_group_arn,
         "${local.lambda_log_group_arn}:*",
         local.audit_lambda_log_group_arn,
-        "${local.audit_lambda_log_group_arn}:*"
+        "${local.audit_lambda_log_group_arn}:*",
+        local.analysis_worker_log_group_arn,
+        "${local.analysis_worker_log_group_arn}:*"
       ]
     }
   }
@@ -401,15 +406,22 @@ data "aws_iam_policy_document" "analysis_worker" {
   dynamic "statement" {
     for_each = var.workspace_mode == "normalized" ? [] : [1]
     content {
-      sid       = "ReadLegacyAccountState"
-      actions   = ["dynamodb:GetItem"]
+      sid       = "ReadWriteLegacyAccountState"
+      actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:TransactWriteItems"]
       resources = [aws_dynamodb_table.account_state.arn]
     }
   }
 
   statement {
-    sid     = "ReadNormalizedWorkspace"
-    actions = ["dynamodb:GetItem", "dynamodb:Query"]
+    sid = "ReadWriteNormalizedWorkspace"
+    actions = [
+      "dynamodb:ConditionCheckItem",
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:Query",
+      "dynamodb:TransactWriteItems",
+      "dynamodb:UpdateItem"
+    ]
     resources = [
       aws_dynamodb_table.workspace.arn,
       "${aws_dynamodb_table.workspace.arn}/index/*"
@@ -417,14 +429,14 @@ data "aws_iam_policy_document" "analysis_worker" {
   }
 
   statement {
-    sid       = "ReadWorkspaceContent"
-    actions   = ["s3:GetObject"]
+    sid       = "ReadWriteWorkspaceContent"
+    actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"]
     resources = ["${aws_s3_bucket.workspace_content.arn}/tenant/${var.tenant_slug}/*"]
   }
 
   statement {
     sid       = "DecryptWorkspaceViaServices"
-    actions   = ["kms:Decrypt", "kms:DescribeKey"]
+    actions   = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"]
     resources = [aws_kms_key.workspace.arn]
     condition {
       test     = "StringLike"
@@ -434,6 +446,22 @@ data "aws_iam_policy_document" "analysis_worker" {
         "s3.${var.aws_region}.amazonaws.com"
       ]
     }
+  }
+
+  statement {
+    sid = "AnalysisStateAndAdmission"
+    actions = [
+      "dynamodb:ConditionCheckItem",
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:Query",
+      "dynamodb:TransactWriteItems",
+      "dynamodb:UpdateItem"
+    ]
+    resources = [
+      aws_dynamodb_table.auth.arn,
+      aws_dynamodb_table.account_state.arn
+    ]
   }
 
   statement {

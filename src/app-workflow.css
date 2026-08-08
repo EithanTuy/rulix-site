@@ -1285,6 +1285,266 @@
   overflow-wrap: anywhere;
 }
 
+.review-agent-workflow {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--workflow-line);
+  border-radius: 10px;
+}
+
+.review-agent-workflow.running {
+  background: linear-gradient(135deg, #f8fcfc 0%, #fff 72%);
+  border-color: #abd5d4;
+}
+
+.review-agent-workflow > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.review-agent-workflow > header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+}
+
+.review-agent-workflow > header p:not(.review-stage-label),
+.review-agent-workflow > details > p,
+.review-agent-workflow-empty {
+  margin: 7px 0 0;
+  color: #536174;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.review-agent-workflow > header > span {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  color: #2b6f4b;
+  background: #edf8f1;
+  border: 1px solid #badbc9;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.review-agent-workflow > header > span.blocked {
+  color: var(--workflow-danger);
+  background: var(--workflow-danger-soft);
+  border-color: #efb9be;
+}
+
+.review-workflow-meter {
+  height: 7px;
+  overflow: hidden;
+  background: #e6efef;
+  border-radius: 999px;
+}
+
+.review-workflow-meter span {
+  display: block;
+  height: 100%;
+  background: var(--workflow-teal);
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.review-workflow-budget {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.review-workflow-budget > div {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  background: #f7fafb;
+  border: 1px solid var(--workflow-line);
+  border-radius: 7px;
+}
+
+.review-workflow-budget dt {
+  color: var(--workflow-muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.review-workflow-budget dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.review-workflow-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-workflow-stages span,
+.review-citation-audit span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  color: var(--workflow-muted);
+  background: #f8fafc;
+  border: 1px solid var(--workflow-line);
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.review-workflow-stages span.completed,
+.review-citation-audit span.verified {
+  color: #2b6f4b;
+  background: #edf8f1;
+  border-color: #badbc9;
+}
+
+.review-workflow-stages span.running {
+  color: var(--workflow-teal-dark);
+  background: #eef9f8;
+  border-color: #abd5d4;
+}
+
+.review-citation-audit {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.review-citation-audit span.failed {
+  color: var(--workflow-danger);
+  background: var(--workflow-danger-soft);
+  border-color: #efb9be;
+}
+
+.review-agent-invocations {
+  display: grid;
+  gap: 6px;
+}
+
+.review-agent-invocations article {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  background: #fbfcfd;
+  border: 1px solid var(--workflow-line);
+  border-radius: 7px;
+}
+
+.review-agent-invocations article > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.review-agent-invocations strong {
+  font-size: 11px;
+}
+
+.review-agent-invocations small,
+.review-agent-invocations code {
+  color: var(--workflow-muted);
+  font-size: 9px;
+}
+
+.review-agent-status {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  color: var(--workflow-muted);
+  background: #eef2f5;
+  border-radius: 50%;
+}
+
+.review-agent-status.completed {
+  color: #2b6f4b;
+  background: #e8f6ee;
+}
+
+.review-agent-status.running {
+  color: var(--workflow-teal-dark);
+  background: #e5f5f4;
+}
+
+.review-agent-workflow > details {
+  padding-top: 12px;
+  border-top: 1px solid var(--workflow-line);
+}
+
+.review-agent-workflow > details > summary {
+  color: var(--workflow-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.review-workflow-detail-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.review-workflow-detail-list > article {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  background: #f9fbfc;
+  border: 1px solid var(--workflow-line);
+  border-radius: 7px;
+}
+
+.review-workflow-detail-list article > header,
+.review-workflow-criterion > strong {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-workflow-detail-list p,
+.review-workflow-detail-list blockquote,
+.review-workflow-detail-list ul,
+.review-agent-workflow > details > ul {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.review-workflow-detail-list blockquote {
+  padding-left: 9px;
+  color: #536174;
+  border-left: 2px solid #abd5d4;
+}
+
+.review-workflow-detail-list small {
+  color: var(--workflow-muted);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.review-workflow-criterion {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-top: 1px solid var(--workflow-line);
+  font-size: 10px;
+}
+
 .review-findings-layout {
   display: grid;
   grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr);
@@ -1624,6 +1884,37 @@
   border-radius: 7px;
   font-size: 11px;
   text-decoration: none;
+}
+
+.review-regulatory-citation {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  color: var(--workflow-ink);
+  background: #fbfcfd;
+  border: 1px solid var(--workflow-line);
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.review-regulatory-citation header {
+  display: grid;
+  gap: 3px;
+}
+
+.review-regulatory-citation small,
+.review-regulatory-citation code {
+  color: var(--workflow-muted);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.review-regulatory-citation blockquote {
+  margin: 0;
+  padding-left: 8px;
+  color: #536174;
+  border-left: 2px solid #abd5d4;
+  line-height: 1.45;
 }
 
 .review-sources-panel details {
@@ -2047,6 +2338,22 @@
 
   .review-ai-summary dl {
     grid-template-columns: 1fr;
+  }
+
+  .review-agent-workflow > header {
+    display: grid;
+  }
+
+  .review-workflow-budget {
+    grid-template-columns: 1fr;
+  }
+
+  .review-agent-invocations article {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .review-agent-invocations code {
+    grid-column: 2;
   }
 
   .review-findings-layout {

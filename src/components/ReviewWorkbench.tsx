@@ -17,22 +17,23 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import { getSourceChunk } from "../data/corpus";
 import {
   ANALYSIS_MODE_CONFIG,
   createReviewComment,
   listReviewComments,
   resolveReviewComment,
   type AnalysisMode,
-  type CouncilApprovalView
+  type AgentWorkflowApprovalView
 } from "../lib/apiClient";
 import type { ReviewPanel, ReviewStage } from "../lib/appRoutes";
 import { summarizeReadiness } from "../lib/reviewLifecycle";
 import type {
   AuditEvent,
+  AnalysisRun,
   CaseComment,
   MemoChatMessage,
   MemoRecord,
+  RegulatoryCitation,
   ReviewResult,
   ReviewerDecision,
   UserProfile
@@ -50,10 +51,11 @@ interface ReviewWorkbenchProps {
   panel?: ReviewPanel;
   analysisStatus: "unanalyzed" | "running" | "live" | "failed";
   analysisMessage: string;
+  analysisRun?: AnalysisRun;
   analysisMode: AnalysisMode;
   backendNotice: string;
   liveAnalysisAvailable: boolean;
-  councilApproval?: CouncilApprovalView;
+  workflowApproval?: AgentWorkflowApprovalView;
   approvalBusy: boolean;
   memoEditor: ReactNode;
   memoDraftDirty: boolean;
@@ -67,7 +69,7 @@ interface ReviewWorkbenchProps {
   onRunAnalysis: () => void;
   onCancelAnalysis?: () => void;
   onAnalysisModeChange: (mode: AnalysisMode) => void;
-  onRevokeCouncilApproval: () => Promise<void> | void;
+  onRevokeWorkflowApproval: () => Promise<void> | void;
   onExport: () => void;
   onOpenMemoBuilder: () => void;
   onUpdateMetadata: (
@@ -100,10 +102,11 @@ export function ReviewWorkbench({
   panel,
   analysisStatus,
   analysisMessage,
+  analysisRun,
   analysisMode,
   backendNotice,
   liveAnalysisAvailable,
-  councilApproval,
+  workflowApproval,
   approvalBusy,
   memoEditor,
   memoDraftDirty,
@@ -117,7 +120,7 @@ export function ReviewWorkbench({
   onRunAnalysis,
   onCancelAnalysis,
   onAnalysisModeChange,
-  onRevokeCouncilApproval,
+  onRevokeWorkflowApproval,
   onExport,
   onOpenMemoBuilder,
   onUpdateMetadata,
@@ -149,15 +152,7 @@ export function ReviewWorkbench({
   const canDecide = user.role !== "submitter";
   const canOverride = user.role === "export-control-officer" || user.role === "counsel";
 
-  const citations = useMemo(() => result
-    ? [...new Set([
-      ...result.jurisdiction.sourceChunkIds,
-      ...result.recommended.sourceChunkIds,
-      ...result.findings.flatMap((finding) => finding.sourceChunkIds)
-    ])]
-      .map((id) => getSourceChunk(id))
-      .filter((chunk): chunk is NonNullable<ReturnType<typeof getSourceChunk>> => Boolean(chunk))
-    : [], [result]);
+  const citations = useMemo(() => uniqueRegulatoryCitations(result), [result]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -276,17 +271,18 @@ export function ReviewWorkbench({
               stale={stale}
               analysisStatus={analysisStatus}
               analysisMessage={analysisMessage}
+              analysisRun={analysisRun}
               analysisMode={analysisMode}
               backendNotice={backendNotice}
               liveAnalysisAvailable={liveAnalysisAvailable}
-              councilApproval={councilApproval}
+              workflowApproval={workflowApproval}
               approvalBusy={approvalBusy}
               user={user}
               memoDraftDirty={memoDraftDirty}
               onRunAnalysis={onRunAnalysis}
               onCancelAnalysis={onCancelAnalysis}
               onAnalysisModeChange={onAnalysisModeChange}
-              onRevokeCouncilApproval={onRevokeCouncilApproval}
+              onRevokeWorkflowApproval={onRevokeWorkflowApproval}
               onFindingSelect={onFindingSelect}
               onResolveFinding={(findingId) => {
                 onFindingSelect(findingId);
@@ -339,7 +335,7 @@ export function ReviewWorkbench({
                 </button>
               ))}
             </nav>
-            <div className="review-context-body">
+            <div className="review-context-body" tabIndex={0} aria-label="Context content">
               {activePanel === "details" ? (
                 <DetailsPanel memo={memo} user={user} members={members} onUpdateMetadata={onUpdateMetadata} />
               ) : null}
@@ -430,17 +426,18 @@ function ReviewStageView({
   stale,
   analysisStatus,
   analysisMessage,
+  analysisRun,
   analysisMode,
   backendNotice,
   liveAnalysisAvailable,
-  councilApproval,
+  workflowApproval,
   approvalBusy,
   user,
   memoDraftDirty,
   onRunAnalysis,
   onCancelAnalysis,
   onAnalysisModeChange,
-  onRevokeCouncilApproval,
+  onRevokeWorkflowApproval,
   onFindingSelect,
   onResolveFinding,
   onRequestInformation,
@@ -452,17 +449,18 @@ function ReviewStageView({
   stale: boolean;
   analysisStatus: ReviewWorkbenchProps["analysisStatus"];
   analysisMessage: string;
+  analysisRun?: AnalysisRun;
   analysisMode: AnalysisMode;
   backendNotice: string;
   liveAnalysisAvailable: boolean;
-  councilApproval?: CouncilApprovalView;
+  workflowApproval?: AgentWorkflowApprovalView;
   approvalBusy: boolean;
   user: UserProfile;
   memoDraftDirty: boolean;
   onRunAnalysis: () => void;
   onCancelAnalysis?: () => void;
   onAnalysisModeChange: (mode: AnalysisMode) => void;
-  onRevokeCouncilApproval: () => Promise<void> | void;
+  onRevokeWorkflowApproval: () => Promise<void> | void;
   onFindingSelect: (findingId: string | undefined) => void;
   onResolveFinding: (findingId: string) => void;
   onRequestInformation: (findingId: string) => void;
@@ -473,7 +471,7 @@ function ReviewStageView({
     ? "Analysis running"
     : isOfficer
       ? "Approve & run AI review"
-      : councilApproval?.usable
+      : workflowApproval?.usable
         ? "Run approved AI review"
         : "Request officer approval";
   const readiness = result ? summarizeReadiness(result) : undefined;
@@ -503,22 +501,19 @@ function ReviewStageView({
         </button>
       </section>
 
-      <div className={`review-approval-scope${councilApproval?.usable ? " approved" : ""}`}>
+      <div className={`review-approval-scope${workflowApproval?.usable ? " approved" : ""}`}>
         <ShieldCheck size={18} />
         <span>
-          <strong>{councilApproval?.usable ? "Approved for one exact dispatch" : "Exact-content approval"}</strong>
+          <strong>{workflowApproval?.usable ? "Approved for one exact dispatch" : "Exact-content approval"}</strong>
           <small>Revision {memo.revision ?? 1} · {analysisMode} · hash {(memo.contentHash ?? "not loaded").slice(0, 10)}…</small>
         </span>
-        {isOfficer && councilApproval?.approval?.current && councilApproval.approval.dispatchesReserved === 0 ? (
-          <button type="button" className="review-link-button" disabled={approvalBusy} onClick={() => void onRevokeCouncilApproval()}>Revoke</button>
+        {isOfficer && workflowApproval?.approval?.current && workflowApproval.approval.dispatchesReserved === 0 ? (
+          <button type="button" className="review-link-button" disabled={approvalBusy} onClick={() => void onRevokeWorkflowApproval()}>Revoke</button>
         ) : null}
       </div>
 
       {analysisStatus === "running" ? (
-        <section className="review-analysis-progress" aria-live="polite">
-          <div><RefreshCw className="spin" size={19} /><span><strong>AI review is running</strong><small>{analysisMessage}</small></span></div>
-          {onCancelAnalysis ? <button type="button" className="review-link-button" onClick={onCancelAnalysis}>Cancel</button> : null}
-        </section>
+        <WorkflowProgress run={analysisRun} message={analysisMessage} onCancel={onCancelAnalysis} />
       ) : null}
       {analysisStatus === "failed" ? (
         <div className="review-inline-notice error" role="alert">
@@ -546,6 +541,8 @@ function ReviewStageView({
               <div><dt>Reviewed</dt><dd>{new Date(result.generatedAt).toLocaleString()}</dd></div>
             </dl>
           </section>
+
+          <WorkflowResults result={result} />
 
           <section className="review-findings">
             <header><div><p className="review-stage-label">Findings</p><h2>{result.findings.length ? `${result.findings.length} to inspect` : "No evidence findings"}</h2></div></header>
@@ -581,6 +578,184 @@ function ReviewStageView({
         </>
       )}
     </>
+  );
+}
+
+function WorkflowProgress({
+  run,
+  message,
+  onCancel
+}: {
+  run?: AnalysisRun;
+  message: string;
+  onCancel?: () => void;
+}) {
+  return (
+    <section className="review-agent-workflow running" aria-live="polite">
+      <header>
+        <div>
+          <p className="review-stage-label">Live multi-agent workflow</p>
+          <h2><RefreshCw className="spin" size={19} />{run ? labelize(run.stage) : "Starting worker"}</h2>
+          <p>{message}</p>
+        </div>
+        {onCancel ? <button type="button" className="review-link-button" onClick={onCancel}>Cancel run</button> : null}
+      </header>
+      {run ? (
+        <>
+          <div className="review-workflow-meter" aria-label={`${run.progress}% complete`}>
+            <span style={{ width: `${run.progress}%` }} />
+          </div>
+          <dl className="review-workflow-budget">
+            <div><dt>Model calls</dt><dd>{run.callBudget.used} / {run.callBudget.maximum}</dd></div>
+            <div><dt>Tokens</dt><dd>{run.tokenBudget.used.toLocaleString()} / {run.tokenBudget.maximum.toLocaleString()}</dd></div>
+            <div><dt>Challenge round</dt><dd>{run.challengeRound} / {run.bindings.maximumChallengeRounds}</dd></div>
+          </dl>
+          <div className="review-workflow-stages">
+            {run.stages.map((stage) => (
+              <span className={stage.status} key={stage.stage}>
+                {stage.status === "completed" ? <Check size={13} /> : stage.status === "running" ? <RefreshCw className="spin" size={13} /> : <Clock3 size={13} />}
+                {labelize(stage.stage)}
+              </span>
+            ))}
+          </div>
+          <AgentInvocationList invocations={run.invocations} />
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function WorkflowResults({ result }: { result: ReviewResult }) {
+  const invocations = result.workflowInvocations ?? [];
+  return (
+    <section className="review-agent-workflow">
+      <header>
+        <div>
+          <p className="review-stage-label">AI Council · actual agent outputs</p>
+          <h2>{result.workflowVersion ?? "Agent workflow"}</h2>
+          <p>{result.reportNarrative ?? result.confidenceExplanation ?? "The recorded agent artifacts are available below for human inspection."}</p>
+        </div>
+        <span className={result.decisionReadiness?.status === "blocked" ? "blocked" : "ready"}>
+          {result.decisionReadiness ? labelize(result.decisionReadiness.status) : labelize(result.outcome ?? "unresolved")}
+        </span>
+      </header>
+
+      <AgentInvocationList invocations={invocations} />
+
+      {result.caseEvidence ? (
+        <details>
+          <summary>Intake evidence ledger · {result.caseEvidence.evidence.length} record{result.caseEvidence.evidence.length === 1 ? "" : "s"}</summary>
+          <div className="review-workflow-detail-list">
+            {result.caseEvidence.evidence.map((evidence) => (
+              <article key={evidence.id}>
+                <header><strong>{evidence.subject}</strong><span>{labelize(evidence.evidenceKind)}</span></header>
+                <p>{evidence.value}{evidence.units ? ` ${evidence.units}` : ""}</p>
+                <blockquote>{evidence.excerpt}</blockquote>
+                <small>{evidence.location.label} · hash {evidence.contentHash.slice(0, 12)}…</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {result.candidateResearch ? (
+        <details open>
+          <summary>Candidate research · {result.candidateResearch.candidates.length} candidate{result.candidateResearch.candidates.length === 1 ? "" : "s"}</summary>
+          <p>{result.candidateResearch.searchSummary}</p>
+          <div className="review-workflow-detail-list">
+            {result.candidateResearch.candidates.map((candidate) => (
+              <article key={candidate.id}>
+                <header><strong>{candidate.classification}</strong><span>{candidate.label}</span></header>
+                <p>{candidate.inclusionReason}</p>
+                {candidate.factualQuestions.length ? <ul>{candidate.factualQuestions.map((question) => <li key={question}>{question}</li>)}</ul> : null}
+                <small>{candidate.regulatoryCitations.length} exact regulatory citation{candidate.regulatoryCitations.length === 1 ? "" : "s"}</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {result.candidateAnalyses?.length ? (
+        <details open>
+          <summary>Element-by-element candidate analysis · {result.candidateAnalyses.length}</summary>
+          <div className="review-workflow-detail-list">
+            {result.candidateAnalyses.map((analysis) => (
+              <article key={analysis.candidateId}>
+                <header><strong>{analysis.classification}</strong><span className={analysis.outcome}>{labelize(analysis.outcome)}</span></header>
+                <p>{analysis.summary}</p>
+                {[...analysis.criteria, ...analysis.exclusionsAndNotes].map((criterion) => (
+                  <div className="review-workflow-criterion" key={criterion.id}>
+                    <strong>{criterion.locator} · {criterion.criterion}</strong>
+                    <span>{labelize(criterion.disposition)}</span>
+                    <p>{criterion.explanation}</p>
+                  </div>
+                ))}
+                {analysis.missingInformationQuestions.length ? (
+                  <ul>{analysis.missingInformationQuestions.map((question) => <li key={question}>{question}</li>)}</ul>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {result.adversarialChallenge ? (
+        <details open>
+          <summary>Adversarial challenge · {result.adversarialChallenge.challenges.length} finding{result.adversarialChallenge.challenges.length === 1 ? "" : "s"}</summary>
+          <p>{result.adversarialChallenge.summary}</p>
+          <div className="review-workflow-detail-list">
+            {result.adversarialChallenge.challenges.map((challenge) => (
+              <article key={challenge.id}>
+                <header><strong>{challenge.summary}</strong><span>{labelize(challenge.severity)}</span></header>
+                <small>Affects {challenge.affectedCandidateIds.join(", ") || "the synthesis"}</small>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {result.citationAudit ? (
+        <details open>
+          <summary>Citation verification · {result.citationAudit.passed ? "passed" : "blocked"}</summary>
+          <p>{result.citationAudit.summary}</p>
+          <div className="review-citation-audit">
+            {result.citationAudit.claims.map((claim) => (
+              <span className={claim.status === "verified" ? "verified" : "failed"} key={claim.claimId}>
+                {claim.status === "verified" ? <Check size={13} /> : <AlertCircle size={13} />}
+                <strong>{claim.claimId}</strong> · {labelize(claim.status)} · {claim.explanation}
+              </span>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {result.infoRequests.length ? (
+        <details open>
+          <summary>Missing information · {result.infoRequests.length}</summary>
+          <ul>{result.infoRequests.map((request) => <li key={request}>{request}</li>)}</ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function AgentInvocationList({ invocations }: { invocations: AnalysisRun["invocations"] }) {
+  if (!invocations.length) return <p className="review-workflow-empty">Agent invocation records will appear as work starts.</p>;
+  return (
+    <div className="review-agent-invocations" aria-label="Agent invocation records">
+      {invocations.map((invocation) => (
+        <article key={invocation.invocationId}>
+          <span className={`review-agent-status ${invocation.status}`}>
+            {invocation.status === "completed" ? <Check size={13} /> : invocation.status === "running" ? <RefreshCw className="spin" size={13} /> : <Clock3 size={13} />}
+          </span>
+          <div>
+            <strong>{labelize(invocation.role)}{invocation.candidateId ? ` · ${invocation.candidateId}` : ""}</strong>
+            <small>{invocation.model} · attempt {invocation.attempt}{invocation.usage ? ` · ${invocation.usage.totalTokens.toLocaleString()} tokens` : ""}{invocation.latencyMs ? ` · ${invocation.latencyMs} ms` : ""}</small>
+          </div>
+          <code>{invocation.invocationId.slice(0, 12)}</code>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -727,13 +902,30 @@ function DetailsPanel({
   );
 }
 
+function uniqueRegulatoryCitations(result?: ReviewResult) {
+  if (!result) return [];
+  const citations: RegulatoryCitation[] = [
+    ...(result.candidateResearch?.candidates.flatMap((candidate) => candidate.regulatoryCitations) ?? []),
+    ...(result.candidateAnalyses?.flatMap((analysis) => [
+      ...analysis.criteria.flatMap((criterion) => criterion.regulatoryCitations),
+      ...analysis.exclusionsAndNotes.flatMap((criterion) => criterion.regulatoryCitations)
+    ]) ?? []),
+    ...(result.adversarialChallenge?.challenges.flatMap((challenge) => challenge.regulatoryCitations) ?? []),
+    ...(result.adversarialChallenge?.additionalCandidates.flatMap((candidate) => candidate.regulatoryCitations) ?? [])
+  ];
+  return [...new Map(citations.map((citation) => [
+    `${citation.sourceId}:${citation.locator}:${citation.contentHash}:${citation.exactText}`,
+    citation
+  ])).values()];
+}
+
 function SourcesPanel({
   memo,
   citations,
   result
 }: {
   memo: MemoRecord;
-  citations: Array<NonNullable<ReturnType<typeof getSourceChunk>>>;
+  citations: RegulatoryCitation[];
   result?: ReviewResult;
 }) {
   return (
@@ -744,10 +936,12 @@ function SourcesPanel({
       </div>
       <h3>Cited sources</h3>
       {citations.length ? citations.map((citation) => (
-        <a href={citation!.url} target="_blank" rel="noreferrer" key={citation!.id}>
-          <span><strong>{citation!.title}</strong><small>{citation!.locator}</small></span><ChevronRight size={15} />
-        </a>
-      )) : <p>{result ? "No source chunks were cited." : "Sources appear after AI review."}</p>}
+        <article className="review-regulatory-citation" key={`${citation.sourceId}:${citation.locator}:${citation.contentHash}`}>
+          <header><strong>{citation.sourceId}</strong><small>{citation.locator} · source date {citation.sourceDate}</small></header>
+          <blockquote>{citation.exactText}</blockquote>
+          <code>sha256:{citation.contentHash}</code>
+        </article>
+      )) : <p>{result ? "No exact regulatory citations were bound to this result." : "Sources appear after AI review."}</p>}
       {result ? (
         <details>
           <summary>AI provenance</summary>
@@ -755,6 +949,8 @@ function SourcesPanel({
             <div><dt>Provider</dt><dd>{result.provider.label}</dd></div>
             <div><dt>Model policy</dt><dd>{result.modelPolicy}</dd></div>
             <div><dt>Corpus</dt><dd>{result.corpusId}</dd></div>
+            <div><dt>Workflow</dt><dd>{result.workflowVersion ?? "Unavailable"}</dd></div>
+            <div><dt>Memo revision</dt><dd>{result.memoRevision ?? memo.revision ?? 1}</dd></div>
             <div><dt>Result hash</dt><dd>{result.resultHash?.slice(0, 12) ?? "Unavailable"}…</dd></div>
           </dl>
         </details>

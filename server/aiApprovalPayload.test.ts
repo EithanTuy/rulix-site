@@ -1,15 +1,13 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { reviewFixtures } from "../src/test/reviewFixtures";
 import { sha256Canonical } from "./domain/hashes";
 import {
   DEFAULT_BEDROCK_MODEL,
-  buildCouncilProviderRequest,
   buildMemoBuilderProviderRequest,
   buildMemoChatProviderRequest,
-  councilApprovalPayload,
   memoBuilderApprovalPayload,
   memoChatApprovalPayload
 } from "./bedrockCouncil";
@@ -22,19 +20,6 @@ import {
 import type { AiProviderLane } from "./aiEgressGateway";
 
 describe("AI approval canonical payloads", () => {
-  it("builds a byte-stable council request for the same immutable memo revision", () => {
-    const memo = reviewFixtures[0];
-    const first = buildCouncilProviderRequest(memo, "standard", DEFAULT_BEDROCK_MODEL).body;
-
-    vi.setSystemTime(new Date("2040-01-02T03:04:05.000Z"));
-    const later = buildCouncilProviderRequest(memo, "standard", DEFAULT_BEDROCK_MODEL).body;
-    vi.useRealTimers();
-
-    expect(later).toEqual(first);
-    expect(sha256Canonical(later)).toBe(sha256Canonical(first));
-    expect(sha256Canonical(councilApprovalPayload(memo, "standard"))).toHaveLength(64);
-  });
-
   it("binds memo chat history, pending text, and provider body without clock input", () => {
     const memo = reviewFixtures[0];
     const history = [{

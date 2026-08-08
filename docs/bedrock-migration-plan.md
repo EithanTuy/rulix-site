@@ -1,6 +1,6 @@
-before anything tell me how to give you the access key to my iam user account safely so you can execute the plan
-
 # Migration Plan: Anthropic API → Amazon Bedrock
+
+> Historical document. This provider migration predates and is superseded by the durable multi-agent regulatory workflow in `docs/regulatory-analysis-architecture.md`. Do not use the old council, public-draft, or local-rule instructions as current architecture.
 
 **Repo:** `rulix-eccn` (B:\rulix)
 **Goal:** Move the backend AI council, memo chat, and public-draft features off the direct Anthropic API (`@anthropic-ai/sdk`, `ANTHROPIC_API_KEY`) and onto **Amazon Bedrock** (`@anthropic-ai/bedrock-sdk`, AWS credentials).
@@ -16,8 +16,8 @@ before anything tell me how to give you the access key to my iam user account sa
   - `draftMemoFromPublicWeb()` — drafts a memo using the **`web_search` server-side tool**.
   - `getAnthropicRuntime()` — reports `{ configured, model }` for the health endpoint and startup log.
 - Callers: `server/index.ts` (startup log), `server/app.ts` (health endpoint + 3 feature handlers), `server/test-live-ai.ts`, `server/test-live-council.ts`.
-- Historical note: this migration originally preserved reviewer-visible fallback to the deterministic local rules engine when live AI was absent. Current production behavior supersedes that instruction: reviewer-facing analysis requires live Bedrock and fails closed when live AI is unavailable; local rules remain an internal council baseline.
-- Provider source is a discriminated union: `AnalysisSource = "anthropic" | "local-rules" | "fallback"` in `src/types.ts`, also referenced in `src/App.tsx`, `src/components/PublicDraftPanel.tsx`, and `src/styles.css`.
+- Historical note: this plan preserved a deterministic local baseline. Current production behavior supersedes and removes that path; regulatory analysis requires the approved multi-agent Bedrock workflow and fails closed when it is unavailable.
+- Current regulatory results use `AnalysisSource = "agent-workflow"`. The former `local-rules`/`fallback` sources and `PublicDraftPanel` were removed.
 
 ### ⚠️ Critical constraint: Bedrock does NOT support server-side tools
 

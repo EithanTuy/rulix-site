@@ -3,7 +3,6 @@ import type { CSSProperties, MutableRefObject } from "react";
 import {
   Archive,
   Edit3,
-  FileEdit,
   FileText,
   Highlighter,
   Wand2,
@@ -14,9 +13,8 @@ import { createHighlightSegments } from "../lib/highlights";
 import { renderMarkdown } from "../lib/markdown";
 import type { EvidenceFinding, MemoRecord, ReviewResult } from "../types";
 import { MemoDiffPreview } from "./MemoDiffPreview";
-import { PublicDraftPanel } from "./PublicDraftPanel";
 
-type WorkspaceMode = "read" | "edit" | "compare" | "draft";
+type WorkspaceMode = "read" | "edit" | "compare";
 
 interface MemoWorkspaceProps {
   memo: MemoRecord;
@@ -25,7 +23,6 @@ interface MemoWorkspaceProps {
   analysisLocked: boolean;
   onMemoTextChange: (memoId: string, memoText: string) => Promise<void>;
   onArchiveMemo: (memoId: string) => Promise<void>;
-  onCreatePublicDraft: (title: string, memoText: string) => Promise<void>;
   onImproveWithAi: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }
@@ -37,7 +34,6 @@ export function MemoWorkspace({
   analysisLocked,
   onMemoTextChange,
   onArchiveMemo,
-  onCreatePublicDraft,
   onImproveWithAi,
   onDirtyChange
 }: MemoWorkspaceProps) {
@@ -69,7 +65,6 @@ export function MemoWorkspace({
 
   const switchMode = (nextMode: WorkspaceMode) => {
     if (nextMode === "edit" && analysisLocked) return;
-    if (nextMode === "draft" && draftDirty) return;
     setMode(nextMode);
   };
 
@@ -161,15 +156,6 @@ export function MemoWorkspace({
         <div className="toolbar-spacer" />
         <button
           type="button"
-          className={mode === "draft" ? "tool active" : "tool"}
-          disabled={draftDirty}
-          title={draftDirty ? "Save or discard memo edits before drafting a new memo." : "Draft Memo"}
-          onClick={() => switchMode(mode === "draft" ? "read" : "draft")}
-        >
-          <FileEdit size={17} /> Draft Memo
-        </button>
-        <button
-          type="button"
           className="tool"
           disabled={draftDirty}
           title={draftDirty ? "Save or discard memo edits before improving with AI." : "Improve with AI"}
@@ -195,10 +181,8 @@ export function MemoWorkspace({
 
       {mutationError && <p className="memo-chat-error">{mutationError}</p>}
 
-      <div className={mode === "draft" ? "document-frame draft-document-frame" : "document-frame"}>
-        {mode === "draft" ? (
-          <PublicDraftPanel onCreateMemo={onCreatePublicDraft} />
-        ) : mode === "edit" ? (
+      <div className="document-frame">
+        {mode === "edit" ? (
           <div className="editor-frame evidence-editor-frame">
             <section className="editor-pane" aria-label="Memo text editing pane">
               <div className="editor-pane-title">
@@ -255,7 +239,7 @@ export function MemoWorkspace({
         )}
       </div>
 
-      {mode !== "draft" && (draftDirty || mode === "edit" || mode === "compare") && (
+      {(draftDirty || mode === "edit" || mode === "compare") && (
         <div className="editor-actions sticky-editor-actions">
           <span>
             {draftDirty

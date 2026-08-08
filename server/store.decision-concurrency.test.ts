@@ -2,7 +2,7 @@
 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { describe, expect, it } from "vitest";
-import { analyzeMemo } from "../src/lib/eccnReview";
+import { makeReviewResult } from "../src/test/reviewResultFactory";
 import type { AuditEvent, MemoRecord, ReviewerDecision } from "../src/types";
 import { hashMemoContent } from "./domain/hashes";
 import { DynamoAccountStore, type DecisionBindingError } from "./store";
@@ -132,13 +132,13 @@ function reviewMemo(): MemoRecord {
 }
 
 function liveResult(memo: MemoRecord) {
-  const result = analyzeMemo(memo);
+  const result = makeReviewResult(memo);
   return {
     ...result,
     id: "analysis-decision-race",
     provider: {
       ...result.provider,
-      source: "bedrock" as const,
+      source: "agent-workflow" as const,
       label: "Amazon Bedrock",
       model: "test-live-model",
       live: true,

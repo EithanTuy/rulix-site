@@ -24,6 +24,7 @@ export type AiProviderLane =
 
 export interface AiProviderResponseBlock {
   type: string;
+  id?: string;
   name?: string;
   input?: unknown;
   text?: string;
@@ -55,7 +56,7 @@ export interface AiEgressContext {
   trustedWorkflowGrant?: AiTrustedWorkflowGrant;
 }
 
-export type AiTrustedWorkflow = "lead-search" | "outreach-personalization" | "outreach-writer";
+export type AiTrustedWorkflow = "lead-search" | "outreach-personalization" | "outreach-writer" | "agent-workflow";
 
 declare const AI_TRUSTED_WORKFLOW_GRANT: unique symbol;
 export interface AiTrustedWorkflowGrant {
@@ -1053,7 +1054,8 @@ function containsBase64Media(value: unknown, seen = new Set<object>()): boolean 
 function isTrustedWorkflow(value: unknown): value is AiTrustedWorkflow {
   return value === "lead-search" ||
     value === "outreach-personalization" ||
-    value === "outreach-writer";
+    value === "outreach-writer" ||
+    value === "agent-workflow";
 }
 
 function validContextIdentifier(value: unknown, maximum: number): value is string {

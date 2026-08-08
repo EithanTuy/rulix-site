@@ -49,11 +49,11 @@ decrypt, re-encrypt, data-key, and describe permissions for the log-group ARN.
 with account-root administration and scoped CloudWatch Logs usage for the
 application log group ARN.
 
-### 2. Initial Local-Rules Mode, Then Bedrock Enabled (RESOLVED)
+### 2. Initial Local-Rules Mode, Then Bedrock Enabled (SUPERSEDED)
 
-The first deployment used the deterministic council only. Production has since
-been redeployed with Bedrock enabled. Reviewer-facing analysis now requires
-live AI; deterministic local rules remain an internal baseline only.
+The first deployment used a deterministic council. The current architecture
+removed that semantic path entirely: production analysis requires the approved
+durable multi-agent Bedrock workflow and fails closed otherwise.
 
 To explicitly redeploy with Bedrock enabled:
 

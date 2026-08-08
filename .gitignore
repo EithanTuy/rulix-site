@@ -2,8 +2,10 @@ node_modules/
 dist/
 lambda-build/
 audit-lambda-build/
+analysis-worker-lambda-build/
 infra/terraform/function.zip
 infra/terraform/audit-function.zip
+infra/terraform/analysis-worker-function.zip
 infra/terraform/.terraform/
 infra/terraform/*.tfstate*
 infra/terraform/*.bin
@@ -17,11 +19,12 @@ test-results/
 .env
 .env.*
 !.env.example
-corpus/raw/
-corpus/manifest.generated.json
+corpus/raw/*
+!corpus/raw/*/
+!corpus/raw/*/**
 tmp/
 .tmp/
-data/
+/data/
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts

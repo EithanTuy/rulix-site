@@ -37,6 +37,8 @@ import type {
   AiApprovalRevocation,
   AiApprovalStatus,
   AiApprovalSubjectBinding,
+  AiWorkflowApprovalBinding,
+  AnalysisRun,
   AuditEvent,
   CaseComment,
   CasePriority,
@@ -61,7 +63,6 @@ import type {
   WorkspacePreferences
 } from "../src/types";
 import { outreachLeads as bundledOutreachLeads } from "../src/outreachLeads";
-import { analyzeMemo } from "../src/lib/eccnReview";
 import { deriveReviewStatus } from "../src/lib/reviewLifecycle";
 import {
   MEMO_CHAT_TEXT_MAX_BYTES,
@@ -119,6 +120,7 @@ import {
   assertAiApprovalRequestRecord,
   assertAiApprovalRevocation,
   assertAiApprovalSubject,
+  assertAiWorkflowApprovalBinding,
   assertSha256,
   createAiApprovalId,
   hashAiApprovalChatHistory,
@@ -437,6 +439,7 @@ export interface CreateAiApprovalCommand {
   providerRequestHashes: string[];
   dataClass: DataClass;
   policy: AiApprovalPolicyBinding;
+  workflow?: AiWorkflowApprovalBinding;
   /** Caller observation, accepted only after equality with authoritative state. */
   memoChatHistoryHash?: string;
   approvedBy: {
@@ -470,12 +473,13 @@ export interface CreateAiApprovalRequestCommand {
     id: string;
     role: UserProfile["role"];
   };
-  purpose: "council" | "memo-chat" | "memo-builder";
+  purpose: "council" | "agent-workflow" | "memo-chat" | "memo-builder";
   subject: AiApprovalSubjectBinding;
   payloadHash: string;
   providerRequestHashes: string[];
   dataClass: DataClass;
   policy: AiApprovalPolicyBinding;
+  workflow?: AiWorkflowApprovalBinding;
   context: AiApprovalRequestContext;
   /** Exact prospective content, encrypted separately and deleted on decision. */
   pendingContent?: { kind: "memo-chat"; text: string };
@@ -506,7 +510,7 @@ export interface DecideAiApprovalRequestCommand {
 export interface ReserveAiDispatchRequest {
   accountId: string;
   approvalId?: string;
-  trustedWorkflow?: "lead-search" | "outreach-personalization" | "outreach-writer";
+  trustedWorkflow?: "lead-search" | "outreach-personalization" | "outreach-writer" | "agent-workflow";
   trustedSubjectId?: string;
   dispatchId: string;
   purpose: AiApprovalPurpose;
@@ -565,7 +569,7 @@ interface AiDispatchReceipt {
   subject?: AiApprovalSubjectBinding;
   authorizationKind: "approval" | "trusted-workflow";
   approvalId?: string;
-  trustedWorkflow?: "lead-search" | "outreach-personalization" | "outreach-writer";
+  trustedWorkflow?: "lead-search" | "outreach-personalization" | "outreach-writer" | "agent-workflow";
   trustedSubjectId?: string;
   payloadHash: string;
   providerRequestHash: string;
@@ -824,6 +828,9 @@ export interface AccountStore {
   upsertReview(userId: string, memo: MemoRecord): Promise<void>;
   updateReview(userId: string, memo: MemoRecord): Promise<void>;
   findReview(userId: string, memoId: string): Promise<MemoRecord | undefined>;
+  getAnalysisRun(userId: string, runId: string): Promise<AnalysisRun | undefined>;
+  listAnalysisRuns(userId: string, memoId: string): Promise<AnalysisRun[]>;
+  upsertAnalysisRun(userId: string, run: AnalysisRun, expectedUpdatedAt?: string): Promise<void>;
   setAnalysisResult(
     userId: string,
     memo: MemoRecord,
@@ -918,6 +925,7 @@ export class LocalAccountStore implements AccountStore {
   private accessRequests: AccessRequestRecord[] = [];
   private workspacePreferences = new Map<string, WorkspacePreferenceRecord>();
   private memoBuilderSessions = new Map<string, Map<string, StoredMemoBuilderSession>>();
+  private analysisRuns = new Map<string, Map<string, AnalysisRun>>();
 
   constructor(options: CreateStoreOptions = {}) {
     this.filePath = options.filePath ?? defaultStorePath();
@@ -1543,6 +1551,29 @@ export class LocalAccountStore implements AccountStore {
     return (await this.getAccountState(userId)).memos.find((memo) => memo.id === memoId);
   }
 
+  async getAnalysisRun(userId: string, runId: string) {
+    const run = this.analysisRuns.get(userId)?.get(runId);
+    return run ? structuredClone(run) : undefined;
+  }
+
+  async listAnalysisRuns(userId: string, memoId: string) {
+    return [...(this.analysisRuns.get(userId)?.values() ?? [])]
+      .filter((run) => run.memoId === memoId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((run) => structuredClone(run));
+  }
+
+  async upsertAnalysisRun(userId: string, run: AnalysisRun, expectedUpdatedAt?: string) {
+    const validated = validateAnalysisRun(run);
+    const accountRuns = this.analysisRuns.get(userId) ?? new Map<string, AnalysisRun>();
+    const current = accountRuns.get(validated.id);
+    if (expectedUpdatedAt !== undefined && current?.updatedAt !== expectedUpdatedAt) {
+      throw new StoreError(409, "Analysis run changed in another worker.", "stale_analysis_run");
+    }
+    accountRuns.set(validated.id, structuredClone(validated));
+    this.analysisRuns.set(userId, accountRuns);
+  }
+
   async setAnalysisResult(
     userId: string,
     memo: MemoRecord,
@@ -1877,6 +1908,7 @@ export class LocalAccountStore implements AccountStore {
       providerRequestHashes: request.providerRequestHashes,
       dataClass: request.dataClass,
       policy: request.policy,
+      ...(request.workflow ? { workflow: request.workflow } : {}),
       ...(request.context.kind === "memo-chat"
         ? { memoChatHistoryHash: request.context.historyHash }
         : {}),
@@ -3627,6 +3659,46 @@ export class DynamoAccountStore implements AccountStore {
     return (await this.getReviewDetail(userId, memoId))?.review;
   }
 
+  async getAnalysisRun(userId: string, runId: string) {
+    const value = await this.getAuthRecord<AnalysisRun>(analysisRunKey(userId, runId), true);
+    return value ? validateAnalysisRun(value) : undefined;
+  }
+
+  async listAnalysisRuns(userId: string, memoId: string) {
+    const items = await this.queryAuthByPrefix(analysisRunPrefix(userId));
+    return items.flatMap((item) => {
+      try {
+        const run = validateAnalysisRun(item.record);
+        return run.memoId === memoId ? [run] : [];
+      } catch {
+        return [];
+      }
+    }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  async upsertAnalysisRun(userId: string, run: AnalysisRun, expectedUpdatedAt?: string) {
+    const validated = validateAnalysisRun(run);
+    const key = analysisRunKey(userId, validated.id);
+    const names: Record<string, string> = expectedUpdatedAt === undefined
+      ? { "#pk": "pk" }
+      : { "#record": "record", "#updatedAt": "updatedAt" };
+    const values = expectedUpdatedAt === undefined ? undefined : { ":expectedUpdatedAt": expectedUpdatedAt };
+    try {
+      await this.doc.send(new PutCommand({
+        TableName: this.authTable,
+        Item: this.authItem(key, validated),
+        ConditionExpression: expectedUpdatedAt === undefined
+          ? "attribute_not_exists(#pk)"
+          : "#record.#updatedAt = :expectedUpdatedAt",
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values
+      }));
+    } catch (error) {
+      if (isAuthStateConflict(error)) throw new StoreError(409, "Analysis run changed in another worker.", "stale_analysis_run");
+      throw error;
+    }
+  }
+
   async setAnalysisResult(
     userId: string,
     memo: MemoRecord,
@@ -4326,6 +4398,7 @@ export class DynamoAccountStore implements AccountStore {
       providerRequestHashes: request.providerRequestHashes,
       dataClass: request.dataClass,
       policy: request.policy,
+      ...(request.workflow ? { workflow: request.workflow } : {}),
       ...(request.context.kind === "memo-chat"
         ? { memoChatHistoryHash: request.context.historyHash }
         : {}),
@@ -7472,7 +7545,7 @@ function ensureAnalysisIntegrity(result: ReviewResult, memo: MemoRecord, userId:
     memoRevision: memo.revision ?? 1,
     inputHash: memo.contentHash ?? hashMemoContent(memo),
     createdBy: result.createdBy ?? userId,
-    promptVersion: result.promptVersion ?? "rulix-council-v2"
+    promptVersion: result.promptVersion ?? "rulix.agent-workflow/1"
   };
   bound.resultHash = hashReviewResult(bound);
   return bound;
@@ -7920,10 +7993,9 @@ function applyDecisionTransition(
     corpusId: result?.corpusId,
     corpusChecksum: result?.corpusChecksum
   };
-  const statusResult = result ?? analyzeMemo(memo);
   const updatedMemo = ensureMemoIntegrity({
     ...memo,
-    status: deriveReviewStatus(statusResult, decision),
+    status: result ? deriveReviewStatus(result, decision) : "needs-info",
     lifecycleStage: decision.action === "accept"
       ? "approved"
       : decision.action === "request-info"
@@ -8260,13 +8332,15 @@ function prepareAiApprovalRequest(
     );
   }
   const requestId = boundedAiIdentifier(command.requestId, "AI approval request idempotency key", 160);
-  if (command.purpose !== "council" && command.purpose !== "memo-chat" && command.purpose !== "memo-builder") {
+  if (command.purpose !== "council" && command.purpose !== "agent-workflow" && command.purpose !== "memo-chat" && command.purpose !== "memo-builder") {
     throw new StoreError(400, "AI approval request purpose is invalid.", "ai_approval_binding_invalid");
   }
   const subject = approvalValue(() => assertAiApprovalSubject(command.subject));
   const context = approvalValue(() => assertAiApprovalRequestContext(command.context));
   const validPurpose = command.purpose === "council"
     ? subject.kind === "review" && context.kind === "council"
+    : command.purpose === "agent-workflow"
+    ? subject.kind === "review" && context.kind === "agent-workflow"
     : command.purpose === "memo-chat"
       ? subject.kind === "review" && context.kind === "memo-chat"
       : subject.kind === "memo-builder" && context.kind === "memo-builder";
@@ -8287,6 +8361,12 @@ function prepareAiApprovalRequest(
     throw new StoreError(400, "AI approval request data class is invalid.", "ai_approval_binding_invalid");
   }
   const policy = approvalValue(() => assertAiApprovalPolicy(command.policy));
+  const workflow = command.workflow === undefined
+    ? undefined
+    : approvalValue(() => assertAiWorkflowApprovalBinding(command.workflow));
+  if ((command.purpose === "agent-workflow") !== Boolean(workflow)) {
+    throw new StoreError(400, "Agent workflow approval request requires an exact workflow binding.", "ai_approval_binding_invalid");
+  }
   if (policy.mode !== "approved") {
     throw new StoreError(403, "Current deployment policy does not approve this AI workload.", "ai_policy_not_approved");
   }
@@ -8314,6 +8394,7 @@ function prepareAiApprovalRequest(
     providerRequestHashes,
     dataClass: command.dataClass,
     policy,
+    workflow: workflow ?? null,
     context
   });
   const commandHash = hashAiApprovalPayload({
@@ -8337,6 +8418,7 @@ function prepareAiApprovalRequest(
     providerRequestHashes,
     dataClass: command.dataClass,
     policy,
+    ...(workflow ? { workflow } : {}),
     context,
     createdAt,
     expiresAt,
@@ -8737,7 +8819,7 @@ function storedAiApprovalRequestIndex(value: unknown): AiApprovalRequestIndexRec
   if (!isRecord(value) || value.schemaVersion !== "rulix.ai-approval-request-index/v1" ||
       !isRecord(value.requestedBy) || !isUserRoleValue(value.requestedBy.role) ||
       !isRecord(value.subject) ||
-      (value.purpose !== "council" && value.purpose !== "memo-chat" && value.purpose !== "memo-builder") ||
+      (value.purpose !== "council" && value.purpose !== "agent-workflow" && value.purpose !== "memo-chat" && value.purpose !== "memo-builder") ||
       !isDataClass(value.dataClass) ||
       (value.status !== "pending" && value.status !== "approved" && value.status !== "rejected" &&
        value.status !== "cancelled" && value.status !== "expired")) {
@@ -8838,6 +8920,12 @@ function prepareAiApproval(
   const normalizedChatFence = memoChatFence
     ? approvalValue(() => assertAiApprovalMemoChatFence(memoChatFence))
     : undefined;
+  const workflow = command.workflow === undefined
+    ? undefined
+    : approvalValue(() => assertAiWorkflowApprovalBinding(command.workflow));
+  if ((command.purpose === "agent-workflow") !== Boolean(workflow)) {
+    throw new StoreError(400, "Agent workflow approval requires an exact workflow binding.", "ai_approval_binding_invalid");
+  }
   if ((command.purpose === "memo-chat") !== Boolean(normalizedChatFence)) {
     throw new StoreError(
       409,
@@ -8903,6 +8991,7 @@ function prepareAiApproval(
     providerRequestHashes,
     dataClass: command.dataClass,
     policy,
+    workflow: workflow ?? null,
     memoChatFence: normalizedChatFence ?? null,
     approvedBy: { id: command.approvedBy.id, role: "export-control-officer" },
     requestedExpiresAt: command.expiresAt ?? null,
@@ -8921,6 +9010,7 @@ function prepareAiApproval(
     providerRequestHashes,
     dataClass: command.dataClass,
     policy,
+    ...(workflow ? { workflow } : {}),
     ...(normalizedChatFence ? { memoChatFence: normalizedChatFence } : {}),
     approvedBy: {
       id: boundedAiIdentifier(command.approvedBy.id, "AI approval officer ID", 512),
@@ -9006,7 +9096,7 @@ function prepareAiDispatchReservation(
     | { authorizationKind: "approval"; approvalId: string; subject: AiApprovalSubjectBinding }
     | {
         authorizationKind: "trusted-workflow";
-        trustedWorkflow: "lead-search" | "outreach-personalization" | "outreach-writer";
+        trustedWorkflow: "lead-search" | "outreach-personalization" | "outreach-writer" | "agent-workflow";
         trustedSubjectId: string;
       };
   if (hasApproval) {
@@ -9016,7 +9106,7 @@ function prepareAiDispatchReservation(
     authorization = { authorizationKind: "approval", approvalId, subject };
   } else {
     const workflow = request.trustedWorkflow;
-    if (workflow !== "lead-search" && workflow !== "outreach-personalization" && workflow !== "outreach-writer" ||
+    if (workflow !== "lead-search" && workflow !== "outreach-personalization" && workflow !== "outreach-writer" && workflow !== "agent-workflow" ||
         workflow !== request.purpose) {
       throw new StoreError(403, "Trusted AI workflow binding is invalid.", "ai_trusted_workflow_invalid");
     }
@@ -9183,7 +9273,7 @@ function assertHumanAiApprovalPurpose(
   subjectKind: AiApprovalSubjectBinding["kind"]
 ) {
   const allowed = subjectKind === "review"
-    ? purpose === "council" || purpose === "memo-chat"
+    ? purpose === "council" || purpose === "memo-chat" || purpose === "agent-workflow"
     : subjectKind === "document"
       ? purpose === "document-extraction"
       : purpose === "memo-builder";
@@ -9294,7 +9384,7 @@ function storedAiDispatchReceipt(value: unknown): AiDispatchReceipt {
       | { authorizationKind: "approval"; approvalId: string; subject: AiApprovalSubjectBinding }
       | {
           authorizationKind: "trusted-workflow";
-          trustedWorkflow: "lead-search" | "outreach-personalization" | "outreach-writer";
+          trustedWorkflow: "lead-search" | "outreach-personalization" | "outreach-writer" | "agent-workflow";
           trustedSubjectId: string;
         };
     if (value.authorizationKind === "approval") {
@@ -9309,7 +9399,8 @@ function storedAiDispatchReceipt(value: unknown): AiDispatchReceipt {
       if (value.approvalId !== undefined || value.subject !== undefined ||
           (value.trustedWorkflow !== "lead-search" &&
            value.trustedWorkflow !== "outreach-personalization" &&
-           value.trustedWorkflow !== "outreach-writer") || value.trustedWorkflow !== purpose) {
+           value.trustedWorkflow !== "outreach-writer" &&
+           value.trustedWorkflow !== "agent-workflow") || value.trustedWorkflow !== purpose) {
         throw new Error("Trusted AI dispatch authorization is invalid.");
       }
       authorization = {
@@ -9527,6 +9618,29 @@ function aiSubjectDigest(subject: Pick<AiApprovalSubjectBinding, "kind" | "id">)
 
 function aiApprovalKey(accountId: string, approvalId: string) {
   return `AI_APPROVAL#${aiAccountDigest(accountId)}#${approvalId}`;
+}
+
+function analysisRunPrefix(accountId: string) {
+  return `ANALYSIS_RUN#${aiAccountDigest(accountId)}#`;
+}
+
+function analysisRunKey(accountId: string, runId: string) {
+  return `${analysisRunPrefix(accountId)}${boundedAiIdentifier(runId, "Analysis run ID", 160)}`;
+}
+
+function validateAnalysisRun(value: unknown): AnalysisRun {
+  if (!isRecord(value) || value.schemaVersion !== "rulix.agent-workflow-run/v1" ||
+      typeof value.id !== "string" || !value.id.startsWith("analysis-run-") ||
+      typeof value.memoId !== "string" || !value.memoId ||
+      typeof value.requestId !== "string" || !value.requestId ||
+      typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt)) ||
+      typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt)) ||
+      !Array.isArray(value.stages) || !Array.isArray(value.invocations) ||
+      !isRecord(value.bindings) || !isRecord(value.callBudget) || !isRecord(value.tokenBudget) ||
+      !isRecord(value.artifactHashes)) {
+    throw new StoreError(503, "Persisted analysis run is invalid.", "analysis_run_state_invalid");
+  }
+  return structuredClone(value) as unknown as AnalysisRun;
 }
 
 function aiApprovalCounterKey(accountId: string, approvalId: string) {
