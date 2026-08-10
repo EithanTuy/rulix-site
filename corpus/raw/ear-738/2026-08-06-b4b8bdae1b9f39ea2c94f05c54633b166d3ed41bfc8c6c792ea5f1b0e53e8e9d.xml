@@ -1,0 +1,4035 @@
+<?xml version="1.0"?>
+<DIV5 N="738" TYPE="PART" VOLUME="2" hierarchy_metadata="{&amp;quot;path&amp;quot;:&amp;quot;/on/_SUBSTITUTE_DATE_/title-15/part-738&amp;quot;,&amp;quot;citation&amp;quot;:&amp;quot;15 CFR Part 738&amp;quot;}">
+<HEAD>PART 738&#x2014;COMMERCE CONTROL LIST OVERVIEW AND THE COUNTRY CHART
+</HEAD>
+<AUTH>
+<HED>Authority:</HED><PSPACE>50 U.S.C. 4801-4852; 50 U.S.C. 4601 <I>et seq.;</I> 50 U.S.C. 1701 <I>et seq.;</I> 10 U.S.C. 8720; 10 U.S.C. 8730(e); 22 U.S.C. 287c; 22 U.S.C. 2151 note; 22 U.S.C. 3201 <I>et seq.;</I> 22 U.S.C. 6004; 42 U.S.C. 2139a; 15 U.S.C. 1824; 50 U.S.C. 4305; 22 U.S.C. 7201 <I>et seq.;</I> 22 U.S.C. 7210; E.O. 13026, 61 FR 58767, 3 CFR, 1996 Comp., p. 228.
+</PSPACE></AUTH>
+<DIV8 N="738.1" TYPE="SECTION" hierarchy_metadata="{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-15/section-738.1&quot;,&quot;citation&quot;:&quot;15 CFR 738.1&quot;}">
+<HEAD>&#xA7; 738.1 Introduction.</HEAD>
+<P>(a) <I>Commerce Control List scope.</I> (1) In this part, references to the EAR are references to 15 CFR chapter VII, subchapter C. The Bureau of Industry and Security (BIS) maintains the Commerce Control List (CCL) within the Export Administration Regulations (EAR), which includes items (i.e., commodities, software, and technology) subject to the export licensing authority of BIS. The CCL does not include those items exclusively controlled for export or reexport by another department or agency of the U.S. Government. In instances where agencies other than the Department of Commerce administer controls over related items, entries in the CCL contain a reference to these controls.</P>
+<P>(2) The CCL is contained in supplement no. 1 to part 774 of the EAR. Supplement no. 2 to part 774 of the EAR contains the General Technology and Software Notes relevant to entries contained in the CCL.</P>
+<P>(3) <I>Items that warrant control for export or reexport but currently are not permanently classified on the CCL.</I> Items subject to temporary CCL controls are classified under the ECCN 0Y521 series (i.e., 0A521, 0B521, 0C521, 0D521, and 0E521) pursuant to &#xA7; 742.6(a)(8) of the EAR while a determination is made as to whether classification under a revised or new ECCN, or an EAR99 designation, is appropriate.</P>
+<P>(b) <I>Commerce Country Chart scope.</I> BIS also maintains the Commerce Country Chart. The Commerce Country Chart, located in supplement no. 1 to part 738, contains licensing requirements based on destination and Reason for Control. In combination with the CCL, the Commerce Country Chart allows you to determine whether a license is required for items on the CCL to any country in the world.</P>
+<CITA TYPE="N">[61 FR 12756, Mar. 25, 1996, as amended at 77 FR 22198, Apr. 13, 2012; 85 FR 23462, Apr. 28, 2020]
+</CITA>
+</DIV8>
+
+<DIV8 N="738.2" TYPE="SECTION" hierarchy_metadata="{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-15/section-738.2&quot;,&quot;citation&quot;:&quot;15 CFR 738.2&quot;}">
+<HEAD>&#xA7; 738.2 Commerce Control List (CCL) structure.</HEAD>
+<P>(a) <I>Categories.</I> The CCL is divided into 10 categories, numbered as follows:</P>
+<EXTRACT>
+<FP-1>0&#x2014;Nuclear Materials, Facilities and Equipment and Miscellaneous
+</FP-1>
+<FP-1>1&#x2014;Materials, Chemicals, &#x201C;Microorganisms,&#x201D; and Toxins
+</FP-1>
+<FP-1>2&#x2014;Materials Processing
+</FP-1>
+<FP-1>3&#x2014;Electronics
+</FP-1>
+<FP-1>4&#x2014;Computers
+</FP-1>
+<FP-1>5&#x2014;Telecommunications and Information Security
+</FP-1>
+<FP-1>6&#x2014;Lasers and Sensors
+</FP-1>
+<FP-1>7&#x2014;Navigation and Avionics
+</FP-1>
+<FP-1>8&#x2014;Marine
+</FP-1>
+<FP-1>9&#x2014;Aerospace and Propulsion </FP-1></EXTRACT>
+<P>(b) <I>Groups.</I> Within each category, items are arranged by group. Each category contains the same five groups. Each Group is identified by the letters A through E, as follows:</P>
+<EXTRACT>
+<FP-1>A&#x2014;Equipment, Assemblies and Components
+</FP-1>
+<FP-1>B&#x2014;Test, Inspection and Production Equipment
+</FP-1>
+<FP-1>C&#x2014;Materials
+</FP-1>
+<FP-1>D&#x2014;Software
+</FP-1>
+<FP-1>E&#x2014;Technology</FP-1></EXTRACT>
+<P>(c) <I>Order of review.</I> The CCL includes a supplement no. 4 to part 774&#x2014;Commerce Control List Order of Review. This supplement establishes the steps (i.e., the order of review) that should be followed in classifying items that are &#x201C;subject to the EAR.&#x201D;</P>
+<P>(d) <I>Entries</I>&#x2014;(1) <I>Composition of an entry.</I> Within each group, individual items are identified by an Export Control Classification Number (ECCN). Each number consists of a set of digits and a letter. The first digit identifies the general category within which the entry falls (<I>e.g.,</I> 3A001). The letter immediately following this first digit identifies under which of the five groups the item is listed (<I>e.g.,</I> 3A001). The second and third digits differentiate individual entries by identifying the type of controls associated with the items contained in the entry (<I>e.g.,</I> 3A001). Table 1 lists the Reasons for Control associated with this second and third digits.</P>
+<DIV width="100%"><DIV class="gpotbl_div">
+<TABLE border="1" cellpadding="1" cellspacing="1" class="gpo_table" frame="void" width="100%">
+<CAPTION><P class="title">Table 1 to Paragraph (<E T="01">d</E>)(1) Introductory Text</P></CAPTION>
+<THEAD>
+<TR>
+<TH class="center border-top-single border-bottom-single border-right-single">Last 3 digits of an ECCN</TH>
+<TH class="center border-top-single border-bottom-single">Reason for control
+</TH>
+</TR>
+</THEAD>
+<TBODY>
+<TR>
+<TD class="left border-right-single">000-099</TD>
+<TD class="left">National Security (NS).
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">100-199</TD>
+<TD class="left">Missile Technology (MT).
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">200-299</TD>
+<TD class="left">Nuclear Nonproliferation (NP).
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">300-399</TD>
+<TD class="left">Chemical and Biological (CB).
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">500-599</TD>
+<TD class="left">Firearms, &#x201C;Spacecraft,&#x201D; and related commodities controlled for NS and other reasons.
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">600-699</TD>
+<TD class="left">Wassenaar Arrangement Munitions List (WAML) or former U.S. Munitions List (USML) controlled for NS and other reasons.
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">900-979</TD>
+<TD class="left">Plurilateral NS and Regional Stability (RS) and other reasons.
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">980-989</TD>
+<TD class="left">Crime Control (CC), Short Supply (SS).
+</TD>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">990-999</TD>
+<TD class="left border-bottom-single">Anti-terrorism (AT), RS, United Nations Sanctions (UN).</TD>
+</TR>
+</TBODY>
+</TABLE>
+</DIV></DIV>
+<P>(i) Reasons for Control are not mutually exclusive and numbers are assigned in order of precedence. As an example, if an item is controlled for both National Security and Missile Technology reasons, the entry's third alphanumeric character will be a &#x201C;0&#x201D;. If the item is controlled only for Missile Technology the third alphanumeric character will be &#x201C;1&#x201D;.</P>
+<P>(ii) The numbers in either the second or third digit (<I>e.g.,</I> 3A001) serve to differentiate between multilateral, plurilateral, and unilateral entries. For example, an entry with the number &#x201C;99&#x201D; as the second and third digit, identifies the entire entry as controlled for a unilateral concern (<I>e.g.,</I> 2B991 for anti-terrorism reasons). If the second digit is a &#x201C;2&#x201D; and the third digit is a &#x201C;9&#x201D;, the item is controlled for unilateral purposes based on a nuclear proliferation concern (<I>e.g.,</I> 2A290 is controlled for unilateral purposes based on nuclear nonproliferation concerns).</P>
+<P>(iii) The last digit within each entry (<I>e.g.,</I> 3A001) is used for the sequential numbering of ECCNs to differentiate between entries on the CCL.</P>
+<P>(iv) Last two characters in a &#x201C;600 series&#x201D; ECCN. The last two characters of each &#x201C;600 series&#x201D; ECCN generally track the Wassenaar Arrangement Munitions List (WAML) categories for the types of items at issue. The WAML ML21 (&#x201C;software&#x201D;) and ML22 (&#x201C;technology&#x201D;) are, however, included in D (&#x201C;software&#x201D;) and E (&#x201C;technology&#x201D;) CCL product groups to remain consistent with the structure of the CCL.</P>
+<P>(2) <I>Reading an ECCN.</I> An ECCN is made up of four sections, the &#x201C;Heading,&#x201D; &#x201C;License Requirements,&#x201D; &#x201C;License Exceptions,&#x201D; and &#x201C;List of Items Controlled&#x201D; sections. A brief description of each section and its use follows:</P>
+<P>(i) <I>Heading.</I> A description of the items controlled is provided next to each ECCN. In certain ECCNs, the description is a summary and will direct you to &#x201C;see List of Items Controlled&#x201D; for a complete list of items classified under those respective ECCNs. The &#x201C;Items&#x201D; paragraph in the List of Items Controlled section will describe all of the items that the ECCN controls for the portions of the heading that precede the &#x201C;see List of Items Controlled&#x201D; phrase. Portions of the heading that follow the phrase are complete descriptions of the items controlled by that portion of the heading. If &#x201C;see List of Items Controlled&#x201D; appears at the end of the heading, the &#x201C;Items&#x201D; paragraph in the List of Items Controlled section is the exclusive, complete list of the items the ECCN controls.</P>
+<P>(ii) <I>License Requirements.</I> This section contains a separate line identifying all possible Reasons for Control in order of precedence, and two columns entitled &#x201C;Control(s)&#x201D; and &#x201C;Country Chart&#x201D;.</P>
+<P>(A) The &#x201C;Controls&#x201D; header identifies all applicable Reasons for Control, in order of restrictiveness, and to what extent each applies (e.g., to the entire entry or only to certain subparagraphs). Those requiring licenses for a larger number of countries and/or items are listed first. As you read down the list the number of countries and/or items requiring a license declines. Since Reasons for Control are not mutually exclusive, items controlled within a particular ECCN may be controlled for more than one reason. The following is a list of all possible Reasons for Control:</P>
+<EXTRACT>
+<FP-1>AT Anti-Terrorism
+</FP-1>
+<FP-1>CB Chemical &amp; Biological Weapons
+</FP-1>
+<FP-1>CC Crime Control
+</FP-1>
+<FP-1>CW Chemical Weapons Convention
+</FP-1>
+<FP-1>EI Encryption Items
+</FP-1>
+<FP-1>FC Firearms Convention
+</FP-1>
+<FP-1>MT Missile Technology
+</FP-1>
+<FP-1>NS National Security
+</FP-1>
+<FP-1>NP Nuclear Nonproliferation
+</FP-1>
+<FP-1>RS Regional Stability
+</FP-1>
+<FP-1>SS Short Supply
+</FP-1>
+<FP-1>UN United Nations Embargo
+</FP-1>
+<FP-1>SI Significant Items
+</FP-1>
+<FP-1>SL Surreptitious Listening</FP-1></EXTRACT>
+<P>(B) The &#x201C;Country Chart&#x201D; header identifies, for each applicable Reason for Control, a column name and number (e.g., CB Column 1). These column identifiers are used to direct you from the CCL to the appropriate column identifying the countries requiring a license. Consult part 742 of the EAR for an indepth discussion of the licensing requirements and policies applicable to each Country Chart column.</P>
+<P>(iii) <I>License Exceptions.</I> This section provides a brief eligibility statement for each ECCN-driven License Exception that may be applicable to your transaction, and should be consulted only AFTER you have determined a license is required based on an analysis of the entry and the Country Chart. The brief eligibility statement in this section is provided to assist you in deciding which ECCN-driven License Exception related to your particular item and destination you should explore prior to submitting an application. The term &#x201C;Yes&#x201D; (followed in some instances by the scope of Yes) appears next to each available ECCN-driven License Exception. Some ECCNs have License Exception STA exclusion paragraphs. These paragraphs identify items for which the License Exception STA provisions in &#xA7; 740.20(c)(2) of the EAR may not be used, but do not otherwise affect License Exception STA availability. The term &#x201C;N/A&#x201D; will be noted for License Exceptions that are not available within a particular entry. In some &#x201C;600 series&#x201D; ECCNs, the STA license exception paragraph or a note to the License Exceptions section contains additional information on the availability of License Exception STA for that ECCN. If one or more License Exceptions appear to apply to your transaction, you must consult part 740 of the EAR to review the conditions and restrictions applicable to each available License Exception. The list of License Exceptions contained within each ECCN is not an all-exclusive list. Other License Exceptions, not based on particular ECCNs, may be available. Consult part 740 of the EAR to determine eligibility for non-ECCN-driven License Exceptions.</P>
+<P>(iv) <I>List of Items Controlled</I>&#x2014;(A) <I>Related definitions.</I> This header identifies, where appropriate, definitions or parameters that apply to all items controlled by the entry. The information provided in this section is unique to the entry, and hence not listed in the definitions contained in part 772 of the EAR.</P>
+<P>(B) <I>Related controls.</I> If another U.S. government agency or department has export licensing authority over items related to those controlled by an entry, a statement is included identifying the agency or department along with the applicable regulatory cite. An additional cross-reference may be included in instances where the scope of controls differs between a CCL entry and its corresponding entry on list maintained by the European Union. This information is provided to assist readers who use both lists.</P>
+<P>(C) <I>Items.</I> This paragraph describes the relationship between the &#x201C;items&#x201D; paragraph and ECCN headings and will assist your understanding as you classify items on the CCL. When the heading contains the phrase &#x201C;see List of Items Controlled,&#x201D; the portion of the heading preceding that phrase is only a summary of the items controlled by the ECCN and the &#x201C;items&#x201D; paragraph contains an exclusive list of items described in the heading. Paragraphs (d)(2)(iv)(C)(<I>1</I>), (<I>2</I>) and (<I>3</I>) of this section provide examples of the three different uses of the phrase &#x201C;(see List of Items Controlled)&#x201D; in ECCN headings. Each heading on the CCL uses one of these three structures. Understanding the relationship between the heading and the &#x201C;items&#x201D; paragraph is important when classifying items that are &#x201C;subject to the EAR&#x201D; on the CCL.</P>
+<P>(<I>1</I>) &#x201C;(See List of Items Controlled)&#x201D; is at the end of the ECCN heading. An example of an ECCN where all of the heading text precedes the phrase &#x201C;(see List of Items Controlled)&#x201D; is ECCN 8A002 Marine systems, equipment, &#x201C;parts&#x201D; and &#x201C;components,&#x201D; as follows (see List of Items Controlled). ECCNs 1A001, 3A001, 6A001, 7A004 and 9A012 are other examples where all of the heading text precedes the phrase &#x201C;(see List of Items Controlled).&#x201D; In these types of headings, the items paragraphs must be reviewed to determine whether your item is contained within the heading and classified under that ECCN.</P>
+<P>(<I>2</I>) &#x201C;(See List of Items Controlled)&#x201D; is in the middle of the ECCN heading. If the phrase &#x201C;(see List of Items Controlled)&#x201D; appears in the middle of the ECCN heading, then all portions of the heading that follow the phrase &#x201C;(see List of Items Controlled)&#x201D; will list items controlled in addition to the list in the &#x201C;items&#x201D; paragraph. An example of such a heading is ECCN 2B992 Non-&#x201C;numerically controlled&#x201D; machine tools for generating optical quality surfaces, (see List of Items Controlled) and &#x201C;specially designed&#x201D; &#x201C;parts&#x201D; and &#x201C;components&#x201D; therefor. Under the ECCN 2B992 example, the &#x201C;items&#x201D; paragraph must be reviewed to determine whether your item is contained within the first part of the heading (&#x201C;non-'numerically controlled' machine tools for generating optical quality surfaces&#x201D;) and classified under 2B992. The second part of the ECCN 2B992 heading (&#x201C;and 'specially designed' 'parts' and 'components' therefor&#x201D;) contains the exclusive list described in the heading. ECCNs 1A006, 3B992, 4A001, 6A006 and 7A001 are other examples where the phrase &#x201C;(see List of Items Controlled)&#x201D; appears in the middle of the ECCN heading.</P>
+<P>(<I>3</I>) ECCNs that do not use the phrase &#x201C;(see List of Items controlled).&#x201D; When all items classified in the ECCN are listed in the heading, a sentence is generally included in the &#x201C;items&#x201D; paragraph to direct you to the heading. An example of such a heading is ECCN 4E980 &#x201C;Technology&#x201D; for the &#x201C;development,&#x201D; &#x201C;production&#x201D; or &#x201C;use&#x201D; of commodities controlled by 4A980. ECCNs 0A982, 5D101, 8D001 and 9A002 are other examples where the heading is the exclusive description of the items classified under those respective ECCNs.</P>
+<CITA TYPE="N">[61 FR 112756, Mar. 25, 1996, as amended at 61 FR 68579, Dec. 30, 1996; 62 FR 25456, May 9, 1997; 64 FR 17970, Apr. 13, 1999; 27141, May 18, 1999; 70 FR 54628, Sept. 16, 2005; 71 FR 20883, Apr. 24, 2006; 71 FR 67035, Nov. 20, 2006; 72 FR 43531, Aug. 6, 2007; 76 FR 35286, June 16, 2011; 78 FR 22708, Apr. 16, 2013; 78 FR 61900, Oct. 4, 2013; 79 FR 77866, Dec. 29, 2014; 81 FR 85144, Nov. 25, 2016; 82 FR 61156, Dec. 27, 2017; 89 FR 72936, Sept. 6, 2024]
+</CITA>
+</DIV8>
+
+<DIV8 N="738.3" TYPE="SECTION" hierarchy_metadata="{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-15/section-738.3&quot;,&quot;citation&quot;:&quot;15 CFR 738.3&quot;}">
+<HEAD>&#xA7; 738.3 Commerce Country Chart structure.</HEAD>
+<P>(a) <I>Scope.</I> The Commerce Country Chart allows you to determine the Commerce Control List (CCL) export and reexport license requirements for most items listed on the CCL. Such license requirements are based on the Reasons for Control listed in the Export Control Classification Number (ECCN) that applies to the item. Some ECCNs, however, impose license requirements either without reference to a reason for control code that is listed on the Commerce Country Chart, or in addition to such a reference. Those ECCNs may state their license requirements in full in their &#x201C;Reasons for Control&#x201D; sections or they may refer the reader to another provision of the EAR for license requirement information. In addition, some ECCNs do not impose license requirements, but refer the reader to the regulations of another government agency that may impose license requirements on the items described in that ECCN.</P>
+<P>(1) ECCNs 0A983, 5A001.f.1, 5A980, 5D001 (for 5A001.f.1, or for 5E001.a (for 5A001.f.1 or for 5D001.a (for 5A001.f.1))), 5D980, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) and 5E980. A license is required for all destinations for items controlled under these entries. For items controlled by 0A983, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) and 5E980, no license exceptions apply. For items controlled by 5A001.f.1, 5A980, 5D001 (for 5A001.f.1 or for 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1))) and 5D980, License Exception GOV may apply if your item is consigned to and for the official use of an agency of the U.S. Government (see &#xA7; 740.2(a)(3)). If your item is controlled by 0A983, 5A001.f.1, 5A980, 5D001 (for 5A001.f.1 or for 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1))), 5D980, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) or 5E980 you should proceed directly to part 748 of the EAR for license application instructions and &#xA7; 742.11 or &#xA7; 742.13 of the EAR for information on the licensing policy relevant to these types of applications.</P>
+<P>(2) [Reserved]</P>
+<P>(b) <I>Countries.</I> The first column of the Country Chart lists countries in alphabetical order. There are a number of destinations that are not listed in the Country Chart contained in supplement no. 1 to part 738. If your destination is not listed on the Country Chart and such destination is a territory, possession, dependency or department of a country included on the Country Chart, the EAR accords your destination the same licensing treatment as the country of which it is a territory, possession, dependency or department. For example, if your destination is the Cayman Islands, a dependent territory of the United Kingdom, refer to the United Kingdom on the Country Chart for licensing requirements. In addition, if your destination is Liechtenstein, which serves as one territory with Switzerland for purposes of the EAR, refer to Switzerland on the Country Chart for licensing requirements.</P>
+<P>(c) <I>Columns.</I> Stretching out to the right are horizontal headers identifying the various Reasons for Control. Under each Reason for Control header are diagonal column identifiers capping individual columns. Each column identifier consists of the two letter Reason for Control and a column number. (e.g., CB Column 1). The column identifiers correspond to those listed in the &#x201C;Country Chart&#x201D; header within the &#x201C;License Requirements&#x201D; section of each ECCN.</P>
+<P>(d) <I>Cells.</I> The symbol &#x201C;X&#x201D; is used to denote licensing requirements on the Country Chart. If an &#x201C;X&#x201D; appears in a particular cell, transactions subject to that particular Reason for Control/Destination combination require a license. There is a direct correlation between the number of &#x201C;X&#x201D;s applicable to your transaction and the number of licensing reviews your application will undergo.</P>
+<CITA TYPE="N">[61 FR 12756, Mar. 25, 1996, as amended at 63 FR 42228, Aug. 7, 1998; 65 FR 55178, Sept. 13, 2000; 70 FR 8249, Feb. 18, 2005; 71 FR 67035, Nov. 20, 2006; 76 FR 54930, Sept. 6, 2011; 76 FR 70339, Nov. 14, 2011; 77 FR 39367, July 2, 2012; 78 FR 37382, June 20, 2013]
+</CITA>
+</DIV8>
+
+<DIV8 N="738.4" TYPE="SECTION" hierarchy_metadata="{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-15/section-738.4&quot;,&quot;citation&quot;:&quot;15 CFR 738.4&quot;}">
+<HEAD>&#xA7; 738.4 Determining whether a license is required.</HEAD>
+<P>(a) <I>Using the CCL and the Country Chart</I>&#x2014;(1) <I>Overview.</I> Once you have determined that your item is classified under a specific ECCN, you must use information contained in the &#x201C;License Requirements&#x201D; section of that ECCN in combination with the Country Chart to decide whether a license is required. Note that not all license requirements set forth under the &#x201C;License Requirements&#x201D; section of an ECCN refer you to the Commerce Country Chart, but in some cases this section will contain references to a specific section in the EAR for license requirements. In such cases, this section would not apply.</P>
+<P>(2) <I>License decision making process.</I> The following decision making process must be followed in order to determine whether a license is required to export or reexport a particular item to a specific destination:</P>
+<P>(i) <I>Examine the appropriate ECCN in the CCL.</I> Is the item you intend to export or reexport controlled for a single Reason for Control?</P>
+<P>(A) If yes, identify the single Reason for Control and the relevant Country Chart column identifier (e.g., CB Column 1).</P>
+<P>(B) If no, identify the Country Chart column identifier for each applicable Reason for Control (e.g., NS Column 1, NP Column 1, etc.).</P>
+<P>(ii) <I>Review the Country Chart.</I> With each of the applicable Country Chart Column identifiers noted, turn to the Country Chart (supplement no. 1 to part 738). Locate the correct Country Chart column identifier on the diagonal headings, and determine whether an &#x201C;X&#x201D; is marked in the cell next to the country in question for each Country Chart column identified in the applicable ECCN. If your item is subject to more than one reason for control, repeat this step using each unique Country Chart column identifier.</P>
+<P>(A) If yes, a license application must be submitted based on the particular reason for control and destination, unless a License Exception applies. If &#x201C;Yes&#x201D; is noted next to any of the listed License Exceptions, you should consult part 740 of the EAR to determine whether you can use any of the available ECCN-driven License Exceptions to effect your shipment, rather than applying for a license. Each affirmative license requirement must be overcome by a License Exception. If you are unable to qualify for a License Exception based on each license requirement noted on the Country Chart, you must apply for a license. Note that other License Exceptions, not related to the CCL, may also apply to your transaction (See part 740 of the EAR).</P>
+<P>(B) If no, a license is not required based on the particular Reason for Control and destination. Provided that General Prohibitions Four through Ten do not apply to your proposed transaction and the License Requirement section does not refer you to any other part of the EAR to determine license requirements. For example, any applicable encryption classification requirements described in &#xA7; 740.17(b) of the EAR must be met for certain mass market encryption items to affect your shipment using the symbol &#x201C;NLR.&#x201D; Proceed to parts 758 and 762 of the EAR for information on export clearance procedures and recordkeeping requirements. Note that although you may stop after determining a license is required based on the first Reason for Control, it is best to work through each applicable Reason for Control. A full analysis of every possible licensing requirement based on each applicable Reason for Control is required to determine the most advantageous License Exception available for your particular transaction and, if a license is required, ascertain the scope of review conducted by BIS on your license application.</P>
+<P>(b) <I>Sample analysis using the CCL and Country Chart</I>&#x2014;(1) <I>Scope.</I> The following sample entry and related analysis is provided to illustrate the type of thought process you must complete in order to determine whether a license is required to export or reexport a particular item to a specific destination using the CCL in combination with the Country Chart.</P>
+<P>(2) Sample CCL entry.</P>
+<EXTRACT>
+<FP-2><B>2A000: Entry heading.</B>
+</FP-2>
+<FP-1><E T="04">License Requirements</E>
+</FP-1>
+<FP-1><I>Reason for Control:</I> NS, NP, AT
+</FP-1>
+<DIV width="100%"><DIV class="gpotbl_div">
+<TABLE border="1" cellpadding="1" cellspacing="1" class="gpo_table" frame="void" width="100%">
+<THEAD>
+<TR>
+<TH class="center border-top-single border-bottom-single border-right-single"><E T="03">Control(s)</E></TH>
+<TH class="center border-top-single border-bottom-single"><E T="03">Country chart</E><br/><E T="03">(see Supp. No. 1 to part 738)</E>
+</TH>
+</TR>
+</THEAD>
+<TBODY>
+<TR>
+<TD class="left border-right-single">NS applies to entire entry</TD>
+<TD class="left">NS Column 2.
+</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">NP applies to 2A000.b entire entry</TD>
+<TD class="left">NP Column 1.
+</TD>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">AT applies to entire entry</TD>
+<TD class="left border-bottom-single">AT Column 1.</TD>
+</TR>
+</TBODY>
+</TABLE>
+</DIV></DIV>
+<FP-1><E T="05">List Based License Exceptions (See Part 740 for a Description of all License Exceptions)</E>
+</FP-1>
+<FP-1><I>LVS:</I> $5,000
+</FP-1>
+<FP-1><I>GBS:</I> Yes
+</FP-1>
+<FP-1><E T="04">List of Items Controlled</E>
+</FP-1>
+<FP-1><I>Related Definition:</I> N/A
+</FP-1>
+<FP-1><I>Related Controls:</I> N/A
+</FP-1>
+<FP><I>Items:</I>
+</FP>
+<P>a. Having x.</P>
+<P>b. Having z.</P></EXTRACT>
+<P>(3) <I>Sample analysis.</I> After consulting the CCL, I determine my item, valued at $10,000, is classified under ECCN 2A000.a. I read that the entire entry is controlled for national security, and anti-terrorism reasons. Because my item is classified under paragraph .a, and not .b, I understand that though nuclear nonproliferation controls apply to a portion of the entry, they do not apply to my item. I note that the appropriate Country Chart column identifiers are NS Column 2 and AT Column 1. Turning to the Country Chart, I locate my specific destination, Chad, and see that an &#x201C;X&#x201D; appears in the NS Column 2 cell for Chad, but not in the AT Column 1 cell. I understand that a license is required, unless my transaction qualifies for a License Exception. From the License Exception LVS value listed in the entry, I know immediately that my proposed transaction exceeds the value limitation associated with LVS. Noting that License Exception GBS is &#x201C;Yes&#x201D; for this entry, I turn to part 740 of the EAR to review the provisions related to use of GBS.</P>
+<CITA TYPE="N">[61 FR 12756, Mar. 25, 1996, as amended at 67 FR 38861, June 6, 2002; 70 FR 54628, Sept. 16, 2005; 73 FR 57503, Oct. 3, 2008; 74 FR 52883, Oct. 15, 2009; 75 FR 36490, June 25, 2010; 78 FR 61901, Oct. 4, 2013; 79 FR 32623, June 5, 2014; 81 FR 64668, Sept. 20, 2016; 83 FR 38020, Aug. 3, 2018; 86 FR 54811, Oct. 5, 2021]
+</CITA>
+</DIV8>
+
+<DIV9 N="Supplement No. 1 to Part 738" TYPE="APPENDIX" hierarchy_metadata="{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-15/part-738/appendix-Supplement No. 1 to Part 738&quot;,&quot;citation&quot;:&quot;Supplement No. 1 to Part 738, Title 15&quot;}">
+<HEAD>Supplement No. 1 to Part 738&#x2014;Commerce Country Chart
+</HEAD>
+<DIV width="100%"><DIV class="gpotbl_div">
+<TABLE border="1" cellpadding="1" cellspacing="1" class="gpo_table" frame="void" width="100%">
+<CAPTION><P class="headnote">[Reason for control]</P></CAPTION>
+<THEAD>
+<TR>
+<TH rowspan="2" class="center border-top-single border-bottom-single border-right-single">Countries</TH>
+<TH colspan="3" class="center border-top-single border-bottom-single border-right-single">Chemical and
+<br/>biological weapons</TH>
+<TH colspan="2" class="center border-top-single border-bottom-single border-right-single">Nuclear<br/>nonproliferation</TH>
+<TH colspan="2" class="center border-top-single border-bottom-single border-right-single">National<br/>security</TH>
+<TH class="center border-top-single border-bottom-single border-right-single">Missile tech</TH>
+<TH colspan="2" class="center border-top-single border-bottom-single border-right-single">Regional<br/>stability</TH>
+<TH class="center border-top-single border-bottom-single border-right-single">Firearms<br/>convention</TH>
+<TH colspan="3" class="center border-top-single border-bottom-single border-right-single">Crime<br/>control</TH>
+<TH colspan="2" class="center border-top-single border-bottom-single">Anti-<br/>terrorism</TH>
+</TR>
+<TR>
+<TH class="center border-bottom-single border-right-single">CB 1</TH>
+<TH class="center border-bottom-single border-right-single">CB 2</TH>
+<TH class="center border-bottom-single border-right-single">CB 3</TH>
+<TH class="center border-bottom-single border-right-single">NP 1</TH>
+<TH class="center border-bottom-single border-right-single">NP 2</TH>
+<TH class="center border-bottom-single border-right-single">NS 1</TH>
+<TH class="center border-bottom-single border-right-single">NS 2</TH>
+<TH class="center border-bottom-single border-right-single">MT 1</TH>
+<TH class="center border-bottom-single border-right-single">RS 1</TH>
+<TH class="center border-bottom-single border-right-single">RS 2</TH>
+<TH class="center border-bottom-single border-right-single">FC 1</TH>
+<TH class="center border-bottom-single border-right-single">CC 1</TH>
+<TH class="center border-bottom-single border-right-single">CC 2</TH>
+<TH class="center border-bottom-single border-right-single">CC 3</TH>
+<TH class="center border-bottom-single border-right-single">AT 1</TH>
+<TH class="center border-bottom-single">AT 2</TH>
+</TR>
+</THEAD>
+<TBODY>
+<TR>
+<TD class="left border-right-single">Afghanistan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Albania <sup>2</sup> <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Algeria</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Andorra</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Angola</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Antigua and Barbuda</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Argentina</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Armenia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Aruba</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Australia <sup>10</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Austria <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Azerbaijan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bahamas, The</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bahrain</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bangladesh</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Barbados</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Belarus <sup>6</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Belgium <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Belize</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Benin</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bhutan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bolivia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bosnia and Herzegovina</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Botswana</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Brazil</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Brunei</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Bulgaria <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Burkina Faso</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Burma</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Burundi</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Cambodia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Cameroon</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Canada</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Cape Verde</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Central African Republic</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Chad</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Chile</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">China</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Colombia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Comoros</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Congo (Democratic Republic of the) <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Congo (Republic of the)</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Costa Rica</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Cote d'Ivoire</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Croatia <sup>3</sup></TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Cuba</TD>
+<TD colspan="16" class="center border-bottom-single">See part 746 of the EAR to determine whether a license is required in order to export or reexport to this destination.</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">Cura&#xE7;ao</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Cyprus <sup>2</sup> <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Czech Republic <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Denmark <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Djibouti</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Dominica</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Dominican Republic</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Ecuador</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Egypt</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">El Salvador</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Equatorial Guinea</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Eritrea <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Estonia <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Eswatini</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Ethiopia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Fiji</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Finland <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">France <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Gabon</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Gambia, The</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Georgia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Germany <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Ghana</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Greece <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Grenada</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Guatemala</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Guinea</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Guinea-Bissau</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Guyana</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Haiti</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Honduras</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Hungary <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Iceland <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">India <sup>7</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Indonesia</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Iran <sup>1</sup></TD>
+<TD colspan="16" class="center border-bottom-single">See part 746 of the EAR to determine whether a license is required in order to export or reexport to this destination.</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">Iraq <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Ireland <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Israel</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Italy <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Jamaica</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Japan <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Jordan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Kazakhstan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Kenya</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Kiribati</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Korea, North <sup>1</sup></TD>
+<TD colspan="16" class="center border-bottom-single">See Sections 742.19 and 746.4 of the EAR to determine whether a license is required in order to export or reexport to this destination.</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">Korea, South <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Kosovo</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Kuwait</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Kyrgyzstan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Laos</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Latvia <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Lebanon <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Lesotho</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Liberia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Libya <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Liechtenstein <sup>5</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Lithuania <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Luxembourg <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Macau</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Madagascar</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Malawi</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Malaysia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Maldives</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mali</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Malta <sup>2</sup> <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Marshall Islands</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mauritania</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mauritius</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mexico</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Micronesia (Federated State of)</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Moldova</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Monaco</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mongolia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Montenegro</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Morocco</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Mozambique</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Namibia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Nauru</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Nepal</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Netherlands <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">New Zealand <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Nicaragua</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Niger</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Nigeria</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">North Macedonia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Norway <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Oman</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Pakistan <sup>8</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Palau</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Panama</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Papua New Guinea</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Paraguay</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Peru</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Philippines</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Poland <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Portugal <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Qatar</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Romania <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Russia <sup>6</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Rwanda</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">St. Kitts and Nevis</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">St. Lucia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">St. Vincent and the Grenadines</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Samoa</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">San Marino</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sao Tome and Principe</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Saudi Arabia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Senegal</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Serbia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Seycheles</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sierra Leone</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Singapore</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sint Maarten (the Dutch two-fifths of the island of Saint Martin)</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Slovakia <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Slovenia <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Solomon Islands</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Somalia <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">South Africa <sup>2</sup> <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">South Sudan, Republic of</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Spain <sup>3</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sri Lanka</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sudan <sup>1</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Suriname</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Sweden <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Switzerland <sup>3</sup> <sup>4</sup></TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Syria</TD>
+<TD colspan="16" class="center border-bottom-single">See &#xA7; 746.9 of the EAR to determine whether a license is required in order to export or reexport to this destination.</TD>
+</TR>
+<TR>
+<TD class="left border-right-single">Taiwan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Tajikistan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Tanzania</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Thailand</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Timor-Leste</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Togo</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Tonga</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Trinidad and Tobago</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Tunisia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">T&#xFC;rkiye</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Turkmenistan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Tuvalu</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Uganda</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Ukraine <sup>9</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">United Arab Emirates</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">United Kingdom <sup>10</sup></TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Uruguay</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Uzbekistan</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Vanuatu</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Vatican City</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Venezuela</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Vietnam</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Western Sahara</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Yemen</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-right-single">Zambia</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="left border-right-single">X</TD>
+<TD class="left border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center border-right-single">X</TD>
+<TD class="center border-right-single"/>
+<TD class="center"/>
+</TR>
+<TR>
+<TD class="left border-bottom-single border-right-single">Zimbabwe</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single">X</TD>
+<TD class="left border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single border-right-single">X</TD>
+<TD class="center border-bottom-single border-right-single"/>
+<TD class="center border-bottom-single"/>
+</TR>
+</TBODY>
+<TFOOT><TR><TD colspan="17"><sup>1</sup> See &#xA7; 746.1(b) for United Nations Security Council Sanctions under the EAR. See &#xA7; 746.3 for United Nations Security Council-related license requirements for exports and reexports to Iraq or transfer within Iraq under the EAR, as well as regional stability licensing requirements not included in the Country Chart.
+</TD></TR><TR><TD colspan="17"><sup>2</sup> See &#xA7; 742.4(a) for special provisions that apply to exports and reexports to these countries of certain thermal imaging cameras.
+</TD></TR><TR><TD colspan="17"><sup>3</sup> See &#xA7; 742.6(a)(3) for special provisions that apply to military commodities that are subject to ECCN 0A919.
+</TD></TR><TR><TD colspan="17"><sup>4</sup> See &#xA7; 742.6(a)(2) and (4)(ii) regarding special provisions for exports and reexports of certain thermal imaging cameras to these countries.
+</TD></TR><TR><TD colspan="17"><sup>5</sup> Refer to Switzerland for licensing requirements for Liechtenstein under the EAR.
+</TD></TR><TR><TD colspan="17"><sup>6</sup> See &#xA7; 746.5 of the EAR for additional license requirements under the Russian Industry Sector Sanctions for ECCNs 0A998, 1C992, 3A229, 3A231, 3A232, 6A991, 8A992, and 8D999 and items identified in supplement no. 2 to part 746 of the EAR. See &#xA7; 746.8 of the EAR for Sanctions against Russia and Belarus, including additional license requirements for items listed in any ECCN on the CCL.
+</TD></TR><TR><TD colspan="17"><sup>7</sup> Note that a license is still required for items controlled under ECCNs 6A003.b.4.b and 9A515.e for RS column 2 reasons when destined to India.
+</TD></TR><TR><TD colspan="17"><sup>8</sup> See &#xA7; 746.6 of the EAR for additional license requirements for exports and reexports to the Crimea region of Ukraine and the so-called Donetsk People's Republic (DNR) and Luhansk People's Republic (LNR) regions of Ukraine and transfers (in-country) within the Crimea, DNR, and LNR regions of Ukraine for all items subject to the EAR, other than food and medicine designated as EAR99 and certain EAR99 or ECCN 5D992.c software for internet-based communications.
+</TD></TR><TR><TD colspan="17"><sup>9</sup> See &#xA7; 746.6 of the EAR for additional license requirements for exports and reexports to the Crimea region of Ukraine and the so-called Donetsk People's Republic (DNR) and Luhansk People's Republic (LNR) regions of Ukraine and transfers (in-country) within the Crimea, DNR, and LNR regions of Ukraine for all items subject to the EAR, other than food and medicine designated as EAR99 and certain EAR99 or ECCN 5D992.c software for internet-based communications.
+</TD></TR><TR><TD colspan="17"><sup>10</sup> A license is required to these destinations for items in the following ECCNs: 0A501 (except for 0A501.y), 0A502 for shotguns with a barrel length less than 18 inches (45.72 cm), 0A504.i, 0A505.a and .x, 0A506, 0A507, 0A508 for semi-automatic shotguns with a barrel length less than 18 inches (45.72 cm), 0A509, 0D501 (except for &#x201C;software&#x201D; for commodities in ECCN 0A501.y or &#x201C;equipment&#x201D; in ECCN 0B501 for commodities in ECCN 0A501.y), 0D505 for &#x201C;software&#x201D; for commodities in ECCN 0A505.a and .x and &#x201C;equipment&#x201D; in ECCN 0B505.a and .x, 0E501, 0E504, 0E505 for &#x201C;technology&#x201D; for &#x201C;development,&#x201D; &#x201C;production,&#x201D; operation, installation, maintenance, repair, overhaul, or refurbishing commodities in 0A505.a and .x; for &#x201C;equipment&#x201D; for those commodities in 0B505; and for &#x201C;software&#x201D; for that &#x201C;equipment&#x201D; and those commodities in 0D505.
+</TD></TR></TFOOT></TABLE>
+</DIV></DIV>
+<CITA TYPE="N">[90 FR 47189, Sept. 30, 2025]
+</CITA>
+</DIV9>
+
+</DIV5>
