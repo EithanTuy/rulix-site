@@ -139,6 +139,124 @@ const TRUST_POINTS = [
   }
 ];
 
+/* Both documents below describe what the software actually does, sourced from
+   docs/security-auth-storage.md, docs/product-safety.md and the egress gateway.
+   They are drafts on purpose: everything here is observable behaviour, and the
+   sections a lawyer has to write are listed as open rather than invented. */
+interface LegalSection {
+  heading: string;
+  points: string[];
+}
+
+interface LegalDocument {
+  title: string;
+  intro: string;
+  updated: string;
+  sections: LegalSection[];
+  open: string[];
+}
+
+const PRIVACY_DOCUMENT: LegalDocument = {
+  title: "Privacy and data handling.",
+  intro:
+    "What this site collects, what the application stores, how long it is kept, and what leaves the deployment. Written from the behaviour of the software rather than from a template.",
+  updated: "30 July 2026",
+  sections: [
+    {
+      heading: "This website",
+      points: [
+        "rulix.cloud is a set of static pages. It runs no analytics, no tracking pixels, and no third-party scripts, and it sets no cookies.",
+        "One value is written to your browser's local storage to remember a light or dark preference. It stays on your device and is never sent anywhere.",
+        "There is no form on this site. The contact link opens your own mail client, so nothing reaches Rulix until you send the message yourself.",
+        "The pages are delivered by a content delivery network, which handles ordinary request metadata such as IP address and user agent in order to serve them."
+      ]
+    },
+    {
+      heading: "The reviewer application",
+      points: [
+        "Access is invite-only. An administrator issues an invite and the invitee sets a password from a single-use link; public self-registration is refused outright.",
+        "A workspace holds review memos, decisions, analysis results, chat history, and audit events, stored per tenant and user key.",
+        "Records live in DynamoDB tables with KMS encryption and point-in-time recovery. Larger documents and exports are held in object storage with tenant-scoped keys."
+      ]
+    },
+    {
+      heading: "Credentials and sessions",
+      points: [
+        "Passwords are salted and hashed server-side with PBKDF2-SHA256, and must be at least 12 characters using three of four character classes.",
+        "Invite, password-reset, and session tokens are never stored in their raw form. Only SHA-256 hashes are persisted.",
+        "Session cookies are httpOnly and sameSite=strict, and are marked secure in production. Mutating requests additionally require a CSRF token.",
+        "Sessions expire after 8 hours by default, invites after 72 hours, and reset links after 30 minutes. Reset links are single use, and completing one invalidates every older session. Six failed sign-ins lock an account for 10 minutes."
+      ]
+    },
+    {
+      heading: "What is sent to a model provider",
+      points: [
+        "Analysis runs on Amazon Bedrock. The memo text and the review artifacts a run needs are what get sent.",
+        "Every call passes through a deployment-owned egress gateway that pins the provider, the region, and the data class. A request body cannot widen that lane, and controlled data cannot be routed to an unapproved one.",
+        "No model output is ever final. A named human reviewer signs off, and nothing is recorded as approved or compliant without that signature."
+      ]
+    },
+    {
+      heading: "How long things are kept",
+      points: [
+        "Sessions, invites, reset tokens, and lockouts expire on their own through a time-to-live on the record.",
+        "Review content does not currently expire. A memo, its analysis, and its decision record stay in the workspace until someone deletes them.",
+        "A retention schedule for review content is a decision for your organization, and the product does not yet make it configurable. Treat that as a gap rather than a policy."
+      ]
+    }
+  ],
+  open: [
+    "the legal basis for processing, and the controller and processor roles",
+    "how to exercise access, correction, export, and deletion rights",
+    "the mechanism relied on for any transfer of data between regions",
+    "a named list of sub-processors",
+    "breach notification commitments and their timings",
+    "a data processing agreement for customers who need one"
+  ]
+};
+
+const TERMS_DOCUMENT: LegalDocument = {
+  title: "Terms of use.",
+  intro:
+    "The limits of what Rulix does, who it is built for, and what stays your responsibility. Written from the product's own safety rules rather than from a template.",
+  updated: "30 July 2026",
+  sections: [
+    {
+      heading: "What Rulix does, and does not do",
+      points: [
+        "Rulix supports a review. It does not make legal determinations and does not replace qualified judgment.",
+        "The software may recommend an ECCN, an EAR99 path, or a jurisdiction escalation. Only a named human reviewer can finalize the record.",
+        "Nothing is labelled approved, compliant, license-not-required, or legally final without human signoff.",
+        "Classification is kept separate from transaction and license analysis. An ECCN alone does not answer end-use, end-user, destination, sanctions, or red-flag questions, and ITAR or USML risk has to be resolved before relying on an EAR or CCL classification.",
+        "Unsupported model claims are treated as findings, not facts. A claim whose citation is not in the downloaded corpus is blocked or flagged."
+      ]
+    },
+    {
+      heading: "Who it is for",
+      points: [
+        "Export-control officers, research compliance teams, technology-transfer offices, counsel-supported reviewers, lab program managers, and national-lab compliance staff.",
+        "Rulix is not offered as unsupervised self-service classification for untrained researchers."
+      ]
+    },
+    {
+      heading: "Your responsibilities",
+      points: [
+        "Share only information your organization has approved for the workspace.",
+        "Invites and credentials are workspace access. Keep them with the people who are meant to have them.",
+        "The reviewer who signs a decision owns that decision. The record exists so it can be explained later, not so it can be delegated."
+      ]
+    }
+  ],
+  open: [
+    "governing law and the forum for disputes",
+    "warranty, liability, and indemnity",
+    "fees, billing, and termination",
+    "service level and availability commitments",
+    "acceptable use, and what happens when it is breached",
+    "intellectual property and the licence granted over submitted content"
+  ]
+};
+
 export interface HeaderVisibilityInput {
   previousY: number;
   currentY: number;
@@ -307,6 +425,10 @@ function renderMarketingPage(page: MarketingPageMeta) {
       return <TrustPage />;
     case "contact":
       return <ContactPage />;
+    case "privacy":
+      return <LegalPage document={PRIVACY_DOCUMENT} />;
+    case "terms":
+      return <LegalPage document={TERMS_DOCUMENT} />;
     default:
       return <HomePage />;
   }
@@ -555,6 +677,54 @@ function ContactPage() {
   );
 }
 
+function LegalPage({ document: doc }: { document: LegalDocument }) {
+  return (
+    <section className="legal-page">
+      <div className="rulix-shell legal-page__inner">
+        <header className="legal-page__head">
+          <h1>{doc.title}</h1>
+          <p>{doc.intro}</p>
+          <p className="legal-page__status">
+            Draft, last revised {doc.updated}. It describes how the software behaves today and has not
+            been reviewed by counsel, so it is not a contract and not legal advice.
+          </p>
+        </header>
+
+        {doc.sections.map((section) => (
+          <section className="legal-section" key={section.heading}>
+            <h2>{section.heading}</h2>
+            <ul>
+              {section.points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
+
+        <section className="legal-section legal-section--open">
+          <h2>Still to be written</h2>
+          <p>
+            These need a lawyer rather than a reading of the source, so they are listed here instead of
+            being guessed at:
+          </p>
+          <ul>
+            {doc.open.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+
+        <p className="legal-page__contact">
+          Questions about any of this, or a document your organization needs before it can proceed:
+        </p>
+        <EmailAction href={CONTACT_EMAIL_HREF}>
+          <span>{CONTACT_EMAIL}</span>
+        </EmailAction>
+      </div>
+    </section>
+  );
+}
+
 function PageHero({
   title,
   copy
@@ -595,8 +765,12 @@ function SiteFooter() {
       <div className="rulix-shell rulix-footer__inner">
         <BrandLogo tone="light" size="compact" />
         <p>AI-assisted export classification with human review.</p>
+        <nav className="rulix-footer__legal" aria-label="Site policies">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+        </nav>
         <small>© 2026 Rulix</small>
-        <a href="https://app.rulix.cloud">Sign in</a>
+        <a className="rulix-footer__signin" href="https://app.rulix.cloud">Sign in</a>
       </div>
     </footer>
   );

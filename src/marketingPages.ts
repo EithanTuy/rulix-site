@@ -1,4 +1,4 @@
-export type MarketingPageKind = "home" | "product" | "use-cases" | "trust" | "contact";
+export type MarketingPageKind = "home" | "product" | "use-cases" | "trust" | "contact" | "privacy" | "terms";
 
 export type MarketingAudience = "officers" | "industry" | "research";
 
@@ -63,6 +63,22 @@ export const MARKETING_SITE_PAGES: ReadonlyArray<MarketingPageMeta> = [
     description:
       "Email Rulix to talk about an export classification or memo review workflow.",
     pageKind: "contact"
+  },
+  {
+    key: "privacy",
+    path: "/privacy",
+    title: "Privacy and data handling | Rulix",
+    description:
+      "What Rulix stores, where it is stored, how long it is kept, and what is sent to a model provider.",
+    pageKind: "privacy"
+  },
+  {
+    key: "terms",
+    path: "/terms",
+    title: "Terms of use | Rulix",
+    description:
+      "The terms that apply to Rulix, including the limits of AI assistance and the requirement for qualified human review.",
+    pageKind: "terms"
   },
   {
     key: "site",
