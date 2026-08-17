@@ -11,7 +11,6 @@ import {
 } from "react";
 import {
   ArrowRight,
-  Check,
   FileCheck2,
   FileSearch,
   GitBranch,
@@ -62,7 +61,7 @@ const PRODUCT_STEPS = [
   {
     title: "Add the memo",
     copy: "Upload or paste the draft classification memo and the facts the reviewer already has.",
-    detail: "Rulix keeps the memo in view so the review starts with your work—not a blank chat window.",
+    detail: "Rulix keeps the memo in view, so the review starts with your work rather than a blank chat window.",
   },
   {
     title: "See what is missing",
@@ -199,7 +198,7 @@ export function MarketingSite() {
 }
 
 /* Marketing is five static pages in one already-loaded bundle, so a plain
-   anchor was paying a full document reload — reparse, remount, refetch — to
+   anchor was paying a full document reload (reparse, remount, refetch) to
    swap a heading and a list. Same markup and same URLs; the click is just
    intercepted and answered from memory. Anything the browser should still
    handle itself (new tab, modifier click, mailto, app subdomain) falls
@@ -533,10 +532,9 @@ function TrustPage() {
               );
             })}
           </div>
-          <div className="data-boundary">
-            <Check size={20} aria-hidden="true" />
-            <p>Only share information your organization has approved for this workspace.</p>
-          </div>
+          <p className="data-boundary">
+            Only share information your organization has approved for this workspace.
+          </p>
         </div>
       </section>
     </>
@@ -647,7 +645,7 @@ function productHeroForPage(key: string) {
       };
     case "ai-export-compliance-review":
       return {
-        title: "Use AI assistance to find the gap—not make the final call.",
+        title: "Use AI assistance to find the gap, not to make the final call.",
         copy: "Rulix organizes missing support and reviewer questions while qualified people remain responsible for the decision."
       };
     default:
