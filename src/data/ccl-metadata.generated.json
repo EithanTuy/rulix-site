@@ -1,10 +1,10 @@
 {
   "schemaVersion": "rulix.ccl-index/v3",
-  "snapshotId": "ecfr-ccl-2026-07-30-a1bd7cb24965",
-  "checksum": "fb79dddc8d4a4e6e28d4a7f83f0df113670025462d61677f82684c8679c2ee96",
-  "pointInTimeDate": "2026-07-30",
-  "effectiveAt": "2026-07-23",
-  "currentThrough": "2026-07-30",
+  "snapshotId": "ecfr-ccl-2026-10-13-c60be9cd7da5",
+  "checksum": "d7c2c548e7d2a2fc866509ccf57b9c43cd2ba2b43affd4f51c225568d5f0ed17",
+  "pointInTimeDate": "2026-10-13",
+  "effectiveAt": "2026-08-28",
+  "currentThrough": "2026-10-13",
   "entryCount": 637,
   "reviewStatus": "pending_review"
 }
