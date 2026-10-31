@@ -669,6 +669,7 @@ function ContactPage() {
       <div className="rulix-shell contact-page__inner glass glass--pane">
         <h1>Talk with us about your classification workflow.</h1>
         <p>Tell us where the review slows down. We’ll reply by email and help you decide whether Rulix fits the work.</p>
+        <p>Co-founders: Pranav and Eithan.</p>
         <EmailAction className="contact-email" href={CONTACT_EMAIL_HREF}>
           <span>{CONTACT_EMAIL}</span>
         </EmailAction>
